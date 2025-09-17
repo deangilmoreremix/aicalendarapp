@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Filter, Search, LayoutGrid, List, Activity, BarChart3, Columns, Moon, Sun, Brain } from 'lucide-react';
+import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain } from 'lucide-react';
 import { BigTaskCalendar } from './components/BigTaskCalendar';
 import { TaskKanbanBoard } from './components/TaskKanbanBoard';
 import { ActivityFeed } from './components/ActivityFeed';
@@ -7,9 +7,9 @@ import RecentActivity from './components/RecentActivity';
 import TaskStats from './components/TaskStats';
 import { useTheme } from './contexts/ThemeContext';
 import { useAI } from './contexts/AIContext';
-import { useAppointmentStore } from './store/appointmentStore';
-import { Task, TaskFilters, Appointment } from './types/task';
+import { Task, TaskFilters } from './types';
 import { useTaskStore } from './store/taskStore';
+import { useContactStore } from './store/contactStore';
 import { formatDate, getPriorityColor, getCategoryColor } from './utils';
 import { InteractiveContactScorer } from './components/InteractiveContactScorer';
 import { TasksAndFunnel } from './components/TasksAndFunnel';
@@ -18,18 +18,21 @@ import { QuickActions } from './components/QuickActions';
 import { CustomerProfile } from './components/CustomerProfile';
 import { ContactsModal } from './components/ContactsModal';
 import { NewContactModal } from './components/NewContactModal';
+import { TaskDetailsModal } from './components/TaskDetailsModal';
 
 const App: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
   const { insights, generateInsights } = useAI();
   const { tasks, markTaskComplete } = useTaskStore();
-  const { appointments } = useAppointmentStore();
+  const { contacts } = useContactStore();
   const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity'>('calendar');
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<TaskFilters>({});
   const [showContactsModal, setShowContactsModal] = useState(false);
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
 
   const TaskListView: React.FC = () => {
     const filteredTasks = Object.values(tasks).filter(task => {
@@ -112,7 +115,10 @@ const App: React.FC = () => {
           {filteredTasks.map(task => (
             <div
               key={task.id}
-              onClick={() => {}}
+              onClick={() => {
+                setSelectedTask(task);
+                setShowTaskDetailsModal(true);
+              }}
               className={`p-4 cursor-pointer transition-colors ${
                 isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
               }`}
@@ -187,7 +193,7 @@ const App: React.FC = () => {
 
   const handleGenerateInsights = async () => {
     try {
-      await generateInsights(Object.values(tasks));
+      await generateInsights(Object.values(contacts));
     } catch (error) {
       console.error('Failed to generate insights:', error);
     }
@@ -388,6 +394,18 @@ const App: React.FC = () => {
         isOpen={showNewContactModal}
         onClose={() => setShowNewContactModal(false)}
       />
+
+      {/* Task Details Modal */}
+      {selectedTask && (
+        <TaskDetailsModal
+          task={selectedTask}
+          isOpen={showTaskDetailsModal}
+          onClose={() => {
+            setShowTaskDetailsModal(false);
+            setSelectedTask(null);
+          }}
+        />
+      )}
     </div>
   );
 };

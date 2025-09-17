@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { 
-  Plus, 
-  Calendar, 
-  User, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Plus,
+  Calendar,
+  User,
+  AlertCircle,
+  CheckCircle2,
   Clock,
   MessageSquare,
   Paperclip,
@@ -17,11 +17,12 @@ import {
   Brain,
   Sparkles,
   Target,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { useAI } from '../contexts/AIContext';
-import { Task } from '../types/task';
+import { Task } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {

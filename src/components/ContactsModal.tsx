@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAI } from '../../contexts/AIContext';
-import { AvatarWithStatus } from '../ui/AvatarWithStatus';
+import { useAI } from '../contexts/AIContext';
+import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { ContactDetailView } from './ContactDetailView';
 import { ImportContactsModal } from './ImportContactsModal';
 import { NewContactModal } from './NewContactModal';
-import { useContactStore } from '../../store/contactStore';
-import { Contact } from '../../types';
-import { AIEnhancedContactCard } from '../contacts/AIEnhancedContactCard';
-import { DarkModeToggle } from '../ui/DarkModeToggle';
+import { useContactStore } from '../store/contactStore';
+import { Contact } from '../types';
+import { AIEnhancedContactCard } from './contacts/AIEnhancedContactCard';
+import { DarkModeToggle } from './ui/DarkModeToggle';
 import Fuse from 'fuse.js';
 import { 
   X, 
@@ -113,13 +113,16 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
 
+  // Convert contacts object to array for Fuse.js
+  const contactsArray = useMemo(() => Object.values(contacts), [contacts]);
+
   // Initialize Fuse.js for fuzzy search
   const fuse = useMemo(() => {
-    return new Fuse(contacts, {
+    return new Fuse(contactsArray, {
       keys: ['name', 'company', 'title', 'email', 'industry'],
       threshold: 0.3,
     });
-  }, [contacts]);
+  }, [contactsArray]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -150,40 +153,40 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
 
   // Filter and search contacts
   const filteredContacts = useMemo(() => {
-    let result = contacts;
+    let result = contactsArray;
 
     // Apply search
     if (searchTerm.trim()) {
       const searchResults = fuse.search(searchTerm);
-      result = searchResults.map(result => result.item);
+      result = searchResults.map(searchResult => searchResult.item);
     }
 
     // Apply interest level filter
     if (activeFilter !== 'all') {
-      result = result.filter(contact => contact.interestLevel === activeFilter);
+      result = result.filter((contact: Contact) => contact.interestLevel === activeFilter);
     }
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      result = result.filter(contact => contact.status === statusFilter);
+      result = result.filter((contact: Contact) => contact.status === statusFilter);
     }
 
     // Apply AI-based smart filters
     if (aiFilterMode !== 'all') {
       switch (aiFilterMode) {
         case 'high-score':
-          result = result.filter(contact => (contact.aiScore || 0) >= 80);
+          result = result.filter((contact: Contact) => (contact.aiScore || 0) >= 80);
           break;
         case 'needs-attention':
-          result = result.filter(contact => 
-            (contact.aiScore || 0) < 60 || 
+          result = result.filter((contact: Contact) =>
+            (contact.aiScore || 0) < 60 ||
             contact.interestLevel === 'cold' ||
             (contact.updatedAt && new Date().getTime() - contact.updatedAt.getTime() > 7 * 24 * 60 * 60 * 1000)
           );
           break;
         case 'opportunities':
-          result = result.filter(contact => 
-            (contact.aiScore || 0) >= 70 && 
+          result = result.filter((contact: Contact) =>
+            (contact.aiScore || 0) >= 70 &&
             contact.interestLevel !== 'cold' &&
             contact.status !== 'customer'
           );
@@ -192,9 +195,9 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     }
 
     // Apply sorting
-    result.sort((a, b) => {
+    result.sort((a: Contact, b: Contact) => {
       let aValue: any, bValue: any;
-      
+
       switch (sortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -222,7 +225,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     });
 
     return result;
-  }, [contacts, searchTerm, activeFilter, statusFilter, sortBy, sortOrder, fuse]);
+  }, [contactsArray, searchTerm, activeFilter, statusFilter, sortBy, sortOrder, fuse, aiFilterMode]);
 
   // AI Analysis Functions
   const handleAnalyzeContact = async (contact: Contact) => {
@@ -243,7 +246,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   };
 
   const handleAnalyzeAll = async () => {
-    const contactsToAnalyze = filteredContacts.filter(c => !c.aiScore || c.aiScore === 0);
+    const contactsToAnalyze = filteredContacts.filter((c: Contact) => !c.aiScore || c.aiScore === 0);
     
     if (contactsToAnalyze.length === 0) {
       alert('All visible contacts already have AI scores. Use "Re-analyze Selected" to update existing scores.');
@@ -259,8 +262,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
       await scoreBulkContacts(contactsToAnalyze);
       
       // Generate smart insights after bulk analysis
-      const insights = await generateBulkInsights(contactsToAnalyze);
-      setSmartInsights(insights);
+      await generateBulkInsights(contactsToAnalyze);
+      setSmartInsights([]);
       
       setAiResults({ success: contactsToAnalyze.length, failed: 0 });
     } catch (error) {
@@ -283,7 +286,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     setAiResults(null);
 
     try {
-      const selectedContactObjects = contacts.filter(c => selectedContacts.includes(c.id));
+      const selectedContactObjects = contactsArray.filter((c: Contact) => selectedContacts.includes(c.id));
       await scoreBulkContacts(selectedContactObjects);
       setAiResults({ success: selectedContactObjects.length, failed: 0 });
     } catch (error) {
@@ -309,7 +312,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     if (selectedContacts.length === filteredContacts.length) {
       setSelectedContacts([]);
     } else {
-      setSelectedContacts(filteredContacts.map(c => c.id));
+      setSelectedContacts(filteredContacts.map((c: Contact) => c.id));
     }
   };
 
@@ -361,7 +364,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const handleExportContacts = () => {
     // Determine which contacts to export
     const contactsToExport = selectedContacts.length > 0
-      ? filteredContacts.filter(contact => selectedContacts.includes(contact.id))
+      ? filteredContacts.filter((contact: Contact) => selectedContacts.includes(contact.id))
       : filteredContacts;
     
     if (contactsToExport.length === 0) {
@@ -388,7 +391,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     ];
 
     // Convert contacts to CSV rows
-    const rows = contactsToExport.map(contact => {
+    const rows = contactsToExport.map((contact: Contact) => {
       return [
         contact.firstName,
         contact.lastName,
@@ -410,10 +413,10 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     // Create CSV content
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => 
+      ...rows.map((row: any[]) => row.map((cell: any) =>
         // Handle cells with commas by wrapping in quotes
-        typeof cell === 'string' && (cell.includes(',') || cell.includes('"') || cell.includes('\n')) 
-          ? `"${cell.replace(/"/g, '""')}"` 
+        typeof cell === 'string' && (cell.includes(',') || cell.includes('"') || cell.includes('\n'))
+          ? `"${cell.replace(/"/g, '""')}"`
           : cell
       ).join(','))
     ].join('\n');
@@ -435,7 +438,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
 
   const activeFilterLabel = filterOptions.find(f => f.value === activeFilter)?.label || 'All';
   const activeStatusLabel = statusOptions.find(f => f.value === statusFilter)?.label || 'All Status';
-  const contactsWithoutScores = filteredContacts.filter(c => !c.aiScore || c.aiScore === 0).length;
+  const contactsWithoutScores = filteredContacts.filter((c: Contact) => !c.aiScore || c.aiScore === 0).length;
 
   return (
     <>

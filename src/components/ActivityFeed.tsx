@@ -25,7 +25,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
-import { Activity } from '../types/task';
+import { Activity } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';

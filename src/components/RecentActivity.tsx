@@ -6,6 +6,9 @@ import { Calendar, CheckCircle, AlertCircle, TrendingUp, ArrowRight, Brain, Spar
 import Avatar from './ui/Avatar';
 import { getInitials } from '../utils/avatars';
 import { Contact } from '../types';
+import { DealDetailsModal } from './ui/DealDetailsModal';
+import { DealsManagementModal } from './ui/DealsManagementModal';
+import { AIInsightsDashboardModal } from './ui/AIInsightsDashboardModal';
 
 const RecentActivity: React.FC = () => {
   const { isDark } = useTheme();
@@ -14,6 +17,25 @@ const RecentActivity: React.FC = () => {
   const [aiAlerts, setAiAlerts] = useState<any[]>([]);
   const [dealPredictions, setDealPredictions] = useState<Record<string, number>>({});
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+
+  // Modal states
+  const [showDealDetailsModal, setShowDealDetailsModal] = useState(false);
+  const [showDealsManagementModal, setShowDealsManagementModal] = useState(false);
+  const [showAIInsightsModal, setShowAIInsightsModal] = useState(false);
+  const [selectedDealId, setSelectedDealId] = useState<number | undefined>();
+
+  const handleViewAllDeals = () => {
+    setShowDealsManagementModal(true);
+  };
+
+  const handleDealClick = (dealId: number) => {
+    setSelectedDealId(dealId);
+    setShowDealDetailsModal(true);
+  };
+
+  const handleViewAllInsights = () => {
+    setShowAIInsightsModal(true);
+  };
   
   // Load AI-driven insights and alerts
   useEffect(() => {
@@ -21,12 +43,13 @@ const RecentActivity: React.FC = () => {
   }, [contacts]);
 
   const loadAIInsights = async () => {
-    if (contacts.length === 0) return;
-    
+    const contactsArray = Object.values(contacts);
+    if (contactsArray.length === 0) return;
+
     setIsLoadingAI(true);
     try {
       // Generate AI insights for risk and opportunity detection
-      const insights = await generateInsights(contacts);
+      const insights = await generateInsights(contactsArray);
       setAiAlerts(insights);
       
       // Generate deal predictions for upcoming deals
@@ -251,6 +274,29 @@ const RecentActivity: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <DealDetailsModal
+        isOpen={showDealDetailsModal}
+        onClose={() => setShowDealDetailsModal(false)}
+        dealId={selectedDealId}
+      />
+
+      <DealsManagementModal
+        isOpen={showDealsManagementModal}
+        onClose={() => setShowDealsManagementModal(false)}
+        onDealClick={handleDealClick}
+        onNewDeal={() => {
+          setShowDealsManagementModal(false);
+          // Could open a new deal modal here
+          alert('New Deal Modal would open here');
+        }}
+      />
+
+      <AIInsightsDashboardModal
+        isOpen={showAIInsightsModal}
+        onClose={() => setShowAIInsightsModal(false)}
+      />
     </div>
   );
 };

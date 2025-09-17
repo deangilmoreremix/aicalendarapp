@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Contact } from '../types';
-import { useAI } from '../contexts/AIContext';
+import { Contact } from '../../types';
+import { useAI } from '../../contexts/AIContext';
 import { 
   User, 
   Building, 

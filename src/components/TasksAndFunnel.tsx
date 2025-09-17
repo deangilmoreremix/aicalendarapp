@@ -3,41 +3,45 @@ import { GlassCard } from './ui/GlassCard';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { useAI } from '../contexts/AIContext';
 import { ModernButton } from './ui/ModernButton';
-import { MoreHorizontal, ArrowRight, Calendar, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2 } from 'lucide-react';
+import { AddUserModal } from './ui/AddUserModal';
+import { MoreOptionsModal } from './ui/MoreOptionsModal';
+import { NavigationModal } from './ui/NavigationModal';
+import { AddTaskModal } from './ui/AddTaskModal';
+import { MoreHorizontal, ArrowRight, Calendar, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2, TrendingUp } from 'lucide-react';
 
 const taskData = [
-  { 
-    day: 'Mon', 
-    tasks: 2, 
+  {
+    day: 'Mon',
+    tasks: 2,
     assignees: [
       { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
       { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'inactive' }
     ]
   },
-  { 
-    day: 'Tue', 
-    tasks: 0, 
+  {
+    day: 'Tue',
+    tasks: 0,
     assignees: []
   },
-  { 
-    day: 'Wed', 
-    tasks: 3, 
+  {
+    day: 'Wed',
+    tasks: 3,
     assignees: [
       { id: '3', name: 'Darlene Robertson', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
       { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
       { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'pending' }
     ]
   },
-  { 
-    day: 'Thu', 
-    tasks: 1, 
+  {
+    day: 'Thu',
+    tasks: 1,
     assignees: [
       { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
     ]
   },
-  { 
-    day: 'Fri', 
-    tasks: 4, 
+  {
+    day: 'Fri',
+    tasks: 4,
     assignees: [
       { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
       { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
@@ -45,17 +49,17 @@ const taskData = [
       { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
     ]
   },
-  { 
-    day: 'Sat', 
-    tasks: 2, 
+  {
+    day: 'Sat',
+    tasks: 2,
     assignees: [
       { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
       { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
     ]
   },
-  { 
-    day: 'Sun', 
-    tasks: 1, 
+  {
+    day: 'Sun',
+    tasks: 1,
     assignees: [
       { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
     ]
@@ -69,103 +73,38 @@ const funnelData = [
   { stage: 'Value Proposition', value: '28,980$', color: 'bg-gray-300' },
 ];
 
-// New component to display assignee avatars
-const TaskAssignees: React.FC<{ 
-  assignees: Array<{ id: string; name: string; avatar: string; status?: string }>;
-  maxVisible?: number;
-  size?: 'sm' | 'md';
-  onClick?: (id: string) => void;
-}> = ({ 
-  assignees, 
-  maxVisible = 3,
-  size = 'sm',
-  onClick 
-}) => {
-  if (!assignees.length) {
-    return (
-      <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-        0
-      </div>
-    );
-  }
-
-  const visibleAssignees = assignees.slice(0, maxVisible);
-  const remainingCount = assignees.length - maxVisible;
-  
-  return (
-    <div className="flex -space-x-2">
-      {visibleAssignees.map((assignee) => (
-        <div 
-          key={assignee.id} 
-          className="relative cursor-pointer hover:z-10 transition-all hover:transform hover:scale-110"
-          onClick={() => onClick && onClick(assignee.id)}
-          title={assignee.name}
-        >
-          <AvatarWithStatus
-            src={assignee.avatar}
-            alt={assignee.name}
-            size={size}
-            status={assignee.status as any || 'active'}
-          />
-        </div>
-      ))}
-      {remainingCount > 0 && (
-        <div className="relative z-10 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700 border-2 border-white shadow-sm">
-          +{remainingCount}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Calendar day component with avatar support
-const CalendarDay: React.FC<{
-  day: number;
-  isToday?: boolean;
-  assignees?: Array<{ id: string; name: string; avatar: string; status?: string }>;
-  onClick?: () => void;
-}> = ({ 
-  day, 
-  isToday = false,
-  assignees = [], 
-  onClick 
-}) => {
-  const hasAssignees = assignees.length > 0;
-  
-  return (
-    <div 
-      className="p-1 flex flex-col items-center"
-      onClick={onClick}
-    >
-      <div className={`
-        ${isToday ? 'bg-blue-500 text-white' : hasAssignees ? 'bg-gray-100' : 'text-gray-600'}
-        w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1
-        ${hasAssignees ? 'ring-2 ring-blue-200' : ''}
-        ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-300' : ''}
-      `}>
-        {day}
-      </div>
-      
-      {hasAssignees && (
-        <div className="flex justify-center -mt-1">
-          <TaskAssignees 
-            assignees={assignees} 
-            maxVisible={2} 
-            size="sm" 
-          />
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const TasksAndFunnel: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const { optimizeMeetingTime, generateMeetingAgenda, isProcessing } = useAI();
   const [meetingSuggestions, setMeetingSuggestions] = useState<Date[]>([]);
   const [suggestedAgenda, setSuggestedAgenda] = useState<string[]>([]);
   const [isLoadingMeetingAI, setIsLoadingMeetingAI] = useState(false);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [aiAlerts, setAiAlerts] = useState<Array<{type: string, description: string}>>([]);
   const today = new Date().getDate();
+
+  // Modal states
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showMoreOptionsModal, setShowMoreOptionsModal] = useState(false);
+  const [showNavigationModal, setShowNavigationModal] = useState(false);
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+
+  // Load AI insights function
+  const loadAIInsights = async () => {
+    setIsLoadingAI(true);
+    try {
+      // Simulate loading AI insights
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setAiAlerts([
+        { type: 'opportunity', description: 'High-value lead identified with 85% conversion probability' },
+        { type: 'opportunity', description: 'Upsell potential detected for enterprise package' }
+      ]);
+    } catch (error) {
+      console.error('Failed to load AI insights:', error);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
 
   // Generate AI meeting suggestions when a day is selected
   useEffect(() => {
@@ -176,18 +115,18 @@ export const TasksAndFunnel: React.FC = () => {
 
   const generateMeetingOptimizations = async () => {
     if (!selectedDay) return;
-    
+
     setIsLoadingMeetingAI(true);
     try {
       // Get attendees for the selected day
       const dayData = calendarData[selectedDay - 1];
       const attendeeIds = dayData.assignees.map(a => a.id);
-      
+
       if (attendeeIds.length > 0) {
         // Get optimal meeting times
         const suggestions = await optimizeMeetingTime(attendeeIds, 60); // 60 minutes
         setMeetingSuggestions(suggestions);
-        
+
         // Generate meeting agenda
         const agenda = await generateMeetingAgenda(
           `Team Sync - October ${selectedDay}`,
@@ -207,13 +146,13 @@ export const TasksAndFunnel: React.FC = () => {
     // Randomly determine if this day has assignees
     const hasAssignees = Math.random() > 0.65;
     if (!hasAssignees) return { day, assignees: [] };
-    
+
     // Get 1-4 random assignees from our task data
     const allAssignees = taskData.flatMap(t => t.assignees);
     const uniqueAssignees = [...new Map(allAssignees.map(a => [a.id, a])).values()];
     const shuffled = [...uniqueAssignees].sort(() => 0.5 - Math.random());
     const count = Math.floor(Math.random() * 4) + 1;
-    
+
     return {
       day,
       assignees: shuffled.slice(0, count)
@@ -223,13 +162,57 @@ export const TasksAndFunnel: React.FC = () => {
   const handleAssigneeClick = (id: string) => {
     console.log(`Clicked on assignee: ${id}`);
     // In a real implementation, this would open the contact details modal
-    // You could call the onContactsClick function from props here
+    alert(`Contact details for ${id} would open here`);
   };
 
   const handleDayClick = (day: number) => {
     setSelectedDay(day);
     console.log(`Clicked on day: ${day}`);
     // In a real implementation, this might open a modal to create/view tasks for this day
+    alert(`Task management for day ${day} would open here`);
+  };
+
+  const handleAddUser = () => {
+    setShowAddUserModal(true);
+  };
+
+  const handleMoreOptions = () => {
+    setShowMoreOptionsModal(true);
+  };
+
+  const handleNavigate = () => {
+    setShowNavigationModal(true);
+  };
+
+  const handleAddTask = () => {
+    setShowAddTaskModal(true);
+  };
+
+  const handleScheduleMeeting = () => {
+    // In a real implementation, this would open the MeetingSchedulerModal
+    // For now, we'll use an alert to indicate functionality
+    alert('Meeting Scheduler Modal would open here with selected attendees');
+  };
+
+  // Modal event handlers
+  const handleUsersAdded = (users: any[]) => {
+    console.log('Users added:', users);
+    alert(`${users.length} users added successfully!`);
+  };
+
+  const handleOptionSelected = (option: string) => {
+    console.log('Option selected:', option);
+    alert(`"${option}" functionality would be implemented here`);
+  };
+
+  const handleNavigateTo = (destination: string) => {
+    console.log('Navigate to:', destination);
+    alert(`Navigation to "${destination}" would be implemented here`);
+  };
+
+  const handleTaskCreated = (task: any) => {
+    console.log('Task created:', task);
+    alert(`Task "${task.title}" created successfully!`);
   };
 
   return (
@@ -239,13 +222,25 @@ export const TasksAndFunnel: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-900">Tasks Schedule</h3>
           <div className="flex space-x-2">
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={handleAddUser}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Add User"
+            >
               <UserPlus className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={handleMoreOptions}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="More Options"
+            >
               <MoreHorizontal className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={handleNavigate}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Navigate"
+            >
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -260,9 +255,9 @@ export const TasksAndFunnel: React.FC = () => {
           </div>
           <div className="grid grid-cols-7 gap-1 text-center text-sm">
             {calendarData.map(({ day, assignees }) => (
-              <CalendarDay 
-                key={day} 
-                day={day} 
+              <CalendarDay
+                key={day}
+                day={day}
                 isToday={day === today}
                 assignees={assignees}
                 onClick={() => handleDayClick(day)}
@@ -276,14 +271,18 @@ export const TasksAndFunnel: React.FC = () => {
             <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="flex items-center space-x-3">
                 <div className="font-medium text-gray-700">{task.day}</div>
-                <TaskAssignees 
-                  assignees={task.assignees} 
+                <TaskAssignees
+                  assignees={task.assignees}
                   onClick={handleAssigneeClick}
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-gray-600">{task.tasks} tasks</span>
-                <button className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors">
+                <button
+                  onClick={handleAddTask}
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                  title="Add Task"
+                >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
@@ -308,7 +307,7 @@ export const TasksAndFunnel: React.FC = () => {
               </p>
               {calendarData[selectedDay - 1].assignees.length > 0 && (
                 <div className="mt-2 flex items-center space-x-2">
-                  <TaskAssignees 
+                  <TaskAssignees
                     assignees={calendarData[selectedDay - 1].assignees}
                     maxVisible={5}
                     onClick={handleAssigneeClick}
@@ -371,15 +370,16 @@ export const TasksAndFunnel: React.FC = () => {
 
                 {/* Quick Actions */}
                 <div className="mt-3 flex space-x-2">
-                  <ModernButton 
-                    size="sm" 
+                  <ModernButton
+                    size="sm"
                     variant="outline"
+                    onClick={handleScheduleMeeting}
                     className="bg-white/50 border-purple-200 text-purple-700 hover:bg-white/70"
                   >
                     Schedule Meeting
                   </ModernButton>
-                  <ModernButton 
-                    size="sm" 
+                  <ModernButton
+                    size="sm"
                     variant="ghost"
                     onClick={generateMeetingOptimizations}
                     disabled={isLoadingMeetingAI}
@@ -403,7 +403,7 @@ export const TasksAndFunnel: React.FC = () => {
             <Sparkles className="w-4 h-4 ml-2 text-yellow-500" />
           </h3>
           <div className="flex space-x-2">
-            <button 
+            <button
               onClick={loadAIInsights}
               disabled={isLoadingAI}
               className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
@@ -415,10 +415,18 @@ export const TasksAndFunnel: React.FC = () => {
                 <Brain className="w-5 h-5" />
               )}
             </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={handleMoreOptions}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="More Options"
+            >
               <MoreHorizontal className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button
+              onClick={handleNavigate}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Navigate"
+            >
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
@@ -432,7 +440,7 @@ export const TasksAndFunnel: React.FC = () => {
                 <span className="text-sm font-semibold text-gray-900">{stage.value}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className={`${stage.color} h-2 rounded-full transition-all duration-300`}
                   style={{ width: `${(4 - index) * 25}%` }}
                 />
@@ -475,14 +483,18 @@ export const TasksAndFunnel: React.FC = () => {
               Team Assignments
             </h4>
             <div className="flex space-x-2">
-              <button className="p-1 rounded hover:bg-blue-100 text-blue-700">
+              <button
+                onClick={handleAddUser}
+                className="p-1 rounded hover:bg-blue-100 text-blue-700"
+                title="Add User"
+              >
                 <UserPlus className="w-4 h-4" />
               </button>
-              <button 
-                onClick={generateMeetingOptimizations}
+              <button
+                onClick={handleScheduleMeeting}
                 disabled={isLoadingMeetingAI}
                 className="p-1 rounded hover:bg-blue-100 text-purple-700 disabled:opacity-50"
-                title="AI Schedule Optimization"
+                title="Schedule Meeting"
               >
                 {isLoadingMeetingAI ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -509,7 +521,9 @@ export const TasksAndFunnel: React.FC = () => {
                     {taskData.filter(t => t.assignees.some(a => a.id === assignee.id)).length} days
                   </span>
                   {meetingSuggestions.length > 0 && (
-                    <Target className="w-3 h-3 text-purple-600" title="AI optimized schedule available" />
+                    <div title="AI optimized schedule available">
+                      <Target className="w-3 h-3 text-purple-600" />
+                    </div>
                   )}
                 </div>
               </div>
@@ -517,6 +531,126 @@ export const TasksAndFunnel: React.FC = () => {
           </div>
         </div>
       </GlassCard>
+
+      {/* Modals */}
+      <AddUserModal
+        isOpen={showAddUserModal}
+        onClose={() => setShowAddUserModal(false)}
+        onUsersAdded={handleUsersAdded}
+        title="Add Team Members to Tasks"
+        description="Select team members to assign to tasks and projects"
+      />
+
+      <MoreOptionsModal
+        isOpen={showMoreOptionsModal}
+        onClose={() => setShowMoreOptionsModal(false)}
+        onOptionSelected={handleOptionSelected}
+        context="task"
+        title="Task Management Options"
+      />
+
+      <NavigationModal
+        isOpen={showNavigationModal}
+        onClose={() => setShowNavigationModal(false)}
+        onNavigate={handleNavigateTo}
+        currentView="tasks"
+      />
+
+      <AddTaskModal
+        isOpen={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        onTaskCreated={handleTaskCreated}
+      />
+    </div>
+  );
+};
+
+// New component to display assignee avatars
+const TaskAssignees: React.FC<{
+  assignees: Array<{ id: string; name: string; avatar: string; status?: string }>;
+  maxVisible?: number;
+  size?: 'sm' | 'md';
+  onClick?: (id: string) => void;
+}> = ({
+  assignees,
+  maxVisible = 3,
+  size = 'sm',
+  onClick
+}) => {
+  if (!assignees.length) {
+    return (
+      <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-500">
+        0
+      </div>
+    );
+  }
+
+  const visibleAssignees = assignees.slice(0, maxVisible);
+  const remainingCount = assignees.length - maxVisible;
+
+  return (
+    <div className="flex -space-x-2">
+      {visibleAssignees.map((assignee) => (
+        <div
+          key={assignee.id}
+          className="relative cursor-pointer hover:z-10 transition-all hover:transform hover:scale-110"
+          onClick={() => onClick && onClick(assignee.id)}
+          title={assignee.name}
+        >
+          <AvatarWithStatus
+            src={assignee.avatar}
+            alt={assignee.name}
+            size={size}
+            status={assignee.status as any || 'active'}
+          />
+        </div>
+      ))}
+      {remainingCount > 0 && (
+        <div className="relative z-10 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700 border-2 border-white shadow-sm">
+          +{remainingCount}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Calendar day component with avatar support
+const CalendarDay: React.FC<{
+  day: number;
+  isToday?: boolean;
+  assignees?: Array<{ id: string; name: string; avatar: string; status?: string }>;
+  onClick?: () => void;
+}> = ({
+  day,
+  isToday = false,
+  assignees = [],
+  onClick
+}) => {
+  const hasAssignees = assignees.length > 0;
+
+  return (
+    <div
+      className="p-1 flex flex-col items-center"
+      onClick={onClick}
+    >
+      <div className={`
+        ${isToday ? 'bg-blue-500 text-white' : hasAssignees ? 'bg-gray-100' : 'text-gray-600'}
+        w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1
+        ${hasAssignees ? 'ring-2 ring-blue-200' : ''}
+        ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-300' : ''}
+      `}>
+        {day}
+      </div>
+
+      {hasAssignees && (
+        <div className="flex justify-center -mt-1">
+          <TaskAssignees
+            assignees={assignees}
+            maxVisible={2}
+            size="sm"
+          />
+        </div>
+      )}
     </div>
   );
 };

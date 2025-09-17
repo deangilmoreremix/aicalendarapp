@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types/task';
+import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
+import { taskApi, activityApi } from '../services/api';
 import { generateId } from '../utils';
 
 interface TaskState {
@@ -164,8 +165,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   createTask: async (taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const newTask: Task = {
-        id: generateId(),
+      const newTask = await taskApi.create({
         title: taskData.title || '',
         description: taskData.description || '',
         dueDate: taskData.dueDate,
@@ -174,18 +174,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         category: taskData.category || 'other',
         type: taskData.type || 'other',
         completed: taskData.completed || false,
-        createdAt: new Date(),
         tags: taskData.tags || [],
         attachments: [],
         subtasks: [],
         ...taskData,
-      };
+      });
 
       set((state) => ({
         tasks: { ...state.tasks, [newTask.id]: newTask },
         isLoading: false,
       }));
     } catch (error) {
+      console.error('Failed to create task:', error);
       set({ error: 'Failed to create task', isLoading: false });
     }
   },
@@ -193,22 +193,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateTask: async (id, taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const currentTask = get().tasks[id];
-      if (!currentTask) {
-        throw new Error('Task not found');
-      }
-
-      const updatedTask: Task = {
-        ...currentTask,
-        ...taskData,
-        id, // Ensure ID doesn't change
-      };
-
+      const updatedTask = await taskApi.update(id, taskData);
       set((state) => ({
         tasks: { ...state.tasks, [id]: updatedTask },
         isLoading: false,
       }));
     } catch (error) {
+      console.error('Failed to update task:', error);
       set({ error: 'Failed to update task', isLoading: false });
     }
   },
@@ -216,13 +207,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   deleteTask: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      const { [id]: deleted, ...remainingTasks } = get().tasks;
-      set({
-        tasks: remainingTasks,
-        selectedTask: get().selectedTask === id ? null : get().selectedTask,
-        isLoading: false,
+      await taskApi.delete(id);
+      set((state) => {
+        const { [id]: deleted, ...remainingTasks } = state.tasks;
+        return {
+          tasks: remainingTasks,
+          selectedTask: state.selectedTask === id ? null : state.selectedTask,
+          isLoading: false,
+        };
       });
     } catch (error) {
+      console.error('Failed to delete task:', error);
       set({ error: 'Failed to delete task', isLoading: false });
     }
   },
@@ -250,10 +245,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   loadTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      // In a real app, this would fetch from an API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      set({ isLoading: false });
+      const tasks = await taskApi.getAll();
+      const tasksMap = tasks.reduce((acc, task) => {
+        acc[task.id] = task;
+        return acc;
+      }, {} as Record<string, Task>);
+
+      set({
+        tasks: tasksMap,
+        isLoading: false,
+      });
     } catch (error) {
+      console.error('Failed to load tasks:', error);
       set({ error: 'Failed to load tasks', isLoading: false });
     }
   },

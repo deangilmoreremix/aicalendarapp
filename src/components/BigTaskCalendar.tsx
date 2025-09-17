@@ -28,7 +28,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
-import { Task } from '../types/task';
+import { Task } from '../types';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
 const localizer = momentLocalizer(moment);

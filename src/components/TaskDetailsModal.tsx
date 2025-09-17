@@ -3,20 +3,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { 
-  X, 
-  Save, 
-  Trash2, 
-  Clock, 
-  User, 
-  Calendar, 
-  Flag, 
+import { Task, Subtask } from '../types';
+import { useTaskStore } from '../store/taskStore';
+import { AITaskAssistant } from './ui/AITaskAssistant';
+import {
+  X,
+  Save,
+  Trash2,
+  Clock,
+  User,
+  Calendar,
+  Flag,
   Tag,
   Plus,
-  Check
+  Check,
+  Brain
 } from 'lucide-react';
-import { Task, Subtask } from '../types/task';
-import { useTaskStore } from '../store/taskStore';
 
 interface TaskDetailsModalProps {
   task: Task | null;
@@ -48,6 +50,25 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const [newTag, setNewTag] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+
+  const handleApplyAISuggestion = (suggestion: Partial<Task>) => {
+    setFormData(prev => ({
+      ...prev,
+      ...suggestion,
+      // Ensure we don't overwrite existing values unless they're empty
+      title: suggestion.title || prev.title || '',
+      description: suggestion.description || prev.description || '',
+      priority: suggestion.priority || prev.priority || 'medium',
+      dueDate: suggestion.dueDate || prev.dueDate,
+      estimatedDuration: suggestion.estimatedDuration || prev.estimatedDuration,
+      tags: suggestion.tags || prev.tags || [],
+      category: suggestion.category || prev.category || 'other',
+      type: suggestion.type || prev.type || 'other',
+      subtasks: suggestion.subtasks || prev.subtasks || []
+    }));
+    setShowAIAssistant(false);
+  };
 
   useEffect(() => {
     if (task) {
@@ -169,12 +190,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             <DialogTitle>
               {task ? (isEditing ? 'Edit Task' : 'Task Details') : 'Create New Task'}
             </DialogTitle>
-            <button
-              onClick={onClose}
-              className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center space-x-2">
+              {!task && (
+                <button
+                  onClick={() => setShowAIAssistant(true)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-colors"
+                >
+                  <Brain size={16} />
+                  <span>AI Help</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -525,6 +557,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </div>
         </div>
       </DialogContent>
+
+      {/* AI Task Assistant */}
+      <AITaskAssistant
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        onApplySuggestion={handleApplyAISuggestion}
+        currentTaskData={formData}
+      />
     </Dialog>
   );
 };
