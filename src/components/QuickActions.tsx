@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
-import { NewDealModal } from './ui/NewDealModal';
 import { MeetingSchedulerModal } from './ui/MeetingSchedulerModal';
 import { EmailComposerModal } from './ui/EmailComposerModal';
 import { Plus, UserPlus, Calendar, Mail, Bot, Users } from 'lucide-react';
@@ -8,10 +7,10 @@ import { Plus, UserPlus, Calendar, Mail, Bot, Users } from 'lucide-react';
 interface QuickActionsProps {
   onNewContact: () => void;
   onContactsView: () => void;
+  onNewDeal?: () => void;
 }
 
-export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onContactsView }) => {
-  const [showNewDealModal, setShowNewDealModal] = useState(false);
+export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onContactsView, onNewDeal }) => {
   const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
   const [showEmailComposerModal, setShowEmailComposerModal] = useState(false);
 
@@ -21,7 +20,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
       description: 'Create a new sales opportunity',
       icon: Plus,
       color: 'bg-blue-500',
-      onClick: () => setShowNewDealModal(true)
+      onClick: onNewDeal || (() => {})
     },
     {
       title: 'New Contact',
@@ -99,13 +98,6 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
           </div>
         </div>
       </div>
-
-      {/* New Deal Modal */}
-      <NewDealModal
-        isOpen={showNewDealModal}
-        onClose={() => setShowNewDealModal(false)}
-        onDealCreated={handleDealCreated}
-      />
 
       {/* Meeting Scheduler Modal */}
       <MeetingSchedulerModal

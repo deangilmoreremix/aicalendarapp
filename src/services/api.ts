@@ -427,6 +427,43 @@ export const dealApi = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  async updateStage(id: string, stage: string, notes?: string): Promise<any> {
+    const updateData: any = {
+      stage: stage,
+      updated_at: new Date().toISOString()
+    };
+
+    if (notes) {
+      updateData.notes = notes;
+    }
+
+    const { data, error } = await supabase
+      .from('deals')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      company: data.company,
+      value: data.value,
+      probability: data.probability,
+      dueDate: data.due_date,
+      contactId: data.contact_id,
+      status: data.status,
+      stage: data.stage,
+      priority: data.priority,
+      aiPrediction: data.ai_prediction,
+      description: data.description,
+      notes: data.notes,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at)
+    };
   }
 };
 

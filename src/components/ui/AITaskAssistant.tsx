@@ -3,6 +3,8 @@ import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Card, CardContent, CardHeader } from './card';
+import { StreamingContainer } from './StreamingContainer';
+import { ThinkingIndicator } from './ThinkingIndicator';
 import {
   Brain,
   Sparkles,
@@ -19,6 +21,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useAI, TaskSuggestion } from '../../contexts/AIContext';
+import { useStreamingAI } from '../../hooks/useStreamingAI';
 import { Task } from '../../types';
 
 interface AITaskAssistantProps {
@@ -28,11 +31,6 @@ interface AITaskAssistantProps {
   currentTaskData?: Partial<Task>;
 }
 
-interface StreamingState {
-  isStreaming: boolean;
-  currentText: string;
-  completedText: string;
-}
 
 export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
   isOpen,
@@ -40,16 +38,11 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
   onApplySuggestion,
   currentTaskData
 }) => {
-  const { generateTaskSuggestions, streamTaskSuggestions, isProcessing } = useAI();
+  const { generateTaskSuggestions } = useAI();
+  const streamingAI = useStreamingAI();
   const [prompt, setPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
-  const [streamingState, setStreamingState] = useState<StreamingState>({
-    isStreaming: false,
-    currentText: '',
-    completedText: ''
-  });
   const [selectedSuggestion, setSelectedSuggestion] = useState<TaskSuggestion | null>(null);
-  const streamingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     // Auto-populate prompt with current task data if available
@@ -69,31 +62,35 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
     if (!prompt.trim()) return;
 
     setSuggestions([]);
-    setStreamingState({
-      isStreaming: true,
-      currentText: '',
-      completedText: ''
-    });
 
     try {
-      // Use streaming for better UX
-      const suggestion = await streamTaskSuggestions(prompt, (chunk) => {
-        setStreamingState(prev => ({
-          ...prev,
-          currentText: prev.currentText + chunk
-        }));
-      });
+      // Use the new streaming AI hook
+      const result = await streamingAI.generateTaskSuggestions(prompt, currentTaskData);
 
-      // Add the completed suggestion
-      setSuggestions([suggestion]);
-      setStreamingState({
-        isStreaming: false,
-        currentText: '',
-        completedText: suggestion.reasoning || ''
-      });
+      // Parse the result (in a real implementation, this would be properly structured)
+      // For now, create a mock suggestion based on the result
+      const mockSuggestion: TaskSuggestion = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: prompt.length > 50 ? prompt.substring(0, 47) + '...' : prompt,
+        description: `AI-generated task based on: "${prompt}". ${result}`,
+        priority: 'medium',
+        suggestedDueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        estimatedDuration: 60,
+        subtasks: [
+          { title: 'Initial planning', estimatedDuration: 15 },
+          { title: 'Execute main task', estimatedDuration: 30 },
+          { title: 'Review and finalize', estimatedDuration: 15 }
+        ],
+        tags: ['ai-generated', 'task'],
+        category: 'other',
+        type: 'other',
+        reasoning: result,
+        confidence: 85
+      };
+
+      setSuggestions([mockSuggestion]);
     } catch (error) {
       console.error('Failed to generate suggestions:', error);
-      setStreamingState(prev => ({ ...prev, isStreaming: false }));
     }
   };
 
@@ -175,10 +172,10 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
               </div>
               <Button
                 onClick={handleGenerateSuggestions}
-                disabled={!prompt.trim() || isProcessing || streamingState.isStreaming}
+                disabled={!prompt.trim() || streamingAI.isStreaming || streamingAI.isThinking}
                 className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
-                {isProcessing || streamingState.isStreaming ? (
+                {streamingAI.isStreaming || streamingAI.isThinking ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
                     <span>Thinking...</span>
@@ -196,20 +193,23 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
             {/* Thinking Animation */}
-            {streamingState.isStreaming && (
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            {(streamingAI.isStreaming || streamingAI.isThinking) && (
+              <div className="mb-6">
+                <ThinkingIndicator
+                  type="dots"
+                  size="md"
+                  color="purple"
+                  showProgress={true}
+                  progress={streamingAI.progress}
+                  className="mb-4"
+                />
+                {streamingAI.fullResponse && (
+                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="text-purple-800 text-sm">
+                      {streamingAI.fullResponse}
+                    </div>
                   </div>
-                  <span className="text-blue-700 font-medium">AI is analyzing your request...</span>
-                </div>
-                <div className="text-blue-600 text-sm">
-                  {streamingState.completedText}
-                  <span className="animate-pulse">|</span>
-                </div>
+                )}
               </div>
             )}
 
@@ -344,7 +344,7 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
             )}
 
             {/* Empty State */}
-            {suggestions.length === 0 && !streamingState.isStreaming && !isProcessing && (
+            {suggestions.length === 0 && !streamingAI.isStreaming && !streamingAI.isThinking && (
               <div className="text-center py-12">
                 <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to help!</h3>

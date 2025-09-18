@@ -577,15 +577,6 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
                 <span>New Contact</span>
               </ModernButton>
               
-              <ModernButton 
-                variant="outline" 
-                size="sm" 
-                onClick={onClose}
-                className="flex items-center space-x-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
-              >
-                <Info className="w-4 h-4" />
-                <span>Learn More</span>
-              </ModernButton>
               
               {/* Dark Mode Toggle */}
               <DarkModeToggle size="sm" />
@@ -667,7 +658,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
                   <span>AI Filters</span>
                 </button>
                 
-                <div className="absolute top-full left-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-10">
+                <div className="absolute bottom-full left-0 mb-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-10">
                   {[
                     { value: 'all', label: 'All Contacts', icon: Users },
                     { value: 'high-score', label: 'High AI Score (80+)', icon: Award },
@@ -858,7 +849,12 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
           contact={selectedContact}
           isOpen={!!selectedContact}
           onClose={handleContactDetailClose}
-          onUpdate={updateContact}
+          onUpdate={async (id: string, updates: Partial<Contact>) => {
+            await updateContact(id, updates);
+            // Return the updated contact by finding it in the store
+            const updatedContact = Object.values(contacts).find(c => c.id === id);
+            return updatedContact || selectedContact;
+          }}
         />
       )}
     </>

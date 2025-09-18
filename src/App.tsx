@@ -18,6 +18,7 @@ import { QuickActions } from './components/QuickActions';
 import { CustomerProfile } from './components/CustomerProfile';
 import { ContactsModal } from './components/ContactsModal';
 import { NewContactModal } from './components/NewContactModal';
+import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 
 const App: React.FC = () => {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [filters, setFilters] = useState<TaskFilters>({});
   const [showContactsModal, setShowContactsModal] = useState(false);
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [showNewDealModal, setShowNewDealModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
 
@@ -344,9 +346,10 @@ const App: React.FC = () => {
       )}
 
       {/* Quick Actions */}
-      <QuickActions 
+      <QuickActions
         onNewContact={() => setShowNewContactModal(true)}
         onContactsView={() => setShowContactsModal(true)}
+        onNewDeal={() => setShowNewDealModal(true)}
       />
 
       {/* Recent Activity Dashboard */}
@@ -393,6 +396,11 @@ const App: React.FC = () => {
       <NewContactModal
         isOpen={showNewContactModal}
         onClose={() => setShowNewContactModal(false)}
+      />
+
+      <NewDealModal
+        isOpen={showNewDealModal}
+        onClose={() => setShowNewDealModal(false)}
       />
 
       {/* Task Details Modal */}
