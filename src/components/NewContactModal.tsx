@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { AIAutoFillButton } from './ui/AIAutoFillButton';
 import { AIResearchButton } from './ui/AIResearchButton';
+import { UniversalAIAssistant, AIAssistantConfig } from './ui/UniversalAIAssistant';
 import { useContactStore } from '../store/contactStore';
 import { ContactEnrichmentData } from '../services/aiEnrichmentService';
 import { Contact } from '../types';
@@ -139,7 +140,8 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
   const [newCustomField, setNewCustomField] = useState({ name: '', value: '' });
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [lastEnrichmentData, setLastEnrichmentData] = useState<ContactEnrichmentData | null>(null);
-  
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+
   const { createContact } = useContactStore();
 
   const validateForm = (): boolean => {
@@ -317,12 +319,12 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
         interestLevel: formData.interestLevel,
         status: formData.status,
         notes: formData.notes || undefined,
-        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
+        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         isFavorite: formData.isFavorite,
         socialProfiles: Object.fromEntries(
           Object.entries(formData.socialProfiles).filter(([_, value]) => value)
         ),
-        customFields: Object.keys(formData.customFields).length > 0 ? formData.customFields : undefined
+        customFields: Object.keys(formData.customFields).length > 0 ? formData.customFields : {}
       };
       
       await createContact(contactData);
@@ -356,7 +358,50 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
     setNewCustomField({ name: '', value: '' });
     setShowCustomFields(false);
     setLastEnrichmentData(null);
+    setShowAIAssistant(false);
     onClose();
+  };
+
+  const handleApplyAISuggestion = (suggestion: any) => {
+    // Apply the AI suggestion to the form
+    const updates: any = {};
+
+    if (suggestion.firstName && !formData.firstName) {
+      updates.firstName = suggestion.firstName;
+    }
+    if (suggestion.lastName && !formData.lastName) {
+      updates.lastName = suggestion.lastName;
+    }
+    if (suggestion.email && !formData.email) {
+      updates.email = suggestion.email;
+    }
+    if (suggestion.phone && !formData.phone) {
+      updates.phone = suggestion.phone;
+    }
+    if (suggestion.title && !formData.title) {
+      updates.title = suggestion.title;
+    }
+    if (suggestion.company && !formData.company) {
+      updates.company = suggestion.company;
+    }
+    if (suggestion.industry && !formData.industry) {
+      updates.industry = suggestion.industry;
+    }
+    if (suggestion.notes && !formData.notes) {
+      updates.notes = suggestion.notes;
+    }
+    if (suggestion.tags && suggestion.tags.length > 0 && !formData.tags) {
+      updates.tags = suggestion.tags.join(', ');
+    }
+    if (suggestion.interestLevel && suggestion.interestLevel !== 'medium') {
+      updates.interestLevel = suggestion.interestLevel;
+    }
+    if (suggestion.status && suggestion.status !== 'lead') {
+      updates.status = suggestion.status;
+    }
+
+    setFormData(prev => ({ ...prev, ...updates }));
+    setShowAIAssistant(false);
   };
 
   if (!isOpen) return null;
@@ -408,7 +453,15 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
               onAutoFill={handleAIAutoFill}
               size="sm"
             />
-            
+
+            <button
+              onClick={() => setShowAIAssistant(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              <Brain className="w-4 h-4" />
+              <span className="text-sm font-medium">AI Assistant</span>
+            </button>
+
             <button
               onClick={handleClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -538,7 +591,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                     />
                     {formData.email && (
                       <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                        <Brain className="w-4 h-4 text-purple-500" title="AI Research Available" />
+                        <Brain className="w-4 h-4 text-purple-500" />
                       </div>
                     )}
                   </div>
@@ -858,7 +911,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                         </div>
                         {platform.name}
                         {platform.key === 'linkedin' && formData.socialProfiles[platform.key] && (
-                          <Brain className="w-3 h-3 ml-1 text-purple-500" title="AI research available" />
+                          <Brain className="w-3 h-3 ml-1 text-purple-500" />
                         )}
                       </label>
                       <input
@@ -1042,6 +1095,27 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
           </form>
         </div>
       </div>
+
+      {/* AI Assistant Modal */}
+      <UniversalAIAssistant
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        onApplySuggestion={handleApplyAISuggestion}
+        currentData={formData}
+        config={{
+          mode: 'contact',
+          title: "AI Contact Assistant",
+          placeholder: "Describe the contact you want to add...",
+          examplePrompts: [
+            "Add John Smith, CEO of TechCorp",
+            "Create contact for Sarah Johnson from LinkedIn",
+            "Add marketing director from ABC Company",
+            "New contact: Michael Brown, Sales Manager at XYZ Inc",
+            "Add contact with email john@company.com"
+          ],
+          icon: User
+        }}
+      />
     </div>
   );
 };

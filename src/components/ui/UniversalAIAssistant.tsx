@@ -25,7 +25,7 @@ import {
 import { useAI } from '../../contexts/AIContext';
 
 export interface AIAssistantConfig {
-  mode: 'deal' | 'meeting' | 'email' | 'task';
+  mode: 'deal' | 'meeting' | 'email' | 'task' | 'contact';
   title: string;
   placeholder: string;
   examplePrompts: string[];
@@ -87,6 +87,11 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
                data.to?.length ? `Write email to ${data.to.length} recipients` : '';
       case 'task':
         return data.title ? `Create task: ${data.title}` : '';
+      case 'contact':
+        return data.firstName && data.lastName ?
+               `Add contact: ${data.firstName} ${data.lastName}${data.company ? ` from ${data.company}` : ''}` :
+               data.email ? `Add contact with email: ${data.email}` :
+               data.company ? `Add contact from ${data.company}` : '';
       default:
         return '';
     }
@@ -149,6 +154,22 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
           subject: suggestion.title,
           body: suggestion.description,
           priority: suggestion.priority === 'urgent' ? 'high' : 'normal'
+        };
+      case 'contact':
+        return {
+          ...suggestion,
+          firstName: suggestion.firstName || suggestion.title?.split(' ')[0] || '',
+          lastName: suggestion.lastName || suggestion.title?.split(' ').slice(1).join(' ') || '',
+          email: suggestion.email || '',
+          phone: suggestion.phone || '',
+          title: suggestion.jobTitle || suggestion.title || '',
+          company: suggestion.company || '',
+          industry: suggestion.industry || '',
+          notes: suggestion.description || suggestion.notes || '',
+          tags: suggestion.tags || [],
+          socialProfiles: suggestion.socialProfiles || {},
+          interestLevel: suggestion.interestLevel || 'medium',
+          status: suggestion.status || 'lead'
         };
       default:
         return suggestion;
@@ -322,6 +343,95 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
                 <Button onClick={() => handleApplySuggestion(suggestion)}>
                   <Zap size={14} className="mr-2" />
                   Apply Email
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 'contact':
+        return (
+          <Card key={suggestion.id} className="border-2 hover:border-purple-300 transition-colors">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-2">
+                    {suggestion.firstName} {suggestion.lastName}
+                  </h3>
+                  {suggestion.title && suggestion.company && (
+                    <p className="text-gray-600 text-sm mb-1">{suggestion.title} at {suggestion.company}</p>
+                  )}
+                  {suggestion.email && (
+                    <p className="text-gray-600 text-sm">{suggestion.email}</p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge className="bg-green-100 text-green-800">
+                    {suggestion.status}
+                  </Badge>
+                  <Badge className="bg-blue-100 text-blue-800">
+                    {suggestion.interestLevel}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {suggestion.phone && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-500">📞</span>
+                    <span>{suggestion.phone}</span>
+                  </div>
+                )}
+                {suggestion.industry && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-500">🏢</span>
+                    <span>{suggestion.industry}</span>
+                  </div>
+                )}
+              </div>
+
+              {suggestion.tags?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Tags:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestion.tags.map((tag: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {suggestion.notes && (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-900 mb-1">Notes:</h4>
+                  <p className="text-sm text-gray-700">{suggestion.notes}</p>
+                </div>
+              )}
+
+              {suggestion.reasoning && (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">AI Analysis:</h4>
+                  <p className="text-sm text-blue-800">{suggestion.reasoning}</p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center space-x-2">
+                  <Button size="sm" variant="outline" onClick={() => handleFeedback(suggestion.id, true)}>
+                    <ThumbsUp size={14} className="mr-1" />
+                    Good
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleFeedback(suggestion.id, false)}>
+                    <ThumbsDown size={14} className="mr-1" />
+                    Not helpful
+                  </Button>
+                </div>
+                <Button onClick={() => handleApplySuggestion(suggestion)}>
+                  <Zap size={14} className="mr-2" />
+                  Apply Contact
                 </Button>
               </div>
             </CardContent>
