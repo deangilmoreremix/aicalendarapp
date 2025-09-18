@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain } from 'lucide-react';
+import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2 } from 'lucide-react';
 import { BigTaskCalendar } from './components/BigTaskCalendar';
 import { TaskKanbanBoard } from './components/TaskKanbanBoard';
 import { ActivityFeed } from './components/ActivityFeed';
@@ -20,6 +20,7 @@ import { ContactsModal } from './components/ContactsModal';
 import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
+import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
 
 const App: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
@@ -35,6 +36,7 @@ const App: React.FC = () => {
   const [showNewDealModal, setShowNewDealModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
+  const [showDeleteMockDataDialog, setShowDeleteMockDataDialog] = useState(false);
 
   const TaskListView: React.FC = () => {
     const filteredTasks = Object.values(tasks).filter(task => {
@@ -216,12 +218,25 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Delete Mock Data Button */}
+            <button
+              onClick={() => setShowDeleteMockDataDialog(true)}
+              className={`p-2 rounded-xl transition-colors ${
+                isDark
+                  ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30 border border-red-500/20'
+                  : 'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm border border-red-200'
+              }`}
+              title="Delete All Mock Data"
+            >
+              <Trash2 size={18} />
+            </button>
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-xl transition-colors ${
-                isDark 
-                  ? 'bg-white/10 text-white hover:bg-white/20' 
+                isDark
+                  ? 'bg-white/10 text-white hover:bg-white/20'
                   : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm border border-gray-200'
               }`}
             >
@@ -414,6 +429,12 @@ const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Delete Mock Data Dialog */}
+      <DeleteMockDataDialog
+        isOpen={showDeleteMockDataDialog}
+        onClose={() => setShowDeleteMockDataDialog(false)}
+      />
     </div>
   );
 };
