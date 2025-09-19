@@ -23,6 +23,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
+import { AIEnrichmentService } from '../../services/aiEnrichmentService';
 
 export interface AIAssistantConfig {
   mode: 'deal' | 'meeting' | 'email' | 'task' | 'contact';
@@ -97,6 +98,85 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
     }
   };
 
+  const generateContactSuggestion = async (prompt: string, contactData: any): Promise<any> => {
+    try {
+      // Try to enrich using available data
+      let enrichmentData = null;
+
+      if (contactData.email) {
+        enrichmentData = await AIEnrichmentService.enrichContactByEmail(contactData.email);
+      } else if (contactData.firstName && contactData.lastName) {
+        enrichmentData = await AIEnrichmentService.enrichContactByName(
+          contactData.firstName,
+          contactData.lastName,
+          contactData.company
+        );
+      }
+
+      if (enrichmentData) {
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          firstName: enrichmentData.firstName || contactData.firstName || '',
+          lastName: enrichmentData.lastName || contactData.lastName || '',
+          email: enrichmentData.email || contactData.email || '',
+          phone: enrichmentData.phone || '',
+          title: enrichmentData.title || '',
+          company: enrichmentData.company || contactData.company || '',
+          industry: enrichmentData.industry || '',
+          notes: enrichmentData.bio || enrichmentData.notes || '',
+          tags: [],
+          socialProfiles: enrichmentData.socialProfiles || {},
+          interestLevel: 'medium',
+          status: 'lead',
+          reasoning: `Contact profile enriched with ${enrichmentData.confidence}% confidence based on available information.`,
+          confidence: enrichmentData.confidence
+        };
+      }
+
+      // Fallback: generate mock contact suggestion based on prompt
+      const nameMatch = prompt.match(/([A-Z][a-z]+)\s+([A-Z][a-z]+)/);
+      const emailMatch = prompt.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        firstName: nameMatch ? nameMatch[1] : (contactData.firstName || ''),
+        lastName: nameMatch ? nameMatch[2] : (contactData.lastName || ''),
+        email: emailMatch ? emailMatch[1] : (contactData.email || ''),
+        phone: '',
+        title: 'Professional',
+        company: contactData.company || 'Unknown Company',
+        industry: 'Technology',
+        notes: `Generated contact based on: "${prompt}"`,
+        tags: [],
+        socialProfiles: {},
+        interestLevel: 'medium',
+        status: 'lead',
+        reasoning: 'Contact profile generated from prompt analysis.',
+        confidence: 60
+      };
+    } catch (error) {
+      console.error('Failed to generate contact suggestion:', error);
+      // Return a basic suggestion
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        firstName: contactData.firstName || '',
+        lastName: contactData.lastName || '',
+        email: contactData.email || '',
+        phone: '',
+        title: '',
+        company: contactData.company || '',
+        industry: '',
+        notes: '',
+        tags: [],
+        socialProfiles: {},
+        interestLevel: 'medium',
+        status: 'lead',
+        reasoning: 'Basic contact suggestion generated.',
+        confidence: 50
+      };
+    }
+  };
+
   const handleGenerateSuggestions = async () => {
     if (!prompt.trim()) return;
 
@@ -108,13 +188,40 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
     });
 
     try {
-      // For now, use task suggestions as a fallback - in production this would be mode-specific
-      const suggestion = await streamTaskSuggestions(prompt, (chunk) => {
-        setStreamingState(prev => ({
-          ...prev,
-          currentText: prev.currentText + chunk
-        }));
-      });
+      let suggestion: any;
+
+      if (config.mode === 'contact') {
+        // For contact mode, use contact enrichment
+        const contactData = {
+          firstName: currentData?.firstName || '',
+          lastName: currentData?.lastName || '',
+          email: currentData?.email || '',
+          company: currentData?.company || ''
+        };
+
+        // Simulate streaming for contact enrichment
+        let streamedText = '';
+        const words = ['Analyzing', 'contact', 'information...', 'Generating', 'contact', 'profile...', 'Finalizing', 'suggestions...'];
+
+        for (const word of words) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          streamedText += word + ' ';
+          setStreamingState(prev => ({
+            ...prev,
+            currentText: streamedText
+          }));
+        }
+
+        suggestion = await generateContactSuggestion(prompt, contactData);
+      } else {
+        // For other modes, use task suggestions
+        suggestion = await streamTaskSuggestions(prompt, (chunk) => {
+          setStreamingState(prev => ({
+            ...prev,
+            currentText: prev.currentText + chunk
+          }));
+        });
+      }
 
       // Transform suggestion based on mode
       const transformedSuggestion = transformSuggestionForMode(suggestion, config.mode);
@@ -123,7 +230,7 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
       setStreamingState({
         isStreaming: false,
         currentText: '',
-        completedText: suggestion.reasoning || ''
+        completedText: suggestion.reasoning || suggestion.bio || 'Contact profile generated successfully.'
       });
     } catch (error) {
       console.error('Failed to generate suggestions:', error);

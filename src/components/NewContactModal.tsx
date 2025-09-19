@@ -6,7 +6,7 @@ import { UniversalAIAssistant, AIAssistantConfig } from './ui/UniversalAIAssista
 import { useContactStore } from '../store/contactStore';
 import { ContactEnrichmentData } from '../services/aiEnrichmentService';
 import { Contact } from '../types';
-import { 
+import {
   X, 
   User, 
   Mail, 
@@ -37,7 +37,8 @@ import {
   Sparkles,
   Wand2,
   RefreshCw,
-  Camera
+  Camera,
+  Loader2
 } from 'lucide-react';
 
 interface NewContactModalProps {
@@ -141,6 +142,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [lastEnrichmentData, setLastEnrichmentData] = useState<ContactEnrichmentData | null>(null);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiWritingLoading, setAiWritingLoading] = useState<string | null>(null);
 
   const { createContact } = useContactStore();
 
@@ -481,23 +483,21 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <User className="w-5 h-5 mr-2 text-blue-500" />
                   Personal Information
                 </h3>
-                {(formData.email || formData.firstName) && (
-                  <div className="flex items-center space-x-2">
-                    <AIResearchButton
-                      searchType="auto"
-                      searchQuery={{
-                        email: formData.email,
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        company: formData.company
-                      }}
-                      onDataFound={handleAIAutoFill}
-                      variant="outline"
-                      size="sm"
-                      className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-blue-100"
-                    />
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  <AIResearchButton
+                    searchType="auto"
+                    searchQuery={{
+                      email: formData.email,
+                      firstName: formData.firstName,
+                      lastName: formData.lastName,
+                      company: formData.company
+                    }}
+                    onDataFound={handleAIAutoFill}
+                    variant="outline"
+                    size="sm"
+                    className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-blue-100"
+                  />
+                </div>
               </div>
               
               {/* Avatar Section with AI Image Search */}
@@ -888,16 +888,19 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <Globe className="w-5 h-5 mr-2 text-blue-500" />
                   Social Profiles & Contact Methods
                 </h3>
-                {formData.socialProfiles.linkedin && (
-                  <AIResearchButton
-                    searchType="linkedin"
-                    searchQuery={{ linkedinUrl: formData.socialProfiles.linkedin }}
-                    onDataFound={handleAIAutoFill}
-                    variant="outline"
-                    size="sm"
-                    className="bg-blue-50 border-blue-200 text-blue-700"
-                  />
-                )}
+                <AIResearchButton
+                  searchType="auto"
+                  searchQuery={{
+                    email: formData.email,
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    company: formData.company
+                  }}
+                  onDataFound={handleAIAutoFill}
+                  variant="outline"
+                  size="sm"
+                  className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-blue-100"
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

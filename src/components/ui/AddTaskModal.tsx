@@ -8,6 +8,7 @@ import { Badge } from './badge';
 import { useContactStore } from '../../store/contactStore';
 import { useTaskStore } from '../../store/taskStore';
 import { Contact } from '../../types';
+import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
 import {
   X,
   Plus,
@@ -19,7 +20,9 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Users
+  Users,
+  Sparkles,
+  Wand2
 } from 'lucide-react';
 
 interface AddTaskModalProps {
@@ -60,6 +63,8 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [aiWritingLoading, setAiWritingLoading] = useState<string | null>(null);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
@@ -138,6 +143,68 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     }));
   };
 
+  const handleAIWriting = async (field: 'title' | 'description', context?: string) => {
+    setAiWritingLoading(field);
+
+    try {
+      // Simulate AI writing assistance
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      let aiSuggestion = '';
+
+      if (field === 'title') {
+        const titlePrompts = [
+          'Schedule client discovery call for Q4 planning',
+          'Prepare project proposal presentation',
+          'Follow up on outstanding invoice payment',
+          'Review and update team performance metrics',
+          'Organize quarterly business review meeting'
+        ];
+        aiSuggestion = titlePrompts[Math.floor(Math.random() * titlePrompts.length)];
+      } else {
+        const descPrompts = [
+          'Conduct a comprehensive discovery call to understand client needs, pain points, and goals for Q4. Prepare agenda covering current challenges, future objectives, and potential solutions.',
+          'Create a compelling project proposal presentation highlighting our unique value proposition, implementation timeline, and expected ROI. Include case studies and testimonials.',
+          'Follow up on the outstanding invoice from the recent project delivery. Review payment terms, send friendly reminder, and explore any potential issues preventing payment.',
+          'Review team performance metrics for the current quarter, identify areas for improvement, and develop action plans for enhancing productivity and achieving targets.',
+          'Organize a comprehensive quarterly business review meeting with key stakeholders to discuss progress, challenges, and strategic direction for the next quarter.'
+        ];
+        aiSuggestion = descPrompts[Math.floor(Math.random() * descPrompts.length)];
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        [field]: aiSuggestion
+      }));
+
+      // Clear any existing errors for this field
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: '' }));
+      }
+
+    } catch (error) {
+      console.error(`AI writing failed for ${field}:`, error);
+      alert(`Failed to generate AI content for ${field}. Please try again.`);
+    } finally {
+      setAiWritingLoading(null);
+    }
+  };
+
+  const handleApplyAISuggestion = (suggestion: any) => {
+    // Apply the AI suggestion to the form
+    setFormData(prev => ({
+      ...prev,
+      title: suggestion.title || prev.title,
+      description: suggestion.description || prev.description,
+      priority: suggestion.priority || prev.priority,
+      category: suggestion.category || prev.category,
+      type: suggestion.type || prev.type,
+      estimatedDuration: suggestion.estimatedDuration || prev.estimatedDuration,
+      tags: suggestion.tags || prev.tags
+    }));
+    setShowAIAssistant(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -182,12 +249,22 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
               <Plus className="w-5 h-5 text-blue-500" />
               <span className="text-lg font-semibold">Create New Task</span>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowAIAssistant(true)}
+                className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                title="AI Task Assistant"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium">AI Assistant</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -197,12 +274,27 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Task Title *
             </label>
-            <Input
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Enter task title..."
-              className={errors.title ? 'border-red-500' : ''}
-            />
+            <div className="relative">
+              <Input
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter task title..."
+                className={`pr-12 ${errors.title ? 'border-red-500' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => handleAIWriting('title')}
+                disabled={aiWritingLoading === 'title'}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors disabled:opacity-50"
+                title="AI writing assistant for task title"
+              >
+                {aiWritingLoading === 'title' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+              </button>
+            </div>
             {errors.title && (
               <p className="text-red-500 text-xs mt-1">{errors.title}</p>
             )}
@@ -213,12 +305,28 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description
             </label>
-            <Textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe the task..."
-              rows={3}
-            />
+            <div className="relative">
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the task..."
+                rows={3}
+                className="pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => handleAIWriting('description')}
+                disabled={aiWritingLoading === 'description'}
+                className="absolute right-2 top-3 p-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors disabled:opacity-50"
+                title="AI writing assistant for task description"
+              >
+                {aiWritingLoading === 'description' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Date, Priority, Duration */}
@@ -459,6 +567,27 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
           </div>
         </form>
       </DialogContent>
+
+      {/* AI Task Assistant Modal */}
+      <UniversalAIAssistant
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+        onApplySuggestion={handleApplyAISuggestion}
+        currentData={formData}
+        config={{
+          mode: 'task',
+          title: "AI Task Assistant",
+          placeholder: "Describe your task or what you need help with...",
+          examplePrompts: [
+            "Schedule client discovery call for next week",
+            "Create project proposal presentation",
+            "Follow up on outstanding invoice",
+            "Review team performance metrics",
+            "Organize quarterly business review"
+          ],
+          icon: Plus
+        }}
+      />
     </Dialog>
   );
 };

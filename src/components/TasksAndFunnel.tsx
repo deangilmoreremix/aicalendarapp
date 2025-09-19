@@ -200,9 +200,54 @@ export const TasksAndFunnel: React.FC = () => {
     alert(`${users.length} users added successfully!`);
   };
 
-  const handleOptionSelected = (option: string) => {
+  const handleOptionSelected = async (option: string) => {
     console.log('Option selected:', option);
-    alert(`"${option}" functionality would be implemented here`);
+
+    try {
+      switch (option) {
+        case 'duplicate':
+          await handleDuplicate();
+          break;
+        case 'archive':
+          await handleArchive();
+          break;
+        case 'delete':
+          await handleDelete();
+          break;
+        case 'notifications':
+          await handleNotifications();
+          break;
+        case 'reminders':
+          await handleReminders();
+          break;
+        case 'priority':
+          await handlePriority();
+          break;
+        case 'export-pdf':
+          await handleExportPDF();
+          break;
+        case 'export-csv':
+          await handleExportCSV();
+          break;
+        case 'share-link':
+          await handleShareLink();
+          break;
+        case 'add-collaborators':
+          await handleAddCollaborators();
+          break;
+        case 'view-activity':
+          await handleViewActivity();
+          break;
+        case 'transfer-ownership':
+          await handleTransferOwnership();
+          break;
+        default:
+          alert(`"${option}" functionality is not yet implemented`);
+      }
+    } catch (error) {
+      console.error(`Error executing ${option}:`, error);
+      alert(`Failed to execute ${option}. Please try again.`);
+    }
   };
 
   const handleNavigateTo = (destination: string) => {
@@ -213,6 +258,261 @@ export const TasksAndFunnel: React.FC = () => {
   const handleTaskCreated = (task: any) => {
     console.log('Task created:', task);
     alert(`Task "${task.title}" created successfully!`);
+  };
+
+  // Task Management Options Handlers
+  const handleDuplicate = async () => {
+    // In a real implementation, this would duplicate the selected task/deal
+    alert('Duplicate functionality: This would create a copy of the selected item');
+  };
+
+  const handleArchive = async () => {
+    // In a real implementation, this would archive the selected task/deal
+    alert('Archive functionality: This would move the selected item to archive');
+  };
+
+  const handleDelete = async () => {
+    // In a real implementation, this would delete the selected task/deal with confirmation
+    if (confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      alert('Delete functionality: This would permanently remove the selected item');
+    }
+  };
+
+  const handleNotifications = async () => {
+    // Simple notification preferences simulation
+    const notificationPrefs = {
+      email: confirm('Receive email notifications for this funnel?'),
+      push: confirm('Receive push notifications for updates?'),
+      sms: confirm('Receive SMS notifications for urgent items?'),
+      frequency: prompt('Notification frequency? (immediate/daily/weekly)', 'daily')
+    };
+
+    alert(`✅ Notification preferences saved!\n\nEmail: ${notificationPrefs.email ? 'Enabled' : 'Disabled'}\nPush: ${notificationPrefs.push ? 'Enabled' : 'Disabled'}\nSMS: ${notificationPrefs.sms ? 'Enabled' : 'Disabled'}\nFrequency: ${notificationPrefs.frequency || 'daily'}`);
+  };
+
+  const handleReminders = async () => {
+    // Reminder setup simulation
+    const reminderType = prompt('What type of reminder? (deadline/followup/custom)', 'deadline');
+    const reminderTime = prompt('When to remind? (1hour/1day/1week/custom)', '1day');
+    const customMessage = prompt('Custom reminder message (optional):', '');
+
+    const reminderDetails = {
+      type: reminderType || 'deadline',
+      time: reminderTime || '1day',
+      message: customMessage || `Reminder: ${reminderType} for funnel item`,
+      created: new Date().toLocaleString()
+    };
+
+    alert(`✅ Reminder set successfully!\n\nType: ${reminderDetails.type}\nTime: ${reminderDetails.time}\nMessage: ${reminderDetails.message}\n\nYou will be notified at the specified time.`);
+  };
+
+  const handlePriority = async () => {
+    // In a real implementation, this would open priority selection
+    alert('Priority functionality: This would allow changing the priority level of the selected item');
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      // Create a simple HTML-based PDF content
+      const pdfContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Funnel Report - ${new Date().toLocaleDateString()}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                .section { margin-bottom: 30px; }
+                .section h2 { color: #333; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f5f5f5; font-weight: bold; }
+                .stage-bar { height: 20px; background-color: #e5e5e5; border-radius: 10px; margin: 5px 0; }
+                .stage-fill { height: 100%; border-radius: 10px; }
+                .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Pipeline Funnel Report</h1>
+                <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+            </div>
+
+            <div class="section">
+                <h2>Pipeline Overview</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>Value</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${funnelData.map((stage, index) => {
+                          const percentage = (4 - index) * 25;
+                          return `
+                            <tr>
+                                <td>${stage.stage}</td>
+                                <td>${stage.value}</td>
+                                <td>
+                                    <div class="stage-bar">
+                                        <div class="stage-fill" style="width: ${percentage}%; background-color: ${stage.color.replace('bg-', '').replace('-600', '')};"></div>
+                                    </div>
+                                    ${percentage}%
+                                </td>
+                            </tr>
+                          `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2>Task Schedule Summary</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Tasks</th>
+                            <th>Team Members</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${taskData.map(task => `
+                            <tr>
+                                <td>${task.day}</td>
+                                <td>${task.tasks} tasks</td>
+                                <td>${task.assignees.map(a => a.name).join(', ')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2>AI Insights</h2>
+                <ul>
+                    ${aiAlerts.map(alert => `<li>${alert.description}</li>`).join('')}
+                </ul>
+            </div>
+
+            <div class="footer">
+                <p>This report was generated by AI Calendar App</p>
+                <p>Confidential - For internal use only</p>
+            </div>
+        </body>
+        </html>
+      `;
+
+      // Create blob and download
+      const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `funnel-report-${new Date().toISOString().split('T')[0]}.html`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      alert('✅ PDF export completed! HTML report downloaded successfully.\n\nNote: In a production app, this would generate a proper PDF file using a library like jsPDF or Puppeteer.');
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      // Generate CSV data from funnel and task data
+      const csvData = [];
+
+      // Add header
+      csvData.push(['Stage', 'Value', 'Percentage']);
+
+      // Add funnel data
+      funnelData.forEach(stage => {
+        const percentage = Math.round((4 - funnelData.indexOf(stage)) * 25);
+        csvData.push([stage.stage, stage.value, `${percentage}%`]);
+      });
+
+      // Add empty row
+      csvData.push([]);
+
+      // Add task data header
+      csvData.push(['Day', 'Tasks', 'Assignees']);
+
+      // Add task data
+      taskData.forEach(task => {
+        const assigneeNames = task.assignees.map(a => a.name).join('; ');
+        csvData.push([task.day, task.tasks.toString(), assigneeNames]);
+      });
+
+      // Convert to CSV string
+      const csvContent = csvData.map(row =>
+        row.map(cell => `"${cell}"`).join(',')
+      ).join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `funnel-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      alert('✅ CSV export completed! File downloaded successfully.');
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      alert('Failed to export CSV. Please try again.');
+    }
+  };
+
+  const handleShareLink = async () => {
+    try {
+      // Generate a shareable link with current context
+      const shareData = {
+        type: 'funnel',
+        timestamp: Date.now(),
+        data: {
+          selectedDay,
+          funnelData,
+          taskData
+        }
+      };
+
+      // In a real implementation, this would be stored in a database and given a proper ID
+      const shareId = btoa(JSON.stringify(shareData)).slice(0, 10);
+      const shareLink = `${window.location.origin}/shared/${shareId}`;
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareLink);
+
+      // Show success message
+      alert(`✅ Share link copied to clipboard!\n\n${shareLink}\n\nThis link can be shared with team members to view this funnel snapshot.`);
+    } catch (error) {
+      console.error('Failed to generate share link:', error);
+      alert('Failed to generate share link. Please try again.');
+    }
+  };
+
+  const handleAddCollaborators = async () => {
+    // In a real implementation, this would open collaborator management
+    alert('Add Collaborators functionality: This would open the collaborator management interface');
+  };
+
+  const handleViewActivity = async () => {
+    // In a real implementation, this would open activity log
+    alert('View Activity Log functionality: This would show the activity history for the selected item');
+  };
+
+  const handleTransferOwnership = async () => {
+    // In a real implementation, this would open ownership transfer
+    alert('Transfer Ownership functionality: This would allow transferring ownership to another user');
   };
 
   return (

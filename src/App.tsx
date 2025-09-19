@@ -28,6 +28,17 @@ const App: React.FC = () => {
   const { tasks, markTaskComplete } = useTaskStore();
   const { contacts } = useContactStore();
   const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity'>('calendar');
+
+  // Debug function to track view changes
+  const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity') => {
+    console.log('View changing from', view, 'to', newView);
+    setView(newView);
+  };
+
+  // Debug effect to track view state changes
+  React.useEffect(() => {
+    console.log('View state changed to:', view);
+  }, [view]);
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<TaskFilters>({});
@@ -181,6 +192,7 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
+    console.log('Rendering view:', view);
     switch (view) {
       case 'calendar':
         return <BigTaskCalendar />;
@@ -215,6 +227,10 @@ const App: React.FC = () => {
           <div>
             <h1 className={`text-4xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Calendar</h1>
             <p className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Manage your tasks and schedule with intelligent insights</p>
+            {/* Debug: Current View Indicator */}
+            <div className="text-xs text-blue-500 font-mono mt-1">
+              Current View: {view.toUpperCase()}
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
@@ -250,50 +266,54 @@ const App: React.FC = () => {
                 : 'bg-white border-gray-200'
             }`}>
               <button
-                onClick={() => setView('calendar')}
+                onClick={() => handleViewChange('calendar')}
                 className={`p-2 rounded-lg transition-colors ${
-                  view === 'calendar' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark 
-                      ? 'text-gray-300 hover:bg-white/10' 
+                  view === 'calendar'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
                       : 'text-gray-600 hover:bg-gray-100'
                 }`}
+                title="Calendar View"
               >
                 <Calendar size={18} />
               </button>
               <button
-                onClick={() => setView('kanban')}
+                onClick={() => handleViewChange('kanban')}
                 className={`p-2 rounded-lg transition-colors ${
-                  view === 'kanban' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark 
-                      ? 'text-gray-300 hover:bg-white/10' 
+                  view === 'kanban'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
                       : 'text-gray-600 hover:bg-gray-100'
                 }`}
+                title="Kanban Board"
               >
                 <Columns size={18} />
               </button>
               <button
-                onClick={() => setView('list')}
+                onClick={() => handleViewChange('list')}
                 className={`p-2 rounded-lg transition-colors ${
-                  view === 'list' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark 
-                      ? 'text-gray-300 hover:bg-white/10' 
+                  view === 'list'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
                       : 'text-gray-600 hover:bg-gray-100'
                 }`}
+                title="List View"
               >
                 <List size={18} />
               </button>
               <button
-                onClick={() => setView('activity')}
+                onClick={() => handleViewChange('activity')}
                 className={`p-2 rounded-lg transition-colors ${
-                  view === 'activity' 
-                    ? 'bg-blue-600 text-white' 
-                    : isDark 
-                      ? 'text-gray-300 hover:bg-white/10' 
+                  view === 'activity'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
                       : 'text-gray-600 hover:bg-gray-100'
                 }`}
+                title="Activity Feed"
               >
                 <Activity size={18} />
               </button>

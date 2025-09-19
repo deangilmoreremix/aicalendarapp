@@ -79,19 +79,10 @@ export const AIAutoFillButton: React.FC<AIAutoFillButtonProps> = ({
     }
   };
 
-  if (!canEnrich()) {
-    return (
-      <div className="text-xs text-gray-500 flex items-center space-x-1">
-        <Sparkles className="w-3 h-3" />
-        <span>Enter email or name for AI auto-fill</span>
-      </div>
-    );
-  }
-
   return (
     <button
       onClick={handleEnrichment}
-      disabled={isEnriching}
+      disabled={isEnriching || !canEnrich()}
       className={`
         ${getSizeClasses()}
         ${getVariantClasses()}
@@ -101,6 +92,7 @@ export const AIAutoFillButton: React.FC<AIAutoFillButtonProps> = ({
         disabled:opacity-50 disabled:cursor-not-allowed
         shadow-sm hover:shadow-md transform hover:scale-105
       `}
+      title={!canEnrich() ? "Enter email, LinkedIn URL, or name to enable AI auto-fill" : "AI auto-fill contact information"}
     >
       {isEnriching ? (
         <>

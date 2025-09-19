@@ -200,10 +200,23 @@ npm run build
 ```
 
 ### Configuration
+
+#### Supabase Database Setup
+1. Create a Supabase account at [supabase.com](https://supabase.com)
+2. Create a new project
+3. Go to Settings > API in your Supabase dashboard
+4. Copy your Project URL and anon/public key
+5. Update the `.env` file in the project root:
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key-here
+   ```
+6. Run the SQL migrations in your Supabase SQL editor (found in `supabase/migrations/` if available)
+
+#### Additional Configuration
 1. Set up your environment variables for AI services and integrations
-2. Configure database connections and API endpoints
-3. Set up authentication and authorization settings
-4. Configure email and calendar integrations
+2. Configure authentication and authorization settings
+3. Configure email and calendar integrations
 
 ## 📚 API Documentation
 
