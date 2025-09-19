@@ -88,8 +88,8 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
           {/* Event Details */}
           <div className="space-y-3">
             {/* Time */}
-            <div className="flex items-center space-x-2 text-sm">
-              <Clock className="h-4 w-4 text-gray-500" />
+            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+              <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <span>
                 {moment(event.start).format('MMMM D, YYYY [at] h:mm A')}
                 {event.end && ` - ${moment(event.end).format('h:mm A')}`}
@@ -109,20 +109,20 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                 </div>
 
                 {data.assignedUserName && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <User className="h-4 w-4 text-gray-500" />
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                    <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <span>{data.assignedUserName}</span>
                   </div>
                 )}
 
                 {data.description && (
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
                 {data.estimatedDuration && (
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <Clock className="h-4 w-4" />
                     <span>{data.estimatedDuration} minutes</span>
                   </div>
@@ -134,25 +134,25 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
             {!isTask && (
               <>
                 {data.location && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <MapPin className="h-4 w-4 text-gray-500" />
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                    <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <span>{data.location}</span>
                   </div>
                 )}
 
                 {data.description && (
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
                 {data.attendees && data.attendees.length > 0 && (
-                  <div className="text-sm">
-                    <span className="font-medium">Attendees:</span>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Attendees:</span>
                     <div className="mt-1 space-y-1">
                       {data.attendees.map((attendee: string, index: number) => (
                         <div key={index} className="flex items-center space-x-2">
-                          <User className="h-3 w-3 text-gray-400" />
+                          <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                           <span>{attendee}</span>
                         </div>
                       ))}
@@ -327,7 +327,7 @@ export const BigTaskCalendar: React.FC = () => {
     };
 
     return (
-      <div className="flex items-center justify-between p-4 border-b bg-white">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <Button
@@ -353,7 +353,7 @@ export const BigTaskCalendar: React.FC = () => {
             </Button>
           </div>
 
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {moment(date).format('MMMM YYYY')}
           </h2>
         </div>
@@ -416,7 +416,7 @@ export const BigTaskCalendar: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       <div className="flex-1 p-6">
         <Calendar
           localizer={localizer}

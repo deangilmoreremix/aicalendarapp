@@ -65,9 +65,9 @@ const TaskStats: React.FC = () => {
       {statCards.map((stat, index) => {
         const Icon = stat.icon;
         return (
-          <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div key={index} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm dark:shadow-gray-900/20 border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md dark:hover:shadow-gray-900/30 transition-shadow">
             <div className="flex items-center justify-between mb-4">
-              <div className={`${stat.bgColor} p-3 rounded-xl`}>
+              <div className={`${stat.bgColor} dark:bg-opacity-20 p-3 rounded-xl`}>
                 <Icon className={`w-6 h-6 ${stat.textColor}`} />
               </div>
               <div className="flex items-center space-x-1">
@@ -79,10 +79,10 @@ const TaskStats: React.FC = () => {
             </div>
             
             <div>
-              <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{stat.title}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">{stat.value}</p>
               {stat.subtitle && (
-                <p className="text-xs text-gray-500">{stat.subtitle}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{stat.subtitle}</p>
               )}
             </div>
           </div>

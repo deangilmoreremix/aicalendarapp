@@ -296,7 +296,10 @@ export const TasksAndFunnel: React.FC = () => {
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-2">
                 <h5 className="font-semibold text-blue-800">October {selectedDay}</h5>
-                <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                <button
+                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                  onClick={handleAddTask}
+                >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>

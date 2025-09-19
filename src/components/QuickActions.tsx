@@ -65,7 +65,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
     <>
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h3>
           {onContactsView && (
             <button
               onClick={onContactsView}
@@ -77,7 +77,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
           )}
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl p-6">
+        <div className="bg-white/10 dark:bg-gray-800/80 backdrop-blur-md border border-white/20 dark:border-gray-700/50 rounded-2xl shadow-xl dark:shadow-gray-900/20 p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {actions.map((action, index) => {
               const Icon = action.icon;
@@ -85,13 +85,13 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
                 <button
                   key={index}
                   onClick={action.onClick}
-                  className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-left hover:shadow-md transform hover:scale-105 transition-all duration-200"
+                  className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors cursor-pointer text-left hover:shadow-md dark:hover:shadow-gray-900/20 transform hover:scale-105 transition-all duration-200"
                 >
                   <div className={`${action.color} p-3 rounded-lg w-fit mb-3`}>
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <h4 className="font-semibold text-gray-900 mb-1">{action.title}</h4>
-                  <p className="text-sm text-gray-600">{action.description}</p>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{action.title}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{action.description}</p>
                 </button>
               );
             })}

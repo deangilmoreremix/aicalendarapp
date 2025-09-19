@@ -213,7 +213,11 @@ const RecentActivity: React.FC = () => {
           <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'} flex items-center`}>
             Recent Activity
             {aiAlerts.length > 0 && (
-              <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full flex items-center">
+              <span className={`ml-2 px-2 py-1 text-xs rounded-full flex items-center ${
+                isDark
+                  ? 'bg-purple-900/50 text-purple-200'
+                  : 'bg-purple-100 text-purple-800'
+              }`}>
                 <Sparkles className="w-3 h-3 mr-1" />
                 {aiAlerts.length} AI
               </span>
@@ -236,7 +240,9 @@ const RecentActivity: React.FC = () => {
                 key={index} 
                 className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${
                   isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50/80'
-                } ${isAIAlert ? 'bg-gradient-to-r from-purple-50/50 to-blue-50/50 border border-purple-200/50' : ''}`}
+                } ${isAIAlert ? (isDark
+                  ? 'bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-700/50'
+                  : 'bg-gradient-to-r from-purple-50/50 to-blue-50/50 border border-purple-200/50') : ''}`}
               >
                 <div className={`p-2 rounded-lg ${activity.color} ${isDark ? 'bg-opacity-10' : 'bg-opacity-10'} ${isAIAlert ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : ''}`}>
                   <Icon className={`w-4 h-4 ${isDark ? activity.color : activity.color}`} />
@@ -247,8 +253,10 @@ const RecentActivity: React.FC = () => {
                   <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'} mt-1`}>{activity.time}</p>
                   {isAIAlert && (
                     <div className="mt-2 flex items-center space-x-2">
-                      <Zap className="w-3 h-3 text-purple-600" />
-                      <span className="text-xs text-purple-700 font-medium">AI-Generated Alert</span>
+                      <Zap className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                      <span className={`text-xs font-medium ${
+                        isDark ? 'text-purple-300' : 'text-purple-700'
+                      }`}>AI-Generated Alert</span>
                     </div>
                   )}
                 </div>
@@ -259,15 +267,28 @@ const RecentActivity: React.FC = () => {
 
         {/* AI Insights Summary */}
         {aiAlerts.length > 2 && (
-          <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+          <div className={`mt-4 p-3 rounded-lg border ${
+            isDark
+              ? 'bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-purple-700/50'
+              : 'bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200'
+          }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Brain className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-900">
+                <Brain className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className={`text-sm font-medium ${
+                  isDark ? 'text-purple-100' : 'text-purple-900'
+                }`}>
                   {aiAlerts.length - 2} more AI insights available
                 </span>
               </div>
-              <button className="text-xs text-purple-600 hover:text-purple-800 underline">
+              <button
+                className={`text-xs underline ${
+                  isDark
+                    ? 'text-purple-400 hover:text-purple-300'
+                    : 'text-purple-600 hover:text-purple-800'
+                }`}
+                onClick={handleViewAllInsights}
+              >
                 View All
               </button>
             </div>

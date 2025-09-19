@@ -21,13 +21,13 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`
-        ${blurClasses[blur]} 
-        bg-white/10 
-        border border-white/20 
-        rounded-2xl 
-        shadow-xl 
+        ${blurClasses[blur]}
+        bg-white/10 dark:bg-gray-800/80
+        border border-white/20 dark:border-gray-700/50
+        rounded-2xl
+        shadow-xl dark:shadow-gray-900/20
         ${className}
       `}
       style={{

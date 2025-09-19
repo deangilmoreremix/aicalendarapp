@@ -117,23 +117,23 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showDate = true }
   };
 
   return (
-    <div className="flex items-start space-x-3 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+    <div className="flex items-start space-x-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
       <div className={`p-2 rounded-full ${colorClass}`}>
         <Icon className="h-4 w-4" />
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 mb-1">
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
           {activity.title}
         </p>
-        
+
         {activity.description && (
-          <p className="text-sm text-gray-600 mb-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
             {activity.description}
           </p>
         )}
         
-        <div className="flex items-center space-x-3 text-xs text-gray-500">
+        <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400">
           <span>{activity.userName}</span>
           {showDate && (
             <>
@@ -173,8 +173,8 @@ const ActivityGroup: React.FC<ActivityGroupProps> = ({ date, activities }) => {
 
   return (
     <div className="space-y-1">
-      <div className="sticky top-0 bg-white border-b border-gray-200 py-2 mb-2">
-        <h3 className="text-sm font-semibold text-gray-900">
+      <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 py-2 mb-2">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {formatGroupDate(date)}
         </h3>
       </div>
@@ -344,12 +344,12 @@ export const ActivityFeed: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="p-6 border-b">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
               Activity Feed
               <Sparkles className="w-5 h-5 ml-2 text-yellow-500" />
               {aiInsights.length > 0 && (
@@ -358,7 +358,7 @@ export const ActivityFeed: React.FC = () => {
                 </span>
               )}
             </h1>
-            <p className="text-gray-600">Track all task and project activities</p>
+            <p className="text-gray-600 dark:text-gray-400">Track all task and project activities</p>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -486,19 +486,19 @@ export const ActivityFeed: React.FC = () => {
       <div className="flex-1 overflow-auto">
         {/* AI Insights Section */}
         {showAIInsights && aiInsights.length > 0 && (
-          <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-200">
-            <h3 className="text-lg font-semibold text-purple-900 mb-4 flex items-center">
+          <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-b border-purple-200 dark:border-purple-700">
+            <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-4 flex items-center">
               <Sparkles className="w-5 h-5 mr-2" />
               AI-Generated Activity Insights
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {aiInsights.map((insight, index) => (
-                <div key={index} className="p-4 bg-white/70 rounded-lg border border-purple-100">
+                <div key={index} className="p-4 bg-white/70 dark:bg-gray-800/70 rounded-lg border border-purple-100 dark:border-purple-700">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Target className="w-4 h-4 text-purple-600" />
-                    <h4 className="font-medium text-purple-900">{insight.title}</h4>
+                    <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-medium text-purple-900 dark:text-purple-100">{insight.title}</h4>
                   </div>
-                  <p className="text-sm text-purple-800 mb-2">{insight.description}</p>
+                  <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">{insight.description}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-purple-600">
                       {insight.confidence}% confidence
@@ -549,8 +549,8 @@ export const ActivityFeed: React.FC = () => {
       </div>
 
       {/* Stats Footer */}
-      <div className="p-4 border-t bg-gray-50">
-        <div className="flex items-center justify-between text-sm text-gray-600">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>
             Showing {filteredActivities.length} of {activities.length} activities
           </span>

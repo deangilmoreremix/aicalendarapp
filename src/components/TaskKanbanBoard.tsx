@@ -38,10 +38,10 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
 const statusColumns = [
-  { id: 'pending', title: 'To Do', color: 'bg-gray-100', headerColor: 'bg-gray-50' },
-  { id: 'in-progress', title: 'In Progress', color: 'bg-blue-100', headerColor: 'bg-blue-50' },
-  { id: 'on-hold', title: 'On Hold', color: 'bg-yellow-100', headerColor: 'bg-yellow-50' },
-  { id: 'completed', title: 'Completed', color: 'bg-green-100', headerColor: 'bg-green-50' },
+  { id: 'pending', title: 'To Do', color: 'bg-gray-100 dark:bg-gray-800', headerColor: 'bg-gray-50 dark:bg-gray-700' },
+  { id: 'in-progress', title: 'In Progress', color: 'bg-blue-100 dark:bg-blue-900/20', headerColor: 'bg-blue-50 dark:bg-blue-900/30' },
+  { id: 'on-hold', title: 'On Hold', color: 'bg-yellow-100 dark:bg-yellow-900/20', headerColor: 'bg-yellow-50 dark:bg-yellow-900/30' },
+  { id: 'completed', title: 'Completed', color: 'bg-green-100 dark:bg-green-900/20', headerColor: 'bg-green-50 dark:bg-green-900/30' },
 ] as const;
 
 const priorityColors = {
@@ -205,10 +205,10 @@ interface ColumnHeaderProps {
 }
 
 const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTask }) => (
-  <div className={`p-4 rounded-t-lg ${column.headerColor} border-b`}>
+  <div className={`p-4 rounded-t-lg ${column.headerColor} dark:bg-opacity-80 border-b border-gray-200 dark:border-gray-600`}>
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-2">
-        <h3 className="font-semibold text-gray-800">{column.title}</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100">{column.title}</h3>
         <Badge variant="secondary" className="text-xs">
           {taskCount}
         </Badge>
@@ -217,7 +217,7 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
         size="sm"
         variant="ghost"
         onClick={onAddTask}
-        className="h-6 w-6 p-0 hover:bg-white/50"
+        className="h-6 w-6 p-0 hover:bg-white/50 dark:hover:bg-gray-700/50"
       >
         <Plus className="h-4 w-4" />
       </Button>
@@ -329,13 +329,13 @@ export const TaskKanbanBoard: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b bg-white">
+      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             Task Board
             <Sparkles className="w-5 h-5 ml-2 text-yellow-500" />
           </h1>
-          <p className="text-gray-600">Manage and track your tasks</p>
+          <p className="text-gray-600 dark:text-gray-400">Manage and track your tasks</p>
           
           {/* AI Smart Suggestions */}
           {smartSuggestions.length > 0 && (
@@ -444,9 +444,9 @@ export const TaskKanbanBoard: React.FC = () => {
       <div className="flex-1 p-6 overflow-auto">
         {/* AI Suggestions Banner */}
         {smartSuggestions.length > 0 && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
+          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border border-purple-200 dark:border-purple-700">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-purple-900 flex items-center">
+              <h3 className="font-semibold text-purple-900 dark:text-purple-100 flex items-center">
                 <Zap className="w-4 h-4 mr-2" />
                 AI Task Optimization Suggestions
               </h3>
@@ -456,11 +456,11 @@ export const TaskKanbanBoard: React.FC = () => {
             </div>
             <div className="space-y-2">
               {smartSuggestions.map((suggestion, index) => (
-                <div key={index} className="flex items-start space-x-2 p-2 bg-white/50 rounded-lg">
-                  <Target className="w-4 h-4 text-purple-600 mt-0.5" />
+                <div key={index} className="flex items-start space-x-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+                  <Target className="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-purple-900">{suggestion.title}</p>
-                    <p className="text-xs text-purple-700">{suggestion.description}</p>
+                    <p className="text-sm font-medium text-purple-900 dark:text-purple-100">{suggestion.title}</p>
+                    <p className="text-xs text-purple-700 dark:text-purple-300">{suggestion.description}</p>
                   </div>
                 </div>
               ))}
