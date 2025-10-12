@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM App - Host Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      background: #667eea;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #5568d3;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .iframe-container {
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    iframe {
+      width: 100%;
+      border: none;
+      min-height: 800px;
+      display: block;
+    }
+
+    .log {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      padding: 5px 0;
+      border-bottom: 1px solid #334155;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: #94a3b8;
+      margin-right: 10px;
+    }
+
+    .log-type {
+      color: #10b981;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+
+    .theme-selector {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      margin-left: 10px;
+    }
+
+    select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>CRM Calendar App - Embedded Demo</h1>
+      <p>This page demonstrates embedding the CRM app using postMessage communication</p>
+
+      <div class="controls">
+        <button onclick="sendInitialData()">Send Initial Data</button>
+        <button onclick="sendThemeLight()">Light Theme</button>
+        <button onclick="sendThemeDark()">Dark Theme</button>
+        <button onclick="updateContact()">Update Contact</button>
+        <button onclick="addTask()">Add Task</button>
+        <button onclick="clearLog()">Clear Log</button>
+
+        <div class="theme-selector">
+          <label for="primary-color">Primary Color:</label>
+          <select id="primary-color" onchange="updateThemeColor()">
+            <option value="#3b82f6">Blue</option>
+            <option value="#10b981">Green</option>
+            <option value="#f59e0b">Orange</option>
+            <option value="#ef4444">Red</option>
+            <option value="#8b5cf6">Purple</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="iframe-container">
+      <iframe id="crm-iframe" src="http://localhost:4173"></iframe>
+    </div>
+
+    <div class="log">
+      <div><strong>Communication Log:</strong></div>
+      <div id="log-content"></div>
+    </div>
+  </div>
+
+  <script>
+    const iframe = document.getElementById('crm-iframe');
+    const logContent = document.getElementById('log-content');
+    const TARGET_ORIGIN = 'http://localhost:4173';
+
+    function addLog(type, message, data) {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <span class="log-time">${time}</span>
+        <span class="log-type">${type}</span>
+        <span>${message}</span>
+        ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+      `;
+      logContent.appendChild(entry);
+      logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    function sendMessage(type, data) {
+      const message = { type, data };
+      iframe.contentWindow.postMessage(message, TARGET_ORIGIN);
+      addLog('SENT', type, data);
+    }
+
+    function sendInitialData() {
+      sendMessage('INITIAL_DATA_SYNC', {
+        contacts: [
+          { id: '1', name: 'John Doe', email: 'john@example.com', company: 'Acme Corp' },
+          { id: '2', name: 'Jane Smith', email: 'jane@example.com', company: 'Tech Inc' }
+        ],
+        deals: [
+          { id: '1', title: 'Big Deal', value: 50000, stage: 'Negotiation' }
+        ],
+        tasks: [
+          { id: '1', title: 'Follow up call', dueDate: new Date().toISOString(), priority: 'high' }
+        ],
+        user: { id: 'host-123', name: 'Host User', email: 'host@example.com' }
+      });
+    }
+
+    function sendThemeLight() {
+      sendMessage('SET_THEME', {
+        mode: 'light',
+        primaryColor: document.getElementById('primary-color').value,
+        secondaryColor: '#10b981'
+      });
+    }
+
+    function sendThemeDark() {
+      sendMessage('SET_THEME', {
+        mode: 'dark',
+        primaryColor: document.getElementById('primary-color').value,
+        secondaryColor: '#10b981'
+      });
+    }
+
+    function updateThemeColor() {
+      const mode = document.body.classList.contains('dark') ? 'dark' : 'light';
+      sendMessage('SET_THEME', {
+        mode,
+        primaryColor: document.getElementById('primary-color').value,
+        secondaryColor: '#10b981'
+      });
+    }
+
+    function updateContact() {
+      sendMessage('DATA_UPDATE', {
+        entityType: 'contact',
+        operation: 'update',
+        payload: {
+          id: '1',
+          name: 'John Doe (Updated)',
+          email: 'john.updated@example.com',
+          company: 'Acme Corp'
+        }
+      });
+    }
+
+    function addTask() {
+      const randomId = Math.random().toString(36).substr(2, 9);
+      sendMessage('DATA_UPDATE', {
+        entityType: 'task',
+        operation: 'create',
+        payload: {
+          id: randomId,
+          title: 'New task from host',
+          dueDate: new Date(Date.now() + 86400000).toISOString(),
+          priority: 'medium',
+          status: 'todo'
+        }
+      });
+    }
+
+    function clearLog() {
+      logContent.innerHTML = '';
+    }
+
+    // Listen for messages from iframe
+    window.addEventListener('message', (event) => {
+      if (event.origin !== TARGET_ORIGIN) {
+        console.warn('Message from unauthorized origin:', event.origin);
+        return;
+      }
+
+      const { type, data } = event.data;
+      addLog('RECEIVED', type, data);
+
+      // Handle specific message types
+      switch (type) {
+        case 'READY':
+          console.log('CRM App is ready!');
+          // Auto-send initial data when app is ready
+          setTimeout(() => {
+            sendInitialData();
+            sendThemeLight();
+          }, 500);
+          break;
+
+        case 'HEIGHT_CHANGE':
+          iframe.style.height = data.height + 'px';
+          break;
+
+        case 'BUTTON_CLICK':
+          console.log('Button clicked in CRM:', data.action);
+          break;
+
+        case 'DATA_CHANGE':
+          console.log('Data changed in CRM:', data);
+          break;
+
+        case 'ERROR':
+          console.error('CRM Error:', data.error, data.details);
+          break;
+      }
+    });
+
+    // Wait for iframe to load
+    iframe.addEventListener('load', () => {
+      addLog('SYSTEM', 'CRM App iframe loaded');
+    });
+
+    addLog('SYSTEM', 'Host application started');
+  </script>
+</body>
+</html>
