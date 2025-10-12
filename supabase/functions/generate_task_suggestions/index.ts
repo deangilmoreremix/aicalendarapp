@@ -1,10 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
 
 interface TaskSuggestion {
   id: string
@@ -24,8 +24,7 @@ interface TaskSuggestion {
   confidence: number
 }
 
-serve(async (req) => {
-  // Handle CORS
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -37,12 +36,10 @@ serve(async (req) => {
       throw new Error('Prompt is required')
     }
 
-    // For streaming responses (future enhancement)
     if (stream) {
       return handleStreamingResponse(prompt, context)
     }
 
-    // Generate AI suggestions using OpenAI or similar service
     const suggestions = await generateTaskSuggestions(prompt, context)
 
     return new Response(JSON.stringify(suggestions), {
@@ -64,13 +61,11 @@ serve(async (req) => {
 async function generateTaskSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
   const lowerPrompt = prompt.toLowerCase()
 
-  // Analyze prompt for keywords and context
   const urgencyKeywords = ['urgent', 'asap', 'immediately', 'critical', 'emergency']
   const projectKeywords = ['project', 'plan', 'strategy', 'implement', 'develop']
   const meetingKeywords = ['meeting', 'call', 'discussion', 'sync', 'review']
   const emailKeywords = ['email', 'send', 'write', 'compose', 'message']
 
-  // Determine priority based on keywords
   let priority: TaskSuggestion['priority'] = 'medium'
   if (urgencyKeywords.some(keyword => lowerPrompt.includes(keyword))) {
     priority = 'urgent'
@@ -78,7 +73,6 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     priority = 'high'
   }
 
-  // Determine category and type
   let category: TaskSuggestion['category'] = 'other'
   let type: TaskSuggestion['type'] = 'other'
 
@@ -96,7 +90,6 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     type = 'call'
   }
 
-  // Calculate suggested due date
   let suggestedDueDate: Date | undefined
   if (lowerPrompt.includes('today')) {
     suggestedDueDate = new Date()
@@ -105,14 +98,13 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
   } else if (lowerPrompt.includes('next week')) {
     suggestedDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   } else if (priority === 'urgent') {
-    suggestedDueDate = new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
+    suggestedDueDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
   } else if (priority === 'high') {
-    suggestedDueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days
+    suggestedDueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
   } else {
-    suggestedDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 1 week
+    suggestedDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   }
 
-  // Generate subtasks based on task complexity
   const subtasks = []
   if (projectKeywords.some(keyword => lowerPrompt.includes(keyword)) ||
       lowerPrompt.length > 50 ||
@@ -140,7 +132,6 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     )
   }
 
-  // Generate relevant tags
   const tags = []
   if (lowerPrompt.includes('client') || lowerPrompt.includes('customer')) tags.push('client')
   if (projectKeywords.some(keyword => lowerPrompt.includes(keyword))) tags.push('project')
@@ -151,12 +142,10 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
   if (lowerPrompt.includes('meeting')) tags.push('meeting')
   if (lowerPrompt.includes('email')) tags.push('communication')
 
-  // Calculate estimated duration
-  const baseDuration = 30 // 30 minutes base
+  const baseDuration = 30
   const subtaskDuration = subtasks.reduce((total, subtask) => total + (subtask.estimatedDuration || 0), 0)
   const estimatedDuration = Math.max(baseDuration, subtaskDuration)
 
-  // Generate reasoning
   let reasoning = `Task analyzed for priority "${priority}" based on keywords and context. `
   reasoning += `Category set to "${category}" due to detected activity type. `
 
@@ -184,15 +173,13 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     category,
     type,
     reasoning,
-    confidence: Math.round(75 + Math.random() * 20) // 75-95% confidence
+    confidence: Math.round(75 + Math.random() * 20)
   }]
 
   return suggestions
 }
 
 async function handleStreamingResponse(prompt: string, context?: any) {
-  // For now, return regular response
-  // In production, this would implement Server-Sent Events for real streaming
   const suggestions = await generateTaskSuggestions(prompt, context)
 
   return new Response(JSON.stringify(suggestions), {
