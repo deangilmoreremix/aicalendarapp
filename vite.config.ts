@@ -40,12 +40,10 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
+    assetsDir: 'assets',
     rollupOptions: {
-      external: [],
       output: {
-        format: 'systemjs',
-        entryFileNames: 'remoteEntry.js',
-        minifyInternalExports: false,
+        manualChunks: undefined,
       },
     },
   },
