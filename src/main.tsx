@@ -5,6 +5,8 @@ import './index.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AIProvider } from './contexts/AIContext';
 
+export { default } from './CalendarApp';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
