@@ -11,12 +11,14 @@ vi.mock('./store/taskStore', () => ({
   useTaskStore: () => ({
     tasks: {},
     markTaskComplete: vi.fn(),
+    loadInitialData: vi.fn(),
   }),
 }));
 
 vi.mock('./store/contactStore', () => ({
   useContactStore: () => ({
     contacts: {},
+    loadContacts: vi.fn(),
   }),
 }));
 
@@ -109,10 +111,10 @@ describe('App Component - Button Functionality', () => {
   test('view toggle buttons exist and have onClick handlers', () => {
     renderApp();
 
-    const calendarButton = screen.getByTitle('Calendar');
-    const kanbanButton = screen.getByTitle('Kanban');
-    const listButton = screen.getByTitle('List');
-    const activityButton = screen.getByTitle('Activity');
+    const calendarButton = screen.getByTitle('Calendar View');
+    const kanbanButton = screen.getByTitle('Kanban Board');
+    const listButton = screen.getByTitle('List View');
+    const activityButton = screen.getByTitle('Activity Feed');
 
     expect(calendarButton).toBeInTheDocument();
     expect(kanbanButton).toBeInTheDocument();
@@ -128,16 +130,16 @@ describe('App Component - Button Functionality', () => {
   test('calendar view button is active by default', () => {
     renderApp();
 
-    const calendarButton = screen.getByTitle('Calendar');
+    const calendarButton = screen.getByTitle('Calendar View');
     expect(calendarButton).toHaveClass('bg-blue-600', 'text-white');
   });
 
   test('can switch between views', () => {
     renderApp();
 
-    const kanbanButton = screen.getByTitle('Kanban');
-    const listButton = screen.getByTitle('List');
-    const activityButton = screen.getByTitle('Activity');
+    const kanbanButton = screen.getByTitle('Kanban Board');
+    const listButton = screen.getByTitle('List View');
+    const activityButton = screen.getByTitle('Activity Feed');
 
     fireEvent.click(kanbanButton);
     expect(kanbanButton).toHaveClass('bg-blue-600', 'text-white');
@@ -152,7 +154,7 @@ describe('App Component - Button Functionality', () => {
   test('generate AI insights button exists and has onClick handler', () => {
     renderApp();
 
-    const aiButton = screen.getByText('Generate AI Insights');
+    const aiButton = screen.getByRole('button', { name: /generate ai insights/i });
     expect(aiButton).toBeInTheDocument();
     expect(aiButton.tagName).toBe('BUTTON');
   });
@@ -211,7 +213,7 @@ describe('App Component - Button Functionality', () => {
   test('buttons handle disabled state properly', () => {
     renderApp();
 
-    const aiButton = screen.getByText('Generate AI Insights');
+    const aiButton = screen.getByRole('button', { name: /generate ai insights/i });
 
     // Initially should not be disabled
     expect(aiButton).not.toBeDisabled();

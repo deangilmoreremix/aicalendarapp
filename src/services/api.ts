@@ -1,5 +1,213 @@
 import { supabase } from '../lib/supabase';
-import { Contact, Task, Deal, Activity } from '../types';
+import { Contact, Task, Deal, Activity, AIInsight } from '../types';
+
+// TaskSuggestion interface for AI API
+interface TaskSuggestion {
+  id: string;
+  title: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  suggestedDueDate?: Date;
+  estimatedDuration?: number;
+  subtasks: Array<{
+    title: string;
+    estimatedDuration?: number;
+  }>;
+  tags: string[];
+  category: 'call' | 'email' | 'meeting' | 'follow-up' | 'other';
+  type: 'follow-up' | 'meeting' | 'call' | 'email' | 'proposal' | 'research' | 'administrative' | 'other';
+  reasoning: string;
+  confidence: number;
+}
+
+// Database record types
+interface ContactDB {
+  id: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  email: string;
+  phone?: string;
+  title: string;
+  company: string;
+  industry?: string;
+  avatar?: string;
+  avatar_src?: string;
+  sources: string[];
+  interest_level: string;
+  status: string;
+  tags: string[];
+  notes?: string;
+  social_profiles?: Record<string, string>;
+  custom_fields?: Record<string, string>;
+  is_favorite: boolean;
+  ai_score?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TaskDB {
+  id: string;
+  title: string;
+  description?: string;
+  due_date?: string;
+  priority: string;
+  status: string;
+  category: string;
+  type: string;
+  completed: boolean;
+  created_at: string;
+  completed_at?: string;
+  assigned_user_id?: string;
+  assigned_user_name?: string;
+  estimated_duration?: number;
+  actual_duration?: number;
+  tags: string[];
+  attachments?: any[];
+  subtasks?: any[];
+  related_to?: any;
+  notes?: string;
+}
+
+interface DealDB {
+  id: string;
+  company: string;
+  value: string;
+  probability: string;
+  due_date: string;
+  contact_id: string;
+  status: string;
+  stage: string;
+  priority: string;
+  ai_prediction?: number;
+  description?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Utility functions for data mapping
+export const mapContactFromDB = (contact: ContactDB): Contact => ({
+  id: contact.id,
+  firstName: contact.first_name,
+  lastName: contact.last_name,
+  name: contact.name,
+  email: contact.email,
+  phone: contact.phone,
+  title: contact.title,
+  company: contact.company,
+  industry: contact.industry,
+  avatar: contact.avatar,
+  avatarSrc: contact.avatar_src,
+  sources: contact.sources,
+  interestLevel: contact.interest_level as Contact['interestLevel'],
+  status: contact.status as Contact['status'],
+  tags: contact.tags,
+  notes: contact.notes,
+  socialProfiles: contact.social_profiles || {},
+  customFields: contact.custom_fields || {},
+  isFavorite: contact.is_favorite,
+  aiScore: contact.ai_score,
+  createdAt: new Date(contact.created_at),
+  updatedAt: new Date(contact.updated_at)
+});
+
+export const mapContactToDB = (contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) => ({
+  first_name: contact.firstName,
+  last_name: contact.lastName,
+  name: contact.name,
+  email: contact.email,
+  phone: contact.phone,
+  title: contact.title,
+  company: contact.company,
+  industry: contact.industry,
+  avatar: contact.avatar,
+  avatar_src: contact.avatarSrc,
+  sources: contact.sources,
+  interest_level: contact.interestLevel,
+  status: contact.status,
+  tags: contact.tags,
+  notes: contact.notes,
+  social_profiles: contact.socialProfiles,
+  custom_fields: contact.customFields,
+  is_favorite: contact.isFavorite,
+  ai_score: contact.aiScore
+});
+
+export const mapTaskFromDB = (task: TaskDB): Task => ({
+  id: task.id,
+  title: task.title,
+  description: task.description,
+  dueDate: task.due_date ? new Date(task.due_date) : undefined,
+  priority: task.priority as Task['priority'],
+  status: task.status as Task['status'],
+  category: task.category as Task['category'],
+  type: task.type as Task['type'],
+  completed: task.completed,
+  createdAt: new Date(task.created_at),
+  completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
+  assignedUserId: task.assigned_user_id,
+  assignedUserName: task.assigned_user_name,
+  estimatedDuration: task.estimated_duration,
+  actualDuration: task.actual_duration,
+  tags: task.tags,
+  attachments: task.attachments || [],
+  subtasks: task.subtasks || [],
+  relatedTo: task.related_to,
+  notes: task.notes
+});
+
+export const mapTaskToDB = (task: Omit<Task, 'id' | 'createdAt'>) => ({
+  title: task.title,
+  description: task.description,
+  due_date: task.dueDate?.toISOString(),
+  priority: task.priority,
+  status: task.status,
+  category: task.category,
+  type: task.type,
+  completed: task.completed,
+  completed_at: task.completedAt?.toISOString(),
+  assigned_user_id: task.assignedUserId,
+  assigned_user_name: task.assignedUserName,
+  estimated_duration: task.estimatedDuration,
+  actual_duration: task.actualDuration,
+  tags: task.tags,
+  attachments: task.attachments,
+  subtasks: task.subtasks,
+  related_to: task.relatedTo,
+  notes: task.notes
+});
+
+export const mapDealFromDB = (deal: DealDB): Deal => ({
+  id: deal.id,
+  company: deal.company,
+  value: deal.value,
+  probability: deal.probability,
+  dueDate: deal.due_date || '',
+  contactId: deal.contact_id,
+  status: deal.status as Deal['status'],
+  stage: deal.stage as Deal['stage'],
+  priority: deal.priority as Deal['priority'],
+  aiPrediction: deal.ai_prediction,
+  description: deal.description,
+  notes: deal.notes,
+  createdAt: new Date(deal.created_at),
+  updatedAt: new Date(deal.updated_at)
+});
+
+export const mapDealToDB = (deal: any) => ({
+  company: deal.company,
+  value: deal.value,
+  probability: deal.probability,
+  due_date: deal.dueDate,
+  contact_id: deal.contactId,
+  status: deal.status,
+  stage: deal.stage,
+  priority: deal.priority,
+  ai_prediction: deal.aiPrediction,
+  description: deal.description,
+  notes: deal.notes
+});
 
 // Contact API
 export const contactApi = {
@@ -11,109 +219,30 @@ export const contactApi = {
 
     if (error) throw error;
 
-    return data.map(contact => ({
-      id: contact.id,
-      firstName: contact.first_name,
-      lastName: contact.last_name,
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone,
-      title: contact.title,
-      company: contact.company,
-      industry: contact.industry,
-      avatar: contact.avatar,
-      avatarSrc: contact.avatar_src,
-      sources: contact.sources,
-      interestLevel: contact.interest_level,
-      status: contact.status,
-      tags: contact.tags,
-      notes: contact.notes,
-      socialProfiles: contact.social_profiles,
-      customFields: contact.custom_fields,
-      isFavorite: contact.is_favorite,
-      aiScore: contact.ai_score,
-      createdAt: new Date(contact.created_at),
-      updatedAt: new Date(contact.updated_at)
-    }));
+    return data.map(mapContactFromDB);
   },
 
   async create(contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact> {
     const { data, error } = await supabase
       .from('contacts')
-      .insert({
-        first_name: contact.firstName,
-        last_name: contact.lastName,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone,
-        title: contact.title,
-        company: contact.company,
-        industry: contact.industry,
-        avatar: contact.avatar,
-        avatar_src: contact.avatarSrc,
-        sources: contact.sources,
-        interest_level: contact.interestLevel,
-        status: contact.status,
-        tags: contact.tags,
-        notes: contact.notes,
-        social_profiles: contact.socialProfiles,
-        custom_fields: contact.customFields,
-        is_favorite: contact.isFavorite,
-        ai_score: contact.aiScore
-      })
+      .insert(mapContactToDB(contact))
       .select()
       .single();
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      title: data.title,
-      company: data.company,
-      industry: data.industry,
-      avatar: data.avatar,
-      avatarSrc: data.avatar_src,
-      sources: data.sources,
-      interestLevel: data.interest_level,
-      status: data.status,
-      tags: data.tags,
-      notes: data.notes,
-      socialProfiles: data.social_profiles,
-      customFields: data.custom_fields,
-      isFavorite: data.is_favorite,
-      aiScore: data.ai_score,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
+    return mapContactFromDB(data);
   },
 
   async update(id: string, updates: Partial<Contact>): Promise<Contact> {
     const updateData: any = {};
 
-    if (updates.firstName !== undefined) updateData.first_name = updates.firstName;
-    if (updates.lastName !== undefined) updateData.last_name = updates.lastName;
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.email !== undefined) updateData.email = updates.email;
-    if (updates.phone !== undefined) updateData.phone = updates.phone;
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.company !== undefined) updateData.company = updates.company;
-    if (updates.industry !== undefined) updateData.industry = updates.industry;
-    if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
-    if (updates.avatarSrc !== undefined) updateData.avatar_src = updates.avatarSrc;
-    if (updates.sources !== undefined) updateData.sources = updates.sources;
-    if (updates.interestLevel !== undefined) updateData.interest_level = updates.interestLevel;
-    if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.tags !== undefined) updateData.tags = updates.tags;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
-    if (updates.socialProfiles !== undefined) updateData.social_profiles = updates.socialProfiles;
-    if (updates.customFields !== undefined) updateData.custom_fields = updates.customFields;
-    if (updates.isFavorite !== undefined) updateData.is_favorite = updates.isFavorite;
-    if (updates.aiScore !== undefined) updateData.ai_score = updates.aiScore;
+    Object.keys(updates).forEach(key => {
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (updates[key as keyof Contact] !== undefined) {
+        updateData[dbKey] = updates[key as keyof Contact];
+      }
+    });
 
     const { data, error } = await supabase
       .from('contacts')
@@ -124,30 +253,7 @@ export const contactApi = {
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      title: data.title,
-      company: data.company,
-      industry: data.industry,
-      avatar: data.avatar,
-      avatarSrc: data.avatar_src,
-      sources: data.sources,
-      interestLevel: data.interest_level,
-      status: data.status,
-      tags: data.tags,
-      notes: data.notes,
-      socialProfiles: data.social_profiles,
-      customFields: data.custom_fields,
-      isFavorite: data.is_favorite,
-      aiScore: data.ai_score,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
+    return mapContactFromDB(data);
   },
 
   async delete(id: string): Promise<void> {
@@ -170,103 +276,31 @@ export const taskApi = {
 
     if (error) throw error;
 
-    return data.map(task => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      dueDate: task.due_date ? new Date(task.due_date) : undefined,
-      priority: task.priority,
-      status: task.status,
-      category: task.category,
-      type: task.type,
-      completed: task.completed,
-      createdAt: new Date(task.created_at),
-      completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
-      assignedUserId: task.assigned_user_id,
-      assignedUserName: task.assigned_user_name,
-      estimatedDuration: task.estimated_duration,
-      actualDuration: task.actual_duration,
-      tags: task.tags,
-      attachments: task.attachments,
-      subtasks: task.subtasks,
-      relatedTo: task.related_to,
-      notes: task.notes
-    }));
+    return data.map(mapTaskFromDB);
   },
 
   async create(task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
     const { data, error } = await supabase
       .from('tasks')
-      .insert({
-        title: task.title,
-        description: task.description,
-        due_date: task.dueDate?.toISOString(),
-        priority: task.priority,
-        status: task.status,
-        category: task.category,
-        type: task.type,
-        completed: task.completed,
-        completed_at: task.completedAt?.toISOString(),
-        assigned_user_id: task.assignedUserId,
-        assigned_user_name: task.assignedUserName,
-        estimated_duration: task.estimatedDuration,
-        actual_duration: task.actualDuration,
-        tags: task.tags,
-        attachments: task.attachments,
-        subtasks: task.subtasks,
-        related_to: task.relatedTo,
-        notes: task.notes
-      })
+      .insert(mapTaskToDB(task))
       .select()
       .single();
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      dueDate: data.due_date ? new Date(data.due_date) : undefined,
-      priority: data.priority,
-      status: data.status,
-      category: data.category,
-      type: data.type,
-      completed: data.completed,
-      createdAt: new Date(data.created_at),
-      completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
-      assignedUserId: data.assigned_user_id,
-      assignedUserName: data.assigned_user_name,
-      estimatedDuration: data.estimated_duration,
-      actualDuration: data.actual_duration,
-      tags: data.tags,
-      attachments: data.attachments,
-      subtasks: data.subtasks,
-      relatedTo: data.related_to,
-      notes: data.notes
-    };
+    return mapTaskFromDB(data);
   },
 
   async update(id: string, updates: Partial<Task>): Promise<Task> {
     const updateData: any = {};
 
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate?.toISOString();
-    if (updates.priority !== undefined) updateData.priority = updates.priority;
-    if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.type !== undefined) updateData.type = updates.type;
-    if (updates.completed !== undefined) updateData.completed = updates.completed;
-    if (updates.completedAt !== undefined) updateData.completed_at = updates.completedAt?.toISOString();
-    if (updates.assignedUserId !== undefined) updateData.assigned_user_id = updates.assignedUserId;
-    if (updates.assignedUserName !== undefined) updateData.assigned_user_name = updates.assignedUserName;
-    if (updates.estimatedDuration !== undefined) updateData.estimated_duration = updates.estimatedDuration;
-    if (updates.actualDuration !== undefined) updateData.actual_duration = updates.actualDuration;
-    if (updates.tags !== undefined) updateData.tags = updates.tags;
-    if (updates.attachments !== undefined) updateData.attachments = updates.attachments;
-    if (updates.subtasks !== undefined) updateData.subtasks = updates.subtasks;
-    if (updates.relatedTo !== undefined) updateData.related_to = updates.relatedTo;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    Object.keys(updates).forEach(key => {
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (updates[key as keyof Task] !== undefined) {
+        const value = updates[key as keyof Task];
+        updateData[dbKey] = value instanceof Date ? value.toISOString() : value;
+      }
+    });
 
     const { data, error } = await supabase
       .from('tasks')
@@ -277,28 +311,7 @@ export const taskApi = {
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      dueDate: data.due_date ? new Date(data.due_date) : undefined,
-      priority: data.priority,
-      status: data.status,
-      category: data.category,
-      type: data.type,
-      completed: data.completed,
-      createdAt: new Date(data.created_at),
-      completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
-      assignedUserId: data.assigned_user_id,
-      assignedUserName: data.assigned_user_name,
-      estimatedDuration: data.estimated_duration,
-      actualDuration: data.actual_duration,
-      tags: data.tags,
-      attachments: data.attachments,
-      subtasks: data.subtasks,
-      relatedTo: data.related_to,
-      notes: data.notes
-    };
+    return mapTaskFromDB(data);
   },
 
   async delete(id: string): Promise<void> {
@@ -313,7 +326,7 @@ export const taskApi = {
 
 // Deal API
 export const dealApi = {
-  async getAll(): Promise<any[]> {
+  async getAll(): Promise<Deal[]> {
     const { data, error } = await supabase
       .from('deals')
       .select('*')
@@ -321,77 +334,28 @@ export const dealApi = {
 
     if (error) throw error;
 
-    return data.map(deal => ({
-      id: deal.id,
-      company: deal.company,
-      value: deal.value,
-      probability: deal.probability,
-      dueDate: deal.due_date,
-      contactId: deal.contact_id,
-      status: deal.status,
-      stage: deal.stage,
-      priority: deal.priority,
-      aiPrediction: deal.ai_prediction,
-      description: deal.description,
-      notes: deal.notes,
-      createdAt: new Date(deal.created_at),
-      updatedAt: new Date(deal.updated_at)
-    }));
+    return data.map(mapDealFromDB);
   },
 
-  async create(deal: any): Promise<any> {
+  async create(deal: Omit<Deal, 'id' | 'createdAt' | 'updatedAt'>): Promise<Deal> {
     const { data, error } = await supabase
       .from('deals')
-      .insert({
-        company: deal.company,
-        value: deal.value,
-        probability: deal.probability,
-        due_date: deal.dueDate,
-        contact_id: deal.contactId,
-        status: deal.status,
-        stage: deal.stage,
-        priority: deal.priority,
-        ai_prediction: deal.aiPrediction,
-        description: deal.description,
-        notes: deal.notes
-      })
+      .insert(mapDealToDB(deal))
       .select()
       .single();
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      company: data.company,
-      value: data.value,
-      probability: data.probability,
-      dueDate: data.due_date,
-      contactId: data.contact_id,
-      status: data.status,
-      stage: data.stage,
-      priority: data.priority,
-      aiPrediction: data.ai_prediction,
-      description: data.description,
-      notes: data.notes,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
+    return mapDealFromDB(data);
   },
 
-  async update(id: string, updates: any): Promise<any> {
-    const updateData: any = {};
+  async update(id: string, updates: Partial<Deal>): Promise<Deal> {
+    const updateData: Partial<DealDB> = {};
 
-    if (updates.company !== undefined) updateData.company = updates.company;
-    if (updates.value !== undefined) updateData.value = updates.value;
-    if (updates.probability !== undefined) updateData.probability = updates.probability;
-    if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate;
-    if (updates.contactId !== undefined) updateData.contact_id = updates.contactId;
-    if (updates.status !== undefined) updateData.status = updates.status;
-    if (updates.stage !== undefined) updateData.stage = updates.stage;
-    if (updates.priority !== undefined) updateData.priority = updates.priority;
-    if (updates.aiPrediction !== undefined) updateData.ai_prediction = updates.aiPrediction;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    Object.keys(updates).forEach(key => {
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      (updateData as any)[dbKey] = (updates as any)[key];
+    });
 
     const { data, error } = await supabase
       .from('deals')
@@ -402,22 +366,7 @@ export const dealApi = {
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      company: data.company,
-      value: data.value,
-      probability: data.probability,
-      dueDate: data.due_date,
-      contactId: data.contact_id,
-      status: data.status,
-      stage: data.stage,
-      priority: data.priority,
-      aiPrediction: data.ai_prediction,
-      description: data.description,
-      notes: data.notes,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
+    return mapDealFromDB(data);
   },
 
   async delete(id: string): Promise<void> {
@@ -448,22 +397,7 @@ export const dealApi = {
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      company: data.company,
-      value: data.value,
-      probability: data.probability,
-      dueDate: data.due_date,
-      contactId: data.contact_id,
-      status: data.status,
-      stage: data.stage,
-      priority: data.priority,
-      aiPrediction: data.ai_prediction,
-      description: data.description,
-      notes: data.notes,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
-    };
+    return mapDealFromDB(data);
   }
 };
 
@@ -526,7 +460,7 @@ export const activityApi = {
 
 // AI API (Edge Functions)
 export const aiApi = {
-  async generateInsights(contacts: Contact[]): Promise<any[]> {
+  async generateInsights(contacts: Contact[]): Promise<AIInsight[]> {
     const { data, error } = await supabase.functions.invoke('generate_ai_insights', {
       body: { contacts }
     });
@@ -562,7 +496,7 @@ export const aiApi = {
     return data;
   },
 
-  async generateTaskSuggestions(prompt: string, context?: any): Promise<any> {
+  async generateTaskSuggestions(prompt: string, context?: Record<string, unknown>): Promise<TaskSuggestion[]> {
     const { data, error } = await supabase.functions.invoke('generate_task_suggestions', {
       body: { prompt, context }
     });
@@ -571,7 +505,7 @@ export const aiApi = {
     return data;
   },
 
-  async streamTaskSuggestions(prompt: string, onChunk?: (chunk: string) => void): Promise<any> {
+  async streamTaskSuggestions(prompt: string, onChunk?: (chunk: string) => void): Promise<TaskSuggestion> {
     // For now, implement as regular call - streaming can be added later with WebSockets/SSE
     const { data, error } = await supabase.functions.invoke('generate_task_suggestions', {
       body: { prompt, stream: true }

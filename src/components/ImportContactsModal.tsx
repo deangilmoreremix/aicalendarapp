@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { useContactStore } from '../store/contactStore';
+import { contactApi } from '../services/api';
 import { Contact } from '../types';
 import { 
   X, 
@@ -103,6 +104,7 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResults, setImportResults] = useState<{ success: number; failed: number } | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; status: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'guide' | 'upload' | 'preview'>('guide');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,19 +146,47 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
     }
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleFileSelect = (selectedFile: File) => {
+    // File type validation
     if (!selectedFile.name.endsWith('.csv')) {
       setErrors(['Please select a CSV file']);
       return;
     }
-    
+
+    // File size validation
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setErrors(['File size must be less than 10MB']);
+      return;
+    }
+
+    // Content type validation
+    if (!selectedFile.type.includes('text') && !selectedFile.type.includes('csv')) {
+      setErrors(['Invalid file type. Please select a valid CSV file.']);
+      return;
+    }
+
     setFile(selectedFile);
     setErrors([]);
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
       try {
+        // Basic content security check - ensure it looks like CSV
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length === 0) {
+          setErrors(['File appears to be empty']);
+          return;
+        }
+
+        // Check for potentially malicious content (very basic)
+        if (text.includes('<script') || text.includes('javascript:') || text.includes('data:')) {
+          setErrors(['File contains potentially unsafe content']);
+          return;
+        }
+
         const parsed = parseCSV(text);
         setCsvData(parsed);
         processCSVData(parsed);
@@ -173,28 +203,29 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
       setErrors(['CSV must contain at least a header row and one data row']);
       return;
     }
-    
+
     const headers = data[0].map(h => h.toLowerCase().trim());
     const rows = data.slice(1);
     const newErrors: string[] = [];
     const contacts: any[] = [];
-    
+    const seenEmails = new Set<string>();
+
     rows.forEach((row, index) => {
       const contact: any = {};
-      
+
       headers.forEach((header, colIndex) => {
         if (row[colIndex]) {
           contact[header] = row[colIndex].trim();
         }
       });
-      
+
       // Generate full name if not provided
       if (!contact.name && contact.firstname && contact.lastname) {
         contact.name = `${contact.firstname} ${contact.lastname}`;
       } else if (!contact.name && contact.firstName && contact.lastName) {
         contact.name = `${contact.firstName} ${contact.lastName}`;
       }
-      
+
       // Default values
       contact.sources = contact.sources ? contact.sources.split(',').map((s: string) => s.trim()) : ['Manual Import'];
       contact.interestLevel = contact.interestlevel || 'medium';
@@ -203,7 +234,17 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
       contact.title = contact.title || 'Professional';
       contact.avatarSrc = `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2`;
       contact.tags = contact.tags ? contact.tags.split(',').map((t: string) => t.trim()) : [];
-      
+
+      // Check for duplicate emails within the CSV
+      const email = contact.email || contact.email?.toLowerCase();
+      if (email && seenEmails.has(email)) {
+        newErrors.push(`Row ${index + 2}: Duplicate email "${email}" found in CSV`);
+        return;
+      }
+      if (email) {
+        seenEmails.add(email);
+      }
+
       const validationErrors = validateContact(contact);
       if (validationErrors.length > 0) {
         newErrors.push(`Row ${index + 2}: ${validationErrors.join(', ')}`);
@@ -211,21 +252,47 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
         contacts.push(contact);
       }
     });
-    
+
     setErrors(newErrors);
     setParsedContacts(contacts);
   };
 
   const handleImport = async () => {
     if (parsedContacts.length === 0) return;
-    
+
     setIsProcessing(true);
+    setImportProgress({ current: 0, total: parsedContacts.length, status: 'Starting import...' });
+
     try {
-      await importContacts(parsedContacts);
-      setImportResults({ success: parsedContacts.length, failed: errors.length });
+      let successCount = 0;
+      let failCount = 0;
+
+      // Import contacts with progress tracking
+      for (let i = 0; i < parsedContacts.length; i++) {
+        try {
+          setImportProgress({
+            current: i + 1,
+            total: parsedContacts.length,
+            status: `Importing contact ${i + 1} of ${parsedContacts.length}...`
+          });
+
+          await contactApi.create(parsedContacts[i]);
+          successCount++;
+
+          // Small delay to show progress
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error(`Failed to import contact ${i + 1}:`, error);
+          failCount++;
+        }
+      }
+
+      setImportResults({ success: successCount, failed: failCount });
+      setImportProgress(null);
       setActiveTab('preview');
     } catch (error) {
       setErrors(['Failed to import contacts']);
+      setImportProgress(null);
     } finally {
       setIsProcessing(false);
     }
@@ -248,7 +315,13 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="import-contacts-title"
+      aria-describedby="import-contacts-description"
+    >
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50">
@@ -257,8 +330,8 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
               <Upload className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Import Contacts</h2>
-              <p className="text-gray-600">Upload CSV file to import multiple contacts</p>
+              <h2 id="import-contacts-title" className="text-2xl font-bold text-gray-900">Import Contacts</h2>
+              <p id="import-contacts-description" className="text-gray-600">Upload CSV file to import multiple contacts</p>
             </div>
           </div>
           <button
@@ -280,7 +353,7 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id as 'guide' | 'upload' | 'preview')}
                 className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
@@ -411,6 +484,15 @@ Sarah,Johnson,sarah.j@startup.io,Startup Inc,CEO,+1-555-0456`}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
+                role="button"
+                tabIndex={0}
+                aria-label="Drag and drop CSV file here or click to browse"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
               >
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -451,18 +533,25 @@ Sarah,Johnson,sarah.j@startup.io,Startup Inc,CEO,+1-555-0456`}
                 accept=".csv"
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 className="hidden"
+                aria-label="Select CSV file for contact import"
+                id="csv-file-input"
               />
 
               {/* Errors */}
               {errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div
+                  className="bg-red-50 border border-red-200 rounded-lg p-4"
+                  role="alert"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   <div className="flex items-start space-x-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" aria-hidden="true" />
                     <div>
                       <h4 className="font-semibold text-red-900 mb-2">Import Errors</h4>
-                      <ul className="space-y-1">
+                      <ul className="space-y-1" role="list">
                         {errors.map((error, index) => (
-                          <li key={index} className="text-sm text-red-700">• {error}</li>
+                          <li key={index} className="text-sm text-red-700" role="listitem">• {error}</li>
                         ))}
                       </ul>
                     </div>
@@ -520,6 +609,27 @@ Sarah,Johnson,sarah.j@startup.io,Startup Inc,CEO,+1-555-0456`}
                       <span>Import {parsedContacts.length} Contacts</span>
                     </ModernButton>
                   </div>
+
+                  {/* Import Progress */}
+                  {importProgress && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4" role="status" aria-live="polite">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-blue-900">{importProgress.status}</span>
+                        <span className="text-sm text-blue-700">{importProgress.current}/{importProgress.total}</span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                          aria-valuenow={importProgress.current}
+                          aria-valuemin={0}
+                          aria-valuemax={importProgress.total}
+                          role="progressbar"
+                          aria-label="Import progress"
+                        ></div>
+                      </div>
+                    </div>
+                  )}
 
                   {parsedContacts.length > 0 && (
                     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

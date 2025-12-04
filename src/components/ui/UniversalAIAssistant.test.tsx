@@ -13,8 +13,25 @@ vi.mock('lucide-react', () => ({
   Brain: () => <div data-testid="brain-icon">Brain</div>,
   Sparkles: () => <div data-testid="sparkles-icon">Sparkles</div>,
   X: () => <div data-testid="x-icon">X</div>,
-  User: () => <div data-testid="user-icon">User</div>
+  User: () => <div data-testid="user-icon">User</div>,
+  RefreshCw: () => <div data-testid="refresh-icon">RefreshCw</div>,
+  Lightbulb: () => <div data-testid="lightbulb-icon">Lightbulb</div>,
+  Target: () => <div data-testid="target-icon">Target</div>,
+  Zap: () => <div data-testid="zap-icon">Zap</div>,
+  DollarSign: () => <div data-testid="dollar-icon">DollarSign</div>,
+  Users: () => <div data-testid="users-icon">Users</div>,
+  Mail: () => <div data-testid="mail-icon">Mail</div>,
+  TrendingUp: () => <div data-testid="trending-icon">TrendingUp</div>,
+  ThumbsUp: () => <div data-testid="thumbs-up-icon">ThumbsUp</div>,
+  ThumbsDown: () => <div data-testid="thumbs-down-icon">ThumbsDown</div>,
+  Calendar: () => <div data-testid="calendar-icon">Calendar</div>,
+  CheckCircle2: () => <div data-testid="check-icon">CheckCircle2</div>,
+  Tag: () => <div data-testid="tag-icon">Tag</div>,
+  Clock: () => <div data-testid="clock-icon">Clock</div>
 }));
+
+// Mock the config icon
+const MockIcon = () => <div data-testid="brain-icon">Brain</div>;
 
 describe('UniversalAIAssistant', () => {
   const mockUseAI = {
@@ -28,7 +45,7 @@ describe('UniversalAIAssistant', () => {
     title: 'AI Contact Assistant',
     placeholder: 'Describe the contact you want to add...',
     examplePrompts: ['Add John Smith, CEO of TechCorp'],
-    icon: () => <div>Icon</div>
+    icon: MockIcon
   };
 
   const defaultProps = {
@@ -124,7 +141,7 @@ describe('UniversalAIAssistant', () => {
 
     it('should disable generate button when prompt is empty', () => {
       render(<UniversalAIAssistant {...defaultProps} />);
-      const button = screen.getByText('Generate');
+      const button = screen.getByRole('button', { name: /generate/i });
       expect(button).toBeDisabled();
     });
 

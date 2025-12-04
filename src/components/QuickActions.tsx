@@ -85,6 +85,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
                 <button
                   key={index}
                   onClick={action.onClick}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      action.onClick();
+                    }
+                  }}
                   className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors cursor-pointer text-left hover:shadow-md dark:hover:shadow-gray-900/20 transform hover:scale-105 transition-all duration-200"
                 >
                   <div className={`${action.color} p-3 rounded-lg w-fit mb-3`}>

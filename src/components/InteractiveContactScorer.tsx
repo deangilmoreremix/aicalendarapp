@@ -2,21 +2,22 @@ import React, { useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { ModernButton } from './ui/ModernButton';
 import { useAI } from '../contexts/AIContext';
-import { 
-  Brain, 
-  Sparkles, 
-  User, 
-  Building, 
-  Mail, 
-  TrendingUp, 
-  Target, 
+import {
+  Brain,
+  Sparkles,
+  User,
+  Building,
+  Mail,
+  TrendingUp,
+  Target,
   CheckCircle,
   Loader2,
   Award,
   AlertCircle
 } from 'lucide-react';
+import { SkeletonText, SkeletonButton } from './ui/Skeleton';
 
-export const InteractiveContactScorer: React.FC = () => {
+export const InteractiveContactScorer: React.FC = React.memo(() => {
   const { scoreContact, generateInsights, isProcessing } = useAI();
   const [formData, setFormData] = useState({
     name: '',
@@ -254,7 +255,31 @@ export const InteractiveContactScorer: React.FC = () => {
             </div>
           )}
 
-          {score !== null ? (
+          {isProcessing ? (
+            <>
+              {/* Loading State */}
+              <div className="text-center">
+                <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+                <SkeletonText lines={2} className="mb-4" />
+              </div>
+
+              {/* Loading Insights */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200">
+                <SkeletonText lines={1} className="mb-3" />
+                <div className="space-y-2">
+                  <SkeletonText lines={3} />
+                </div>
+              </div>
+
+              {/* Loading Actions */}
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <SkeletonText lines={1} className="mb-2" />
+                <SkeletonText lines={3} />
+              </div>
+            </>
+          ) : score !== null ? (
             <>
               {/* Score Display */}
               <div className="text-center">
@@ -284,7 +309,7 @@ export const InteractiveContactScorer: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Advanced AI Insights */}
                 {aiInsights.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-blue-200">
@@ -372,4 +397,6 @@ export const InteractiveContactScorer: React.FC = () => {
       </div>
     </GlassCard>
   );
-};
+});
+
+InteractiveContactScorer.displayName = 'InteractiveContactScorer';

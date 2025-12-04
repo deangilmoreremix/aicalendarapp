@@ -4,13 +4,114 @@ import { useAI } from '../contexts/AIContext';
 import { AIProvider } from '../contexts/AIContext';
 import { useStreamingAI } from '../hooks/useStreamingAI';
 import { AIEnrichmentService } from '../services/aiEnrichmentService';
+import { Contact } from '../types';
 import React from 'react';
+
+// Mock the API services
+vi.mock('../services/api', () => ({
+  aiApi: {
+    generateInsights: vi.fn(),
+    predictDealSuccess: vi.fn(),
+    optimizeMeetingTime: vi.fn(),
+    generateMeetingAgenda: vi.fn(),
+    generateTaskSuggestions: vi.fn(),
+    streamTaskSuggestions: vi.fn(),
+  },
+}));
+
+// Get access to the mocked module
+const { aiApi } = vi.mocked(await import('../services/api'));
+
+// Mock Supabase
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    functions: {
+      invoke: vi.fn(),
+    },
+  },
+}));
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <AIProvider>{children}</AIProvider>
 );
 
 describe('AI Features', () => {
+  beforeEach(() => {
+    // Reset all mocks
+    vi.clearAllMocks();
+
+    // Set up mock implementations
+    (aiApi.generateInsights as any).mockResolvedValue([
+      {
+        id: '1',
+        type: 'opportunity',
+        title: 'High-Value Prospects Identified',
+        description: 'Contacts show high conversion potential',
+        confidence: 92,
+        actionable: true,
+        suggestedActions: ['Schedule follow-ups'],
+        createdAt: new Date()
+      }
+    ]);
+
+    (aiApi.predictDealSuccess as any).mockResolvedValue(75);
+    (aiApi.optimizeMeetingTime as any).mockResolvedValue([new Date()]);
+    (aiApi.generateMeetingAgenda as any).mockResolvedValue(['Welcome', 'Discussion', 'Next steps']);
+    (aiApi.generateTaskSuggestions as any).mockImplementation((prompt: string) => {
+      if (prompt.includes('URGENT')) {
+        return Promise.resolve([{
+          id: '1',
+          title: 'Test urgent task',
+          priority: 'urgent',
+          category: 'meeting',
+          type: 'meeting',
+          subtasks: [],
+          tags: [],
+          reasoning: 'Test reasoning',
+          confidence: 85
+        }]);
+      } else if (prompt.includes('Plan and implement')) {
+        return Promise.resolve([{
+          id: '1',
+          title: 'Complex task',
+          priority: 'high',
+          category: 'meeting',
+          type: 'meeting',
+          subtasks: [
+            { title: 'Break down requirements', estimatedDuration: 30 },
+            { title: 'Identify key milestones', estimatedDuration: 20 }
+          ],
+          tags: [],
+          reasoning: 'Test reasoning',
+          confidence: 85
+        }]);
+      } else {
+        return Promise.resolve([{
+          id: '1',
+          title: 'Test task',
+          priority: 'high',
+          category: 'meeting',
+          type: 'meeting',
+          subtasks: [],
+          tags: [],
+          reasoning: 'Test reasoning',
+          confidence: 85
+        }]);
+      }
+    });
+    (aiApi.streamTaskSuggestions as any).mockResolvedValue({
+      id: '1',
+      title: 'Streamed task',
+      priority: 'high',
+      category: 'meeting',
+      type: 'meeting',
+      subtasks: [],
+      tags: [],
+      reasoning: 'Streamed reasoning',
+      confidence: 85
+    });
+  });
+
   describe('AIContext and Provider', () => {
     it('should provide AI context with all methods', () => {
       const { result } = renderHook(() => useAI(), { wrapper });
@@ -39,13 +140,21 @@ describe('AI Features', () => {
 
       expect(result.current.isProcessing).toBe(false);
 
-      const mockContact = {
+      const mockContact: Contact = {
         id: '1',
         firstName: 'John',
         lastName: 'Doe',
+        name: 'John Doe',
         email: 'john@example.com',
         title: 'CEO',
         company: 'Acme Corp',
+        sources: ['website'],
+        interestLevel: 'hot' as const,
+        status: 'prospect' as const,
+        tags: [],
+        socialProfiles: {},
+        customFields: {},
+        isFavorite: false,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -68,14 +177,21 @@ describe('AI Features', () => {
     it('should score contacts based on title and company', async () => {
       const { result } = renderHook(() => useAI(), { wrapper });
 
-      const seniorContact = {
+      const seniorContact: Contact = {
         id: '1',
         firstName: 'Jane',
         lastName: 'Smith',
+        name: 'Jane Smith',
         email: 'jane@example.com',
         title: 'CEO',
         company: 'Tech Corp Inc',
+        sources: ['website'],
         interestLevel: 'hot' as const,
+        status: 'prospect' as const,
+        tags: [],
+        socialProfiles: {},
+        customFields: {},
+        isFavorite: false,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -271,14 +387,22 @@ describe('AI Features', () => {
     it('should generate insights from contacts', async () => {
       const { result } = renderHook(() => useAI(), { wrapper });
 
-      const mockContacts = [
+      const mockContacts: Contact[] = [
         {
           id: '1',
           firstName: 'John',
           lastName: 'Doe',
+          name: 'John Doe',
           email: 'john@example.com',
           title: 'CEO',
           company: 'Acme Corp',
+          sources: ['website'],
+          interestLevel: 'hot' as const,
+          status: 'prospect' as const,
+          tags: [],
+          socialProfiles: {},
+          customFields: {},
+          isFavorite: false,
           aiScore: 85,
           createdAt: new Date(),
           updatedAt: new Date()

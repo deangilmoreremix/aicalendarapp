@@ -138,7 +138,7 @@ describe('QuickActions Component - Button Functionality', () => {
   test('buttons are keyboard accessible', () => {
     renderQuickActions();
 
-    const newContactButton = screen.getByText('New Contact');
+    const newContactButton = screen.getByRole('button', { name: /new contact/i });
 
     // Focus the button
     newContactButton.focus();
@@ -168,10 +168,10 @@ describe('QuickActions Component - Button Functionality', () => {
   test('action buttons have proper styling', () => {
     renderQuickActions();
 
-    const newDealButton = screen.getByText('New Deal');
-    const newContactButton = screen.getByText('New Contact');
-    const scheduleButton = screen.getByText('Schedule Meeting');
-    const emailButton = screen.getByText('Send Email');
+    const newDealButton = screen.getByRole('button', { name: /new deal/i });
+    const newContactButton = screen.getByRole('button', { name: /new contact/i });
+    const scheduleButton = screen.getByRole('button', { name: /schedule meeting/i });
+    const emailButton = screen.getByRole('button', { name: /send email/i });
 
     // Check that they are button elements
     expect(newDealButton.tagName).toBe('BUTTON');
@@ -189,7 +189,7 @@ describe('QuickActions Component - Button Functionality', () => {
   test('View All Contacts button has proper styling', () => {
     renderQuickActions();
 
-    const viewContactsButton = screen.getByText('View All Contacts');
+    const viewContactsButton = screen.getByRole('button', { name: /view all contacts/i });
 
     expect(viewContactsButton.tagName).toBe('BUTTON');
     expect(viewContactsButton.className).toMatch(/bg-blue/);

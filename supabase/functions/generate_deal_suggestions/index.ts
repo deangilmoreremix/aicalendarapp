@@ -32,14 +32,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { prompt, context } = await req.json()
+    const body = await req.json()
+    const { prompt, context } = body
 
-    if (!prompt) {
-      throw new Error('Prompt is required')
+    // Input validation
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('Prompt is required and must be a string')
     }
 
+    if (prompt.length < 3) {
+      throw new Error('Prompt must be at least 3 characters long')
+    }
+
+    if (prompt.length > 1000) {
+      throw new Error('Prompt must be less than 1000 characters')
+    }
+
+    // Basic sanitization - remove potentially harmful characters
+    const sanitizedPrompt = prompt.replace(/[<>\"'&]/g, '')
+
     // Generate AI deal suggestions
-    const suggestions = await generateDealSuggestions(prompt, context)
+    const suggestions = await generateDealSuggestions(sanitizedPrompt, context)
 
     return new Response(JSON.stringify(suggestions), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

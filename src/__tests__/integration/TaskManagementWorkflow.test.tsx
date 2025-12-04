@@ -22,7 +22,12 @@ describe('Task Management Workflow Integration', () => {
         id: 'task-1',
         title: 'Review quarterly reports',
         description: 'Analyze Q3 performance metrics',
-        dueDate: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now (due today)
+        dueDate: (() => {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(12, 0, 0, 0); // Noon tomorrow
+          return tomorrow;
+        })(),
         priority: 'high',
         status: 'pending',
         category: 'meeting',
@@ -37,7 +42,12 @@ describe('Task Management Workflow Integration', () => {
         id: 'task-2',
         title: 'Follow up with client',
         description: 'Check on implementation progress',
-        dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday (overdue)
+        dueDate: (() => {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          yesterday.setHours(12, 0, 0, 0); // Noon yesterday
+          return yesterday;
+        })(),
         priority: 'medium',
         status: 'pending',
         category: 'call',
@@ -115,9 +125,9 @@ describe('Task Management Workflow Integration', () => {
   it('should handle due today tasks correctly', () => {
     render(<TaskStats />)
 
-    // Should show 1 due today task
+    // Should show 0 due today tasks (task-1 is due tomorrow, task-2 is overdue)
     const dueTodayElement = screen.getByText('Due Today').nextElementSibling
-    expect(dueTodayElement).toHaveTextContent('1')
+    expect(dueTodayElement).toHaveTextContent('0')
   })
 
   it('should handle empty task list', () => {

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2 } from 'lucide-react';
-import { BigTaskCalendar } from './components/BigTaskCalendar';
-import { TaskKanbanBoard } from './components/TaskKanbanBoard';
-import { ActivityFeed } from './components/ActivityFeed';
+
+// Lazy load heavy components
+const BigTaskCalendar = lazy(() => import('./components/BigTaskCalendar').then(module => ({ default: module.BigTaskCalendar })));
+const TaskKanbanBoard = lazy(() => import('./components/TaskKanbanBoard').then(module => ({ default: module.TaskKanbanBoard })));
+const ActivityFeed = lazy(() => import('./components/ActivityFeed').then(module => ({ default: module.ActivityFeed })));
 import RecentActivity from './components/RecentActivity';
 import TaskStats from './components/TaskStats';
 import { useTheme } from './contexts/ThemeContext';
@@ -21,24 +23,20 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { SkeletonCard } from './components/ui/Skeleton';
+import ErrorBoundary from './components/ui/ErrorBoundary';
+import Toast from './components/ui/Toast';
 
 const App: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
   const { insights, generateInsights } = useAI();
-  const { tasks, markTaskComplete } = useTaskStore();
-  const { contacts } = useContactStore();
+  const { tasks, markTaskComplete, loadInitialData } = useTaskStore();
+  const { contacts, loadContacts } = useContactStore();
   const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity'>('calendar');
 
-  // Debug function to track view changes
   const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity') => {
-    console.log('View changing from', view, 'to', newView);
     setView(newView);
   };
-
-  // Debug effect to track view state changes
-  React.useEffect(() => {
-    console.log('View state changed to:', view);
-  }, [view]);
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<TaskFilters>({});
@@ -48,6 +46,19 @@ const App: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [showDeleteMockDataDialog, setShowDeleteMockDataDialog] = useState(false);
+
+  // Load initial data on mount
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        await loadInitialData();
+        await loadContacts();
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+      }
+    };
+    loadData();
+  }, [loadInitialData, loadContacts]);
 
   const TaskListView: React.FC = () => {
     const filteredTasks = Object.values(tasks).filter(task => {
@@ -192,19 +203,35 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    console.log('Rendering view:', view);
-    switch (view) {
-      case 'calendar':
-        return <BigTaskCalendar />;
-      case 'kanban':
-        return <TaskKanbanBoard />;
-      case 'activity':
-        return <ActivityFeed />;
-      case 'list':
-        return <TaskListView />;
-      default:
-        return <BigTaskCalendar />;
-    }
+    const ViewLoadingSkeleton: React.FC = () => (
+      <div className="space-y-4">
+        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    );
+
+    return (
+      <Suspense fallback={<ViewLoadingSkeleton />}>
+        {(() => {
+          switch (view) {
+            case 'calendar':
+              return <BigTaskCalendar />;
+            case 'kanban':
+              return <TaskKanbanBoard />;
+            case 'activity':
+              return <ActivityFeed />;
+            case 'list':
+              return <TaskListView />;
+            default:
+              return <BigTaskCalendar />;
+          }
+        })()}
+      </Suspense>
+    );
   };
 
   const handleGenerateInsights = async () => {
@@ -227,10 +254,6 @@ const App: React.FC = () => {
           <div>
             <h1 className={`text-4xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Calendar</h1>
             <p className={`${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Manage your tasks and schedule with intelligent insights</p>
-            {/* Debug: Current View Indicator */}
-            <div className="text-xs text-blue-500 font-mono mt-1">
-              Current View: {view.toUpperCase()}
-            </div>
           </div>
           
           <div className="flex items-center gap-3">

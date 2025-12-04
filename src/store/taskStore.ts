@@ -25,6 +25,7 @@ interface TaskActions {
   setFilters: (filters: Partial<TaskFilters>) => void;
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => void;
   setSelectedTask: (task: Task | null) => void;
+  loadInitialData: () => Promise<void>;
 }
 
 type TaskStore = TaskState & TaskActions;
@@ -153,9 +154,9 @@ const sampleActivities: Activity[] = [
 ];
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
-  tasks: sampleTasks,
-  calendarEvents: sampleCalendarEvents,
-  activities: sampleActivities,
+  tasks: {},
+  calendarEvents: [],
+  activities: [],
   appointments: {},
   selectedTask: null,
   filters: {},
@@ -325,5 +326,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   setSelectedTask: (task) => {
     set({ selectedTask: task?.id || null });
+  },
+
+  loadInitialData: async () => {
+    const state = get();
+    if (Object.keys(state.tasks).length === 0) {
+      await state.loadTasks();
+    }
   },
 }));

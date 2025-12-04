@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckSquare, Calendar, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 
-const TaskStats: React.FC = () => {
+const TaskStats: React.FC = React.memo(() => {
   const { tasks } = useTaskStore();
   const taskList = Object.values(tasks);
 
@@ -90,6 +90,8 @@ const TaskStats: React.FC = () => {
       })}
     </div>
   );
-};
+});
+
+TaskStats.displayName = 'TaskStats';
 
 export default TaskStats;

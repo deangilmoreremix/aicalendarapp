@@ -36,6 +36,7 @@ import {
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { TaskDetailsModal } from './TaskDetailsModal';
+import { SkeletonList } from './ui/Skeleton';
 
 const statusColumns = [
   { id: 'pending', title: 'To Do', color: 'bg-gray-100 dark:bg-gray-800', headerColor: 'bg-gray-50 dark:bg-gray-700' },
@@ -68,7 +69,7 @@ interface TaskCardProps {
   onClick: () => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick }) => {
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) => {
   const isOverdue = task.dueDate && task.dueDate < new Date() && task.status !== 'completed';
   const isDueToday = task.dueDate && 
     task.dueDate.toDateString() === new Date().toDateString();
@@ -78,7 +79,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick }) => {
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => (
-        <Card
+        <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
@@ -87,6 +88,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick }) => {
           } ${isOverdue ? 'border-red-300 bg-red-50' : ''}`}
           onClick={onClick}
         >
+          <Card>
           <CardContent className="p-4">
             {/* Header */}
             <div className="flex items-start justify-between mb-2">
@@ -193,10 +195,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick }) => {
             )}
           </CardContent>
         </Card>
-      )}
-    </Draggable>
+      </div>
+    )}
+  </Draggable>
   );
-};
+});
+
+TaskCard.displayName = 'TaskCard';
 
 interface ColumnHeaderProps {
   column: typeof statusColumns[0];
@@ -226,13 +231,14 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
 );
 
 export const TaskKanbanBoard: React.FC = () => {
-  const { 
-    getFilteredTasks, 
-    updateTask, 
-    filters, 
+  const {
+    getFilteredTasks,
+    updateTask,
+    filters,
     setFilters,
     setSelectedTask,
-    selectedTask 
+    selectedTask,
+    isLoading
   } = useTaskStore();
   const { predictNextBestAction, generateInsights, isProcessing } = useAI();
   
@@ -493,21 +499,27 @@ export const TaskKanbanBoard: React.FC = () => {
                         }`}
                         style={{ minHeight: '500px' }}
                       >
-                        {columnTasks.map((task, index) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            index={index}
-                            onClick={() => handleTaskClick(task)}
-                          />
-                        ))}
-                        {provided.placeholder}
-                        
-                        {columnTasks.length === 0 && (
-                          <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-                            <CheckCircle2 className="h-8 w-8 mb-2" />
-                            <p className="text-sm">No tasks</p>
-                          </div>
+                        {isLoading ? (
+                          <SkeletonList items={3} />
+                        ) : (
+                          <>
+                            {columnTasks.map((task, index) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                onClick={() => handleTaskClick(task)}
+                              />
+                            ))}
+                            {provided.placeholder}
+
+                            {columnTasks.length === 0 && (
+                              <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                                <CheckCircle2 className="h-8 w-8 mb-2" />
+                                <p className="text-sm">No tasks</p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

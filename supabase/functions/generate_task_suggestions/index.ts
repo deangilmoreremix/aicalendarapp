@@ -30,17 +30,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { prompt, context, stream } = await req.json()
+    const body = await req.json()
+    const { prompt, context, stream } = body
 
-    if (!prompt) {
-      throw new Error('Prompt is required')
+    // Input validation
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('Prompt is required and must be a string')
     }
+
+    if (prompt.length < 3) {
+      throw new Error('Prompt must be at least 3 characters long')
+    }
+
+    if (prompt.length > 1000) {
+      throw new Error('Prompt must be less than 1000 characters')
+    }
+
+    // Basic sanitization - remove potentially harmful characters
+    const sanitizedPrompt = prompt.replace(/[<>\"'&]/g, '')
 
     if (stream) {
       return handleStreamingResponse(prompt, context)
     }
 
-    const suggestions = await generateTaskSuggestions(prompt, context)
+    const suggestions = await generateTaskSuggestions(sanitizedPrompt, context)
 
     return new Response(JSON.stringify(suggestions), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -179,8 +192,8 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
   return suggestions
 }
 
-async function handleStreamingResponse(prompt: string, context?: any) {
-  const suggestions = await generateTaskSuggestions(prompt, context)
+async function handleStreamingResponse(sanitizedPrompt: string, context?: any) {
+  const suggestions = await generateTaskSuggestions(sanitizedPrompt, context)
 
   return new Response(JSON.stringify(suggestions), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
