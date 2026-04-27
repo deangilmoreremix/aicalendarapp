@@ -8,5 +8,5 @@ Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
 Access-Control-Allow-Headers = "Content-Type, Authorization, X-Client-Info, Apikey"
 
 [build]
-command = "npx vite build"
+command = "rm -rf twenty && npx vite build"
 publish = "dist"
