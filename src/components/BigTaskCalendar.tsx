@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Event, NavigateAction, ToolbarProps } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { CalendarMonthCardAdapter } from '../adapters/twenty/calendar/CalendarMonthCardAdapter';
+import { CalendarContext } from '../adapters/twenty/calendar/CalendarContext';
+import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
 import {
   Dialog,
   DialogContent,
@@ -237,6 +240,47 @@ export const BigTaskCalendar: React.FC = () => {
     return [...taskEvents, ...calendarEventItems];
   }, [tasks, calendarEvents, visibleCalendars]);
 
+  // Convert to Twenty format
+  const twentyEvents: TimelineCalendarEvent[] = useMemo(() => {
+    return events.map(event => ({
+      id: event.id,
+      title: event.title,
+      isFullDay: event.allDay,
+      startsAt: event.start.toISOString(),
+      endsAt: event.end?.toISOString(),
+      visibility: 'SHARE_EVERYTHING' as const,
+      participants: event.resource.type === 'calendar-event' && event.resource.data.attendees
+        ? event.resource.data.attendees.map((attendee: string) => ({
+            displayName: attendee,
+            firstName: '',
+            lastName: '',
+          }))
+        : [],
+    }));
+  }, [events]);
+
+  // Group events by day for Twenty context
+  const calendarEventsByDayTime = useMemo(() => {
+    const grouped: Record<number, TimelineCalendarEvent[]> = {};
+    twentyEvents.forEach(event => {
+      const dayTime = new Date(event.startsAt).setHours(0, 0, 0, 0);
+      if (!grouped[dayTime]) grouped[dayTime] = [];
+      grouped[dayTime].push(event);
+    });
+    return grouped;
+  }, [twentyEvents]);
+
+  // Generate dayTimes for current month
+  const dayTimes = useMemo(() => {
+    const days: number[] = [];
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+      days.push(d.setHours(0, 0, 0, 0));
+    }
+    return days;
+  }, [currentDate]);
+
   const handleSelectEvent = (event: TaskEvent) => {
     setSelectedEvent(event);
     setShowEventModal(true);
@@ -417,27 +461,16 @@ export const BigTaskCalendar: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+      <CustomToolbar
+        date={currentDate}
+        view={currentView}
+        onNavigate={(action) => handleNavigate(action === 'DATE' ? currentDate : action === 'PREV' ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+        onView={handleViewChange}
+      />
       <div className="flex-1 p-6">
-        <Calendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: 'calc(100vh - 200px)' }}
-          date={currentDate}
-          view={currentView}
-          onNavigate={handleNavigate}
-          onView={handleViewChange}
-          onSelectEvent={handleSelectEvent}
-          eventPropGetter={eventStyleGetter}
-          components={{
-            toolbar: CustomToolbar,
-          }}
-          popup
-          showMultiDayTimes
-          step={15}
-          timeslots={4}
-        />
+        <CalendarContext.Provider value={{ calendarEventsByDayTime }}>
+          <CalendarMonthCardAdapter dayTimes={dayTimes} />
+        </CalendarContext.Provider>
       </div>
 
       {/* Event Details Modal */}

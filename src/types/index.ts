@@ -44,6 +44,16 @@ export interface Attachment {
   uploadedAt: Date;
 }
 
+export interface CalendarEventParticipant {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  avatarUrl?: string;
+  handle?: string;
+  personId?: string;
+  workspaceMemberId?: string;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -52,10 +62,15 @@ export interface CalendarEvent {
   endDate: Date;
   isAllDay: boolean;
   location?: string;
-  attendees?: string[];
+  attendees?: string[]; // legacy
+  participants?: CalendarEventParticipant[];
   calendarId: string;
   type: 'meeting' | 'call' | 'event' | 'reminder';
   status: 'scheduled' | 'completed' | 'cancelled';
+  isCanceled?: boolean;
+  conferenceSolution?: string;
+  conferenceLink?: string;
+  visibility?: 'SHARE_EVERYTHING' | 'METADATA';
 }
 
 export interface Activity {

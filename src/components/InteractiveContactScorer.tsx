@@ -26,7 +26,11 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
     email: '',
     industry: '',
     interestLevel: 'medium',
-    sources: ''
+    sources: '',
+    linkedin: '',
+    twitter: '',
+    website: '',
+    phone: ''
   });
   const [score, setScore] = useState<number | null>(null);
   const [insights, setInsights] = useState<string[]>([]);
@@ -62,12 +66,16 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
         sources: formData.sources ? formData.sources.split(',').map(s => s.trim()) : [],
         tags: [],
         notes: '',
-        socialProfiles: {},
+        socialProfiles: {
+          linkedin: formData.linkedin,
+          twitter: formData.twitter,
+          website: formData.website,
+        },
         customFields: {},
         isFavorite: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        phone: '',
+        phone: formData.phone,
         avatarSrc: ''
       };
 
@@ -206,6 +214,59 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
             />
             <p className="text-xs text-gray-500 mt-1">Separate multiple sources with commas</p>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              LinkedIn Profile
+            </label>
+            <input
+              type="url"
+              value={formData.linkedin}
+              onChange={(e) => handleInputChange('linkedin', e.target.value)}
+              placeholder="https://linkedin.com/in/johnsmith"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Twitter Handle
+            </label>
+            <input
+              type="text"
+              value={formData.twitter}
+              onChange={(e) => handleInputChange('twitter', e.target.value)}
+              placeholder="@johnsmith"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Website
+            </label>
+            <input
+              type="url"
+              value={formData.website}
+              onChange={(e) => handleInputChange('website', e.target.value)}
+              placeholder="https://johnsmith.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleInputChange('phone', e.target.value)}
+              placeholder="+1 (555) 123-4567"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Interest Level

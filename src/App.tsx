@@ -1,5 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
-import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2 } from 'lucide-react';
+import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings } from 'lucide-react';
 
 // Lazy load heavy components
 const BigTaskCalendar = lazy(() => import('./components/BigTaskCalendar').then(module => ({ default: module.BigTaskCalendar })));
@@ -23,6 +23,7 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { CalendarSettings } from './components/CalendarSettings';
 import { SkeletonCard } from './components/ui/Skeleton';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import Toast from './components/ui/Toast';
@@ -46,6 +47,7 @@ const App: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [showDeleteMockDataDialog, setShowDeleteMockDataDialog] = useState(false);
+  const [showCalendarSettings, setShowCalendarSettings] = useState(false);
 
   // Load initial data on mount
   React.useEffect(() => {
@@ -270,6 +272,19 @@ const App: React.FC = () => {
               <Trash2 size={18} />
             </button>
 
+            {/* Settings Button */}
+            <button
+              onClick={() => setShowCalendarSettings(true)}
+              className={`p-2 rounded-xl transition-colors ${
+                isDark
+                  ? 'bg-white/10 text-white hover:bg-white/20'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm border border-gray-200'
+              }`}
+              title="Calendar Settings"
+            >
+              <Settings size={18} />
+            </button>
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -478,6 +493,30 @@ const App: React.FC = () => {
         isOpen={showDeleteMockDataDialog}
         onClose={() => setShowDeleteMockDataDialog(false)}
       />
+
+      {/* Calendar Settings Modal */}
+      {showCalendarSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
+            isDark ? 'text-white' : 'text-gray-900'
+          }`}>
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Calendar Settings</h2>
+                <button
+                  onClick={() => setShowCalendarSettings(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <CalendarSettings />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

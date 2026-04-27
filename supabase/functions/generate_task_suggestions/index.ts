@@ -72,6 +72,78 @@ Deno.serve(async (req) => {
 })
 
 async function generateTaskSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
+  // Use OpenAI for intelligent task analysis
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!openaiApiKey) {
+    // Fallback to rule-based if no API key
+    return generateRuleBasedSuggestions(prompt, context)
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'system',
+          content: `You are an AI assistant that analyzes text prompts to generate structured task suggestions for a productivity app. 
+
+Your response must be valid JSON with this exact structure:
+{
+  "suggestions": [{
+    "id": "unique_string",
+    "title": "concise_task_title",
+    "description": "brief_description",
+    "priority": "low" | "medium" | "high" | "urgent",
+    "suggestedDueDate": "YYYY-MM-DD" | null,
+    "estimatedDuration": number_in_minutes,
+    "subtasks": [{"title": "subtask_name", "estimatedDuration": number_in_minutes}],
+    "tags": ["tag1", "tag2"],
+    "category": "call" | "email" | "meeting" | "follow-up" | "other",
+    "type": "follow-up" | "meeting" | "call" | "email" | "proposal" | "research" | "administrative" | "other",
+    "reasoning": "explanation_of_analysis",
+    "confidence": number_0_to_100
+  }]
+}
+
+Guidelines:
+- Analyze the prompt for urgency, complexity, and type
+- Suggest appropriate priority, due date, and duration
+- Break down complex tasks into logical subtasks
+- Add relevant tags for organization
+- Provide detailed reasoning for your analysis
+- Set realistic time estimates
+- Use today's date as reference for due dates`
+        }, {
+          role: 'user',
+          content: `Analyze this task prompt and generate a structured suggestion: "${prompt}"`
+        }],
+        temperature: 0.3,
+        max_tokens: 1000
+      })
+    })
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content
+
+    if (content) {
+      const parsed = JSON.parse(content)
+      return parsed.suggestions || [generateFallbackSuggestion(prompt)]
+    }
+  } catch (error) {
+    console.error('OpenAI API error:', error)
+  }
+
+  // Fallback to rule-based
+  return generateRuleBasedSuggestions(prompt, context)
+}
+
+function generateRuleBasedSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
+  // Original rule-based logic as fallback
   const lowerPrompt = prompt.toLowerCase()
 
   const urgencyKeywords = ['urgent', 'asap', 'immediately', 'critical', 'emergency']
@@ -189,7 +261,24 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     confidence: Math.round(75 + Math.random() * 20)
   }]
 
-  return suggestions
+  return Promise.resolve(suggestions)
+}
+
+function generateFallbackSuggestion(prompt: string): TaskSuggestion {
+  return {
+    id: Math.random().toString(36).substr(2, 9),
+    title: prompt.length > 60 ? prompt.substring(0, 57) + '...' : prompt,
+    description: `AI-generated task based on: "${prompt}". This task has been intelligently analyzed and structured for optimal completion.`,
+    priority: 'medium',
+    suggestedDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    estimatedDuration: 60,
+    subtasks: [],
+    tags: [],
+    category: 'other',
+    type: 'other',
+    reasoning: 'Fallback suggestion generated due to processing error.',
+    confidence: 50
+  }
 }
 
 async function handleStreamingResponse(sanitizedPrompt: string, context?: any) {

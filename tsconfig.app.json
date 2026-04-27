@@ -18,7 +18,15 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "@twenty/*": ["twenty/packages/twenty-front/src/*"],
+      "@twenty-shared/*": ["twenty/packages/twenty-shared/src/*"],
+      "@twenty-ui/*": ["twenty/packages/twenty-ui/src/*"]
+    }
   },
   "include": ["src"]
 }
