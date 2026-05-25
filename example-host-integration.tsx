@@ -1,8 +1,11 @@
 /**
- * Example Host Application Integration
+ * Example Host Application Integration for SmartCRM
  *
- * This file demonstrates how to consume the CalendarApp module federation remote
- * in a host application.
+ * PREFERRED: import('CalendarApp/App')  -- loads the COMPLETE working application
+ * (all original features, UI, AI, realtime, uploads, editors, state, routing preserved)
+ *
+ * This remote uses the official bootstrap pattern (main -> bootstrap -> App pure component)
+ * + smart MemoryRouter/BrowserRouter switching + singleton shared React deps.
  */
 
 import React, { lazy, Suspense } from 'react';

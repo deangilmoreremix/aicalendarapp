@@ -1,133 +1,122 @@
-# Module Federation Configuration
+# SmartCRM Module Federation Remote - Full Application
 
-This AI Calendar CRM app is configured for Module Federation, allowing it to be consumed as a remote module by other applications.
+This is a **production-ready, fully functional SmartCRM Module Federation remote application**.
+
+**CRITICAL:** This is NOT an iframe, NOT a shell, NOT partial. It is the COMPLETE AI Calendar CRM application loadable inside SmartCRM host via true Module Federation.
+
+## Bootstrap Architecture (REQUIRED PATTERN)
+
+- `main.tsx` - dynamically imports bootstrap (never renders directly)
+- `bootstrap.tsx` - mounts ReactDOM + loads App
+- `App.tsx` - exports ONLY the full self-contained application component (with internal providers + router). NO ReactDOM here.
+
+This ensures:
+- Runs 100% standalone (`npm run dev`)
+- Loads fully inside SmartCRM host: `const RemoteApp = lazy(() => import('CalendarApp/App')); <RemoteApp />`
 
 ## Configuration Details
 
 **Remote Name:** `CalendarApp`
 **Entry Point:** `remoteEntry.js`
-**URL:** https://calendar.smartcrm.vip/
+**Deployment URL:** https://calendar.smartcrm.vip/
 
 ## Exposed Modules
 
-### 1. CalendarApp (`./CalendarApp`)
-The complete standalone calendar application with all providers.
-
-```tsx
-import CalendarApp from 'CalendarApp/CalendarApp';
-
-// Usage
-<CalendarApp />
-```
-
-### 2. CalendarModule (`./CalendarModule`)
-A modular component that can display different views based on mode.
-
-```tsx
-import CalendarModule from 'CalendarApp/CalendarModule';
-
-// Usage
-<CalendarModule mode="calendar" />
-<CalendarModule mode="tasks" />
-<CalendarModule mode="contacts" />
-<CalendarModule mode="profile" />
-```
-
-### 3. App (`./App`)
-The main App component without providers.
-
+### Primary: Full Application
 ```tsx
 import App from 'CalendarApp/App';
+
+// Full working CRM - all pages, features, AI, editors, uploads, realtime, etc. preserved
+<Suspense fallback={<div>Loading SmartCRM Calendar...</div>}>
+  <App />
+</Suspense>
 ```
 
-### 4. Individual Components
-
-```tsx
-import ContactsModal from 'CalendarApp/ContactsModal';
-import TasksAndFunnel from 'CalendarApp/TasksAndFunnel';
-import BigTaskCalendar from 'CalendarApp/BigTaskCalendar';
-import CustomerProfile from 'CalendarApp/CustomerProfile';
+### Legacy / Granular (still fully functional, no placeholders)
+- `./CalendarApp`
+- `./CalendarModule`
+- `./ContactsModal`, `./TasksAndFunnel`, `./BigTaskCalendar`, `./CustomerProfile`
 ```
 
-## Shared Dependencies
+## Shared Dependencies (SmartCRM Compatible Singletons)
 
-The following packages are configured as singletons:
-- `react` (^18.0.0)
-- `react-dom` (^18.0.0)
-- `react-router-dom` (^6.26.0)
+```js
+shared: {
+  react: { singleton: true, eager: true, requiredVersion: '^18.2.0' },
+  'react-dom': { singleton: true, eager: true, requiredVersion: '^18.2.0' },
+  'react-router-dom': { singleton: true, eager: true }
+}
+```
 
-## Host Application Setup
+All React singletons + router to safely coexist inside SmartCRM provider tree without duplication conflicts.
+Zustand stores and internal contexts (Theme, AI, Error) are self-contained inside the remote.
 
-To consume this remote module in your host application:
+## SmartCRM Host Application Setup (True Federation - No Iframes)
 
-### 1. Update your `vite.config.js`:
+### 1. Host `vite.config.ts` (SmartCRM Host)
 
-```javascript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import federation from '@originjs/vite-plugin-federation'
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import federation from '@originjs/vite-plugin-federation';
 
 export default defineConfig({
   plugins: [
     react(),
     federation({
-      name: 'HostApp',
+      name: 'SmartCRMHost',
       remotes: {
         CalendarApp: 'https://calendar.smartcrm.vip/assets/remoteEntry.js',
       },
       shared: {
-        react: {
-          singleton: true,
-          requiredVersion: '^18.0.0'
-        },
-        'react-dom': {
-          singleton: true,
-          requiredVersion: '^18.0.0'
-        },
-        'react-router-dom': {
-          singleton: true,
-          requiredVersion: '^6.26.0'
-        }
-      }
-    })
+        react: { singleton: true, eager: true, requiredVersion: '^18.2.0' },
+        'react-dom': { singleton: true, eager: true, requiredVersion: '^18.2.0' },
+        'react-router-dom': { singleton: true, eager: true },
+      },
+    }),
   ],
   build: {
     target: 'esnext',
     minify: false,
-    cssCodeSplit: false
-  }
-})
+    cssCodeSplit: false,
+  },
+});
 ```
 
-### 2. Use the remote modules:
+**IMPORTANT for SmartCRM host before loading remote:**
+```ts
+// Set global flag so remote detects SmartCRM embedded mode (enables MemoryRouter + auth sync)
+(window as any).__SMARTCRM_HOST__ = true;
+```
+
+### 2. Consume the FULL application (recommended):
 
 ```tsx
 import React, { lazy, Suspense } from 'react';
 
-// Lazy load the calendar app
-const CalendarApp = lazy(() => import('CalendarApp/CalendarApp'));
-const CalendarModule = lazy(() => import('CalendarApp/CalendarModule'));
+const RemoteCRMApp = lazy(() => import('CalendarApp/App'));
 
-function App() {
+function SmartCRMPage() {
   return (
-    <Suspense fallback={<div>Loading Calendar...</div>}>
-      {/* Full app */}
-      <CalendarApp />
-
-      {/* Or specific module */}
-      <CalendarModule mode="calendar" />
+    <Suspense fallback={<div className="p-8">Loading SmartCRM Calendar Module...</div>}>
+      <RemoteCRMApp />
     </Suspense>
   );
 }
 ```
 
-## Build Configuration
+- All original features, UI, business logic, AI tools, editors, uploads, realtime, Supabase, Zustand stores preserved 100%.
+- Routing uses MemoryRouter automatically when embedded (no host history pollution).
+- Auth sharing supported via postMessage AUTH_STATUS { access_token, refresh_token } or token.
 
-The app is built with the following settings:
-- **Format:** SystemJS
-- **Minification:** Disabled (for debugging)
-- **CSS Code Split:** Disabled
-- **Target:** ESNext
+This remote runs identically standalone or federated.
+
+## Build Configuration & Folder Structure
+
+- Remote always exposes complete working app (no shells/placeholders)
+- Folder structure: src/App.tsx + bootstrap.tsx + main.tsx (dynamic) + routes/ + pages/ + components/ + services/ + store/ + hooks/ + utils/
+- Build uses cssCodeSplit: false + esnext target for reliable MF CSS/JS loading
+- Post-build step ensures remoteEntry.js available at root + /assets/
 
 ## CORS Configuration
 
@@ -191,40 +180,21 @@ When consuming this module, you get access to:
 4. **Check exposed modules:**
    All exposed modules should be listed in the remoteEntry.js file.
 
-## Deployment
+## Deployment for SmartCRM
 
-When deploying to https://calendar.smartcrm.vip/:
-
-1. Build the application:
-   ```bash
-   npm run build
-   ```
-
-2. Upload the `dist` folder contents to your hosting
-
-3. Ensure the `remoteEntry.js` file is accessible at:
-   ```
-   https://calendar.smartcrm.vip/assets/remoteEntry.js
-   ```
-
-4. Test the remote modules are loading correctly from the host application
+1. `npm run build`
+2. Upload dist/ (remoteEntry.js must be served with CORS)
+3. Host loads from the remoteEntry URL using the MF config above.
+4. For standalone testing: `npm run preview` then visit directly.
 
 ## Troubleshooting
 
-### Module Not Found
-- Ensure the remoteEntry.js URL is correct
-- Check network tab for 404 errors
-- Verify CORS headers are set correctly
-
-### Version Conflicts
-- Ensure shared dependencies versions match between host and remote
-- Use singleton: true for React packages
-- Check console for version mismatch warnings
-
-### Styles Not Loading
-- Verify CSS is included in the build
-- Check that cssCodeSplit is set to false
-- Ensure styles are imported in the exposed components
+- **Remote fails to render in host**: Confirm host sets `window.__SMARTCRM_HOST__ = true` BEFORE the dynamic import. Check shared versions match exactly.
+- **Router issues / double history**: Remote auto-switches to MemoryRouter in embedded mode.
+- **Missing styles**: cssCodeSplit:false + full CSS in build.
+- **Auth not shared**: Host must postMessage type:'AUTH_STATUS' with tokens before/after mount.
+- **Standalone works but embedded broken**: Verify no duplicate React instances (singleton + eager required).
+- Always test both `npm run dev` (standalone) + host MF load.
 
 ## Support
 

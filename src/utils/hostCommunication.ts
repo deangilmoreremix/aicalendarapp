@@ -32,7 +32,10 @@ export class HostCommunication {
   constructor(hostOrigin?: string) {
     this.hostOrigin = hostOrigin || '*';
     this.listeners = new Map();
-    this.isEmbedded = window.self !== window.top;
+    // Detect both iframe embedding and SmartCRM Module Federation embedding
+    const isInIframe = window.self !== window.top;
+    const isSmartCRMHosted = !!(window as any).__SMARTCRM_HOST__ || !!(window as any).__MF_EMBEDDED__ || !!(window as any).__IS_SMARTCRM_REMOTE__;
+    this.isEmbedded = isInIframe || isSmartCRMHosted;
 
     if (this.isEmbedded) {
       this.initializeListener();
@@ -48,6 +51,11 @@ export class HostCommunication {
 
       const message = event.data as HostMessage;
       if (!message || !message.type) return;
+
+      // Handle SmartCRM shared auth injection (token/session sharing from host)
+      if (message.type === 'AUTH_STATUS' && message.data) {
+        this.handleAuthInjection(message.data);
+      }
 
       const handlers = this.listeners.get(message.type);
       if (handlers) {
@@ -117,6 +125,34 @@ export class HostCommunication {
 
   setHostOrigin(origin: string) {
     this.hostOrigin = origin;
+  }
+
+  private async handleAuthInjection(authData: any) {
+    console.log('[SmartCRM] Received auth injection from host:', authData);
+    try {
+      // Dynamic import to avoid circular deps / bundle issues
+      const { supabase } = await import('../lib/supabase');
+      if (authData.access_token && authData.refresh_token) {
+        const { error } = await supabase.auth.setSession({
+          access_token: authData.access_token,
+          refresh_token: authData.refresh_token,
+        });
+        if (error) {
+          console.warn('[SmartCRM] Failed to set injected session:', error);
+        } else {
+          console.log('[SmartCRM] Auth session injected successfully from SmartCRM host');
+          // Notify host we're authenticated
+          this.send('READY', { auth: 'injected', timestamp: Date.now() });
+        }
+      } else if (authData.token) {
+        // Fallback for simple bearer token (some hosts use custom)
+        // Supabase can use it via headers in api calls if customized
+        (window as any).__SMARTCRM_AUTH_TOKEN__ = authData.token;
+        this.send('READY', { auth: 'token-received', timestamp: Date.now() });
+      }
+    } catch (err) {
+      console.error('[SmartCRM] Auth injection error:', err);
+    }
   }
 }
 

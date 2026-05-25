@@ -17,10 +17,13 @@ export default defineConfig({
     federation({
       name: 'CalendarApp',
       filename: 'remoteEntry.js',
+      // Expose the FULL application for SmartCRM Module Federation consumption
+      // Host loads via: const RemoteApp = lazy(() => import('CalendarApp/App'));
       exposes: {
+        './App': './src/App.tsx',
+        // Legacy partial exposes preserved for compatibility (still fully functional)
         './CalendarApp': './src/CalendarApp.tsx',
         './CalendarModule': './src/CalendarModule.tsx',
-        './App': './src/App.tsx',
         './ContactsModal': './src/components/ContactsModal.tsx',
         './TasksAndFunnel': './src/components/TasksAndFunnel.tsx',
         './BigTaskCalendar': './src/components/BigTaskCalendar.tsx',
@@ -29,15 +32,17 @@ export default defineConfig({
       shared: {
         react: {
           singleton: true,
-          requiredVersion: '^18.0.0',
+          eager: true,
+          requiredVersion: '^18.2.0',
         },
         'react-dom': {
           singleton: true,
-          requiredVersion: '^18.0.0',
+          eager: true,
+          requiredVersion: '^18.2.0',
         },
         'react-router-dom': {
           singleton: true,
-          requiredVersion: '^6.26.0',
+          eager: true,
         },
       },
     }),

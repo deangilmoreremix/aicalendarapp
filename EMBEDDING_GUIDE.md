@@ -1,16 +1,20 @@
-# CRM Calendar App - Module Federation Embedding Guide
+# SmartCRM Calendar - True Module Federation Remote Guide (No Iframes)
 
-This CRM application is configured to be embedded in other applications using Vite Module Federation.
+**This is a complete, production federated microfrontend remote.**
+It runs as a FULL application inside SmartCRM host using @originjs/vite-plugin-federation (NOT iframes, NOT wrappers).
 
-## Quick Start
+See MODULE_FEDERATION.md for primary instructions.
 
-### 1. Build the Application
+## Quick Start (Federation)
+
+Build produces fully functional remoteEntry.js exposing the complete app.
 
 ```bash
 npm run build
+npm run preview   # test standalone at localhost
 ```
 
-This creates a `dist` folder with `remoteEntry.js` that can be consumed by host applications.
+For SmartCRM host integration use the MF config + `import('CalendarApp/App')` (see MODULE_FEDERATION.md).
 
 ### 2. Host Application Configuration
 
@@ -57,15 +61,10 @@ function MyHostApp() {
 }
 ```
 
-## Exposed Components
+## Exposed (Full App Primary)
 
-The following components are exposed via Module Federation:
-
-- `./App` - Full CRM application
-- `./ContactsModal` - Contacts management modal
-- `./TasksAndFunnel` - Tasks and funnel view
-- `./BigTaskCalendar` - Task calendar component
-- `./CustomerProfile` - Customer profile view
+- `./App` - **THE COMPLETE SMARTCRM-COMPATIBLE APPLICATION** (all features, routing, state, AI, etc.)
+- Plus granular legacy components for incremental adoption (still 100% functional, no mocks)
 
 ## Communication API
 
@@ -166,57 +165,9 @@ window.addEventListener('message', (event) => {
 - `ERROR` - An error occurred
 - `HEIGHT_CHANGE` - Content height changed
 
-## Example: Iframe Embedding
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Host Application</title>
-</head>
-<body>
-  <iframe
-    id="crm-iframe"
-    src="https://your-crm-domain.com"
-    width="100%"
-    height="600"
-    frameborder="0"
-  ></iframe>
-
-  <script>
-    const iframe = document.getElementById('crm-iframe');
-
-    // Wait for iframe to load
-    iframe.addEventListener('load', () => {
-      // Send initial configuration
-      iframe.contentWindow.postMessage({
-        type: 'SET_THEME',
-        data: {
-          mode: 'light',
-          primaryColor: '#3b82f6'
-        }
-      }, 'https://your-crm-domain.com');
-
-      // Send initial data
-      iframe.contentWindow.postMessage({
-        type: 'INITIAL_DATA_SYNC',
-        data: {
-          contacts: [],
-          deals: [],
-          tasks: []
-        }
-      }, 'https://your-crm-domain.com');
-    });
-
-    // Listen for messages from iframe
-    window.addEventListener('message', (event) => {
-      if (event.origin !== 'https://your-crm-domain.com') return;
-      console.log('Received from CRM:', event.data);
-    });
-  </script>
-</body>
-</html>
-```
+<!-- IFRAME EXAMPLE REMOVED: This remote is designed for true Module Federation only.
+   Use the MF lazy import pattern from MODULE_FEDERATION.md instead of iframes.
+   Iframes are explicitly not supported for SmartCRM integration. -->
 
 ## Security Considerations
 

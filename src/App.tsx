@@ -27,8 +27,12 @@ import { CalendarSettings } from './components/CalendarSettings';
 import { SkeletonCard } from './components/ui/Skeleton';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import Toast from './components/ui/Toast';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { AIProvider } from './contexts/AIContext';
+import { ErrorProvider } from './contexts/ErrorContext';
+import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
 
-const App: React.FC = () => {
+const CRMApplication: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
   const { insights, generateInsights } = useAI();
   const { tasks, markTaskComplete, loadInitialData } = useTaskStore();
@@ -521,4 +525,36 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+// SmartCRM-compatible router factory: MemoryRouter when embedded in host to avoid history conflicts, BrowserRouter for standalone
+function getRouterComponent() {
+  const isSmartCRMEmbedded = !!(window as any).__SMARTCRM_HOST__ ||
+    !!(window as any).__MF_EMBEDDED__ ||
+    !!(window as any).__IS_SMARTCRM_REMOTE__ ||
+    window.self !== window.top;
+  return isSmartCRMEmbedded ? MemoryRouter : BrowserRouter;
+}
+
+// Self-contained App with providers + router for standalone and federated usage inside SmartCRM host.
+// Full application exposed as ./App for Module Federation.
+const AppWithProviders: React.FC = () => {
+  const Router = getRouterComponent();
+  return (
+    <Router>
+      <Routes>
+        <Route path="*" element={
+          <ErrorBoundary>
+            <ErrorProvider>
+              <ThemeProvider>
+                <AIProvider>
+                  <CRMApplication />
+                </AIProvider>
+              </ThemeProvider>
+            </ErrorProvider>
+          </ErrorBoundary>
+        } />
+      </Routes>
+    </Router>
+  );
+};
+
+export default AppWithProviders;
