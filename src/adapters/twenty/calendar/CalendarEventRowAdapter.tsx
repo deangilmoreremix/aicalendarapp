@@ -3,6 +3,12 @@ import { ChevronRight, Users } from 'lucide-react';
 
 import { type TimelineCalendarEvent } from './types';
 
+/**
+ * @deprecated - Visual component (kept for reference only)
+ *
+ * New enhancements must merge Twenty concepts (rich participants, conference data, etc.)
+ * into the AI Calendar's existing components using the current design system.
+ */
 type CalendarEventRowProps = {
   calendarEvent: TimelineCalendarEvent;
   className?: string;

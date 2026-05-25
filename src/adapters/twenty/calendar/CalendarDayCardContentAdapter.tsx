@@ -5,6 +5,10 @@ import { CalendarEventRowAdapter } from './CalendarEventRowAdapter';
 import { CalendarContext } from './CalendarContext';
 import { type TimelineCalendarEvent } from './types';
 
+/**
+ * @deprecated - Visual component (reference only)
+ * Use transformers.ts for data-only enhancements.
+ */
 type CalendarDayCardContentProps = {
   calendarEvents: TimelineCalendarEvent[];
   divider?: boolean;

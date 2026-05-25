@@ -2,9 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Event, NavigateAction, ToolbarProps } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { CalendarMonthCardAdapter } from '../adapters/twenty/calendar/CalendarMonthCardAdapter';
-import { CalendarContext } from '../adapters/twenty/calendar/CalendarContext';
+
+// Twenty adapters are now PURE DATA TRANSFORMERS only.
+// We import types and (optionally) transformers for data enrichment.
+// Visual components from Twenty are NEVER rendered — all UI uses AI Calendar design.
 import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
+import { convertEventsToTimelineFormat, groupTimelineEventsByDay } from '../adapters/twenty/calendar/transformers';
+
 import {
   Dialog,
   DialogContent,
@@ -29,8 +33,6 @@ import {
   Filter,
   Eye,
   EyeOff,
-  Calendar as CalendarIcon,
-  LayoutGrid,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { Task } from '../types';
@@ -197,8 +199,8 @@ export const BigTaskCalendar: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  // Toggle between 'standard' (react-big-calendar) and 'timeline' (Twenty adapter)
-  const [calendarViewMode, setCalendarViewMode] = useState<'standard' | 'timeline'>('standard');
+  // Note: We no longer maintain a separate visual "Twenty view".
+  // Twenty concepts are merged as data enrichment only.
 
   // Mock calendars data for now
   const calendars = [
@@ -246,46 +248,17 @@ export const BigTaskCalendar: React.FC = () => {
     return [...taskEvents, ...calendarEventItems];
   }, [tasks, calendarEvents, visibleCalendars]);
 
-  // Convert to Twenty format
-  const twentyEvents: TimelineCalendarEvent[] = useMemo(() => {
-    return events.map(event => ({
-      id: event.id,
-      title: event.title,
-      isFullDay: event.allDay,
-      startsAt: event.start.toISOString(),
-      endsAt: event.end?.toISOString(),
-      visibility: 'SHARE_EVERYTHING' as const,
-      participants: event.resource.type === 'calendar-event' && event.resource.data.attendees
-        ? event.resource.data.attendees.map((attendee: string) => ({
-            displayName: attendee,
-            firstName: '',
-            lastName: '',
-          }))
-        : [],
-    }));
+  // Example: Using the new pure Twenty transformers for data enrichment.
+  // This data can be used to enhance existing AI Calendar components
+  // (modals, activity feed, AI features, etc.) while keeping the original design.
+  const timelineEvents: TimelineCalendarEvent[] = useMemo(() => {
+    return convertEventsToTimelineFormat(events);
   }, [events]);
 
-  // Group events by day for Twenty context
-  const calendarEventsByDayTime = useMemo(() => {
-    const grouped: Record<number, TimelineCalendarEvent[]> = {};
-    twentyEvents.forEach(event => {
-      const dayTime = new Date(event.startsAt).setHours(0, 0, 0, 0);
-      if (!grouped[dayTime]) grouped[dayTime] = [];
-      grouped[dayTime].push(event);
-    });
-    return grouped;
-  }, [twentyEvents]);
-
-  // Generate dayTimes for current month
-  const dayTimes = useMemo(() => {
-    const days: number[] = [];
-    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-      days.push(d.setHours(0, 0, 0, 0));
-    }
-    return days;
-  }, [currentDate]);
+  // Example grouped data (available for future internal enhancements)
+  const eventsByDay = useMemo(() => {
+    return groupTimelineEventsByDay(timelineEvents);
+  }, [timelineEvents]);
 
   const handleSelectEvent = (event: TaskEvent) => {
     setSelectedEvent(event);
@@ -482,7 +455,21 @@ export const BigTaskCalendar: React.FC = () => {
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
-        </div>
+
+          {/* View selector - purely for react-big-calendar views */}
+          <div className="flex items-center space-x-1 border rounded-md">
+            {['month', 'week', 'day', 'agenda'].map((viewName) => (
+              <Button
+                key={viewName}
+                variant={view === viewName ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => onView(viewName as View)}
+                className="rounded-none first:rounded-l-md last:rounded-r-md"
+              >
+                {viewName.charAt(0).toUpperCase() + viewName.slice(1)}
+              </Button>
+            ))}
+          </div>
       </div>
     );
   };
@@ -496,35 +483,25 @@ export const BigTaskCalendar: React.FC = () => {
         onView={handleViewChange}
       />
       <div className="flex-1 p-6 overflow-hidden">
-        {/* AI Calendar + Twenty combined: both views preserved, user picks which to use */}
-        {calendarViewMode === 'standard' ? (
-          // ===== ORIGINAL AI CALENDAR (react-big-calendar) — primary view =====
-          <div className={`h-full rounded-xl overflow-hidden border ${
-            isDark ? 'border-white/10 bg-gray-800' : 'border-gray-200 bg-white'
-          }`}>
-            <Calendar
-              localizer={localizer}
-              events={events}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: '100%' }}
-              eventPropGetter={eventStyleGetter}
-              onSelectEvent={handleSelectEvent}
-              views={['month', 'week', 'day', 'agenda']}
-              popup
-              selectable
-            />
-          </div>
-        ) : (
-          // ===== TWENTY TIMELINE ADAPTER — enhanced view, same data, using Twenty design language =====
-          <div className={`h-full rounded-xl overflow-hidden border ${
-            isDark ? 'border-white/10 bg-gray-800' : 'border-gray-200 bg-white'
-          }`}>
-            <CalendarContext.Provider value={{ calendarEventsByDayTime }}>
-              <CalendarMonthCardAdapter dayTimes={dayTimes} />
-            </CalendarContext.Provider>
-          </div>
-        )}
+        {/* Primary view: Original AI Calendar react-big-calendar.
+            Twenty concepts are used ONLY for data enrichment (via transformers).
+            All UI follows the AI Calendar design system. */}
+        <div className={`h-full rounded-xl overflow-hidden border ${
+          isDark ? 'border-white/10 bg-gray-800' : 'border-gray-200 bg-white'
+        }`}>
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: '100%' }}
+            eventPropGetter={eventStyleGetter}
+            onSelectEvent={handleSelectEvent}
+            views={['month', 'week', 'day', 'agenda']}
+            popup
+            selectable
+          />
+        </div>
       </div>
 
       {/* Event Details Modal */}
