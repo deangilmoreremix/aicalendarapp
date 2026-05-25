@@ -29,10 +29,13 @@ import {
   Filter,
   Eye,
   EyeOff,
+  Calendar as CalendarIcon,
+  LayoutGrid,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { Task } from '../types';
 import { TaskDetailsModal } from './TaskDetailsModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 const localizer = momentLocalizer(moment);
 
@@ -182,17 +185,20 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
 };
 
 export const BigTaskCalendar: React.FC = () => {
-  const { 
-    tasks, 
+  const { isDark } = useTheme();
+  const {
+    tasks,
     calendarEvents,
   } = useTaskStore();
-  
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>('month');
   const [selectedEvent, setSelectedEvent] = useState<TaskEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Toggle between 'standard' (react-big-calendar) and 'timeline' (Twenty adapter)
+  const [calendarViewMode, setCalendarViewMode] = useState<'standard' | 'timeline'>('standard');
 
   // Mock calendars data for now
   const calendars = [
@@ -435,6 +441,28 @@ export const BigTaskCalendar: React.FC = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* View mode toggle: Standard (AI Calendar) vs Timeline (Twenty Enhanced) */}
+          <div className="flex items-center space-x-1 border rounded-md">
+            <Button
+              variant={calendarViewMode === 'standard' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setCalendarViewMode('standard')}
+              title="Standard Calendar View"
+              className="rounded-none first:rounded-l-md last:rounded-r-md"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={calendarViewMode === 'timeline' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setCalendarViewMode('timeline')}
+              title="Twenty Timeline Enhanced View"
+              className="rounded-none first:rounded-l-md last:rounded-r-md"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </div>
+
           {/* View selector */}
           <div className="flex items-center space-x-1 border rounded-md">
             {['month', 'week', 'day', 'agenda'].map((viewName) => (
@@ -467,10 +495,36 @@ export const BigTaskCalendar: React.FC = () => {
         onNavigate={(action) => handleNavigate(action === 'DATE' ? currentDate : action === 'PREV' ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
         onView={handleViewChange}
       />
-      <div className="flex-1 p-6">
-        <CalendarContext.Provider value={{ calendarEventsByDayTime }}>
-          <CalendarMonthCardAdapter dayTimes={dayTimes} />
-        </CalendarContext.Provider>
+      <div className="flex-1 p-6 overflow-hidden">
+        {/* AI Calendar + Twenty combined: both views preserved, user picks which to use */}
+        {calendarViewMode === 'standard' ? (
+          // ===== ORIGINAL AI CALENDAR (react-big-calendar) — primary view =====
+          <div className={`h-full rounded-xl overflow-hidden border ${
+            isDark ? 'border-white/10 bg-gray-800' : 'border-gray-200 bg-white'
+          }`}>
+            <Calendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: '100%' }}
+              eventPropGetter={eventStyleGetter}
+              onSelectEvent={handleSelectEvent}
+              views={['month', 'week', 'day', 'agenda']}
+              popup
+              selectable
+            />
+          </div>
+        ) : (
+          // ===== TWENTY TIMELINE ADAPTER — enhanced view, same data, using Twenty design language =====
+          <div className={`h-full rounded-xl overflow-hidden border ${
+            isDark ? 'border-white/10 bg-gray-800' : 'border-gray-200 bg-white'
+          }`}>
+            <CalendarContext.Provider value={{ calendarEventsByDayTime }}>
+              <CalendarMonthCardAdapter dayTimes={dayTimes} />
+            </CalendarContext.Provider>
+          </div>
+        )}
       </div>
 
       {/* Event Details Modal */}
