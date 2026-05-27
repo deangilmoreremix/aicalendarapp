@@ -170,6 +170,25 @@ const sampleActivities: Activity[] = [
     entityId: '3',
     createdAt: new Date(2024, 11, 23, 15, 30),
   },
+  {
+    id: '3',
+    type: 'meeting_scheduled',
+    title: 'Meeting Scheduled: Product Demo',
+    description: 'Demonstrate new features to potential client',
+    userId: 'user1',
+    userName: 'John Doe',
+    entityType: 'calendar',
+    entityId: '1',
+    createdAt: new Date(2024, 11, 22),
+    metadata: {
+      participants: [
+        { displayName: 'John Smith', handle: 'john.smith' },
+        { displayName: 'Client Contact', handle: 'client.demo' },
+      ],
+      conferenceLink: 'https://meet.google.com/demo-123',
+      location: 'Conference Room A',
+    },
+  },
 ];
 
 export const useTaskStore = create<TaskStore>((set, get) => ({

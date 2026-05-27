@@ -22,7 +22,8 @@ import {
   TrendingUp,
   Target,
   Zap,
-  Loader2
+  Loader2,
+  Video,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { Activity } from '../types';
@@ -127,13 +128,48 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showDate = true }
           {activity.title}
         </p>
 
-        {activity.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            {activity.description}
-          </p>
-        )}
-        
-        <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400">
+{activity.description && (
+           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+             {activity.description}
+           </p>
+         )}
+
+         {/* Calendar Event Details - Participant Avatars */}
+         {activity.metadata?.participants && (
+           <div className="flex items-center space-x-2 mb-2">
+             <div className="flex -space-x-1">
+               {activity.metadata.participants.map((participant: any, index: number) => (
+                 <div
+                   key={index}
+                   className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium"
+                   title={participant.displayName}
+                 >
+                   {participant.displayName?.charAt(0) || '?'}
+                 </div>
+               ))}
+             </div>
+             <span className="text-xs text-gray-500">
+               {activity.metadata.participants.length} participant{activity.metadata.participants.length > 1 ? 's' : ''}
+             </span>
+           </div>
+         )}
+
+         {/* Conference Link for Calendar Activities */}
+         {activity.metadata?.conferenceLink && (
+           <div className="flex items-center space-x-2 mb-2">
+             <Video className="h-3 w-3 text-blue-600" />
+             <a
+               href={activity.metadata.conferenceLink}
+               target="_blank"
+               rel="noopener noreferrer"
+               className="text-xs text-blue-600 hover:text-blue-700 underline"
+             >
+               Join meeting
+             </a>
+           </div>
+         )}
+
+         <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400">
           <span>{activity.userName}</span>
           {showDate && (
             <>
