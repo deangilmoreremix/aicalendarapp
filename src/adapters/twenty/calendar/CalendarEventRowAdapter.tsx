@@ -25,7 +25,7 @@ export const CalendarEventRowAdapter = ({
 
   return (
     <div
-      className={`flex items-center gap-3 h-6 cursor-pointer ${className || ''}`}
+      className={`flex items-center gap-3 h-6 cursor-pointer ${hasEnded ? 'opacity-60' : ''} ${className || ''}`}
       onClick={showTitle ? () => console.log('Open event', calendarEvent.id) : undefined}
     >
       <div
@@ -46,8 +46,8 @@ export const CalendarEventRowAdapter = ({
         {showTitle ? (
           <div
             className={`flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap ${
-              hasEnded ? 'text-gray-500' : ''
-            } ${calendarEvent.isCanceled ? 'line-through' : ''}`}
+              calendarEvent.isCanceled ? 'line-through' : ''
+            }`}
           >
             {calendarEvent.title}
           </div>

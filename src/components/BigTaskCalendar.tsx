@@ -2,9 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Event, NavigateAction, ToolbarProps } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { CalendarMonthCardAdapter } from '../adapters/twenty/calendar/CalendarMonthCardAdapter';
-import { CalendarContext } from '../adapters/twenty/calendar/CalendarContext';
 import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
+import { toTimelineCalendarEvent, getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +30,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
-import { Task } from '../types';
+import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
 const localizer = momentLocalizer(moment);
@@ -42,6 +41,10 @@ interface TaskEvent extends Event {
     data: Task | any;
     priority?: Task['priority'];
     status?: Task['status'];
+    conferenceSolution?: string;
+    conferenceLink?: string;
+    visibility?: 'SHARE_EVERYTHING' | 'METADATA';
+    participants?: CalendarEventParticipant[];
   };
 }
 
@@ -149,21 +152,80 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                   </div>
                 )}
 
-                {data.attendees && data.attendees.length > 0 && (
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">Attendees:</span>
-                    <div className="mt-1 space-y-1">
-                      {data.attendees.map((attendee: string, index: number) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                          <span>{attendee}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+{data.attendees && data.attendees.length > 0 && (
+                   <div className="text-sm text-gray-600 dark:text-gray-400">
+                     <span className="font-medium text-gray-900 dark:text-gray-100">Attendees:</span>
+                     <div className="mt-1 space-y-1">
+                       {data.attendees.map((attendee: string, index: number) => (
+                         <div key={index} className="flex items-center space-x-2">
+                           <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                           <span>{attendee}</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Enhanced: Rich participants from Twenty model */}
+                 {resource.participants && resource.participants.length > 0 && (
+                   <div className="text-sm text-gray-600 dark:text-gray-400">
+                     <span className="font-medium text-gray-900 dark:text-gray-100">Participants:</span>
+                     <div className="mt-1 flex flex-wrap gap-2">
+                       {resource.participants.map((participant, index) => (
+                         <div key={index} className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-full px-3 py-1">
+                           {participant.avatarUrl ? (
+                             <img
+                               src={participant.avatarUrl}
+                               alt={participant.displayName}
+                               className="h-5 w-5 rounded-full"
+                             />
+                           ) : (
+                             <div className="h-5 w-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium">
+                               {participant.displayName.charAt(0) || '?'}
+                             </div>
+                           )}
+                           <span className="text-sm">{participant.displayName}</span>
+                           {participant.handle && (
+                             <span className="text-xs text-gray-500">@{participant.handle}</span>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Enhanced: Conference link from Twenty model */}
+                 {(resource.conferenceSolution || resource.conferenceLink) && (
+                   <div className="flex items-center space-x-2 text-sm">
+                     <span className="text-gray-600 dark:text-gray-400">
+                       {getConferenceProviderIcon(resource.conferenceSolution)}
+                     </span>
+                     {resource.conferenceLink ? (
+                       <a
+                         href={resource.conferenceLink}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="text-blue-600 hover:text-blue-700 underline"
+                       >
+                         Join {resource.conferenceSolution || 'Meeting'}
+                       </a>
+                     ) : (
+                       <span className="text-gray-600 dark:text-gray-400">{resource.conferenceSolution}</span>
+                     )}
+                   </div>
+                 )}
+
+                 {/* Enhanced: Visibility badge from Twenty model */}
+                 {resource.visibility && (
+                   <div className="flex items-center space-x-2 text-sm">
+                     <span className="text-gray-600 dark:text-gray-400">Visibility:</span>
+                     <Badge variant={resource.visibility === 'METADATA' ? 'secondary' : 'default'}>
+                       {getVisibilityLabel(resource.visibility)}
+                     </Badge>
+                   </div>
+                 )}
+               </>
+             )}
           </div>
 
           {/* Actions */}
@@ -223,68 +285,53 @@ export const BigTaskCalendar: React.FC = () => {
         },
       }));
 
-    const calendarEventItems: TaskEvent[] = calendarEvents
-      .filter(event => visibleCalendars.includes(event.calendarId))
-      .map(event => ({
-        id: event.id,
-        title: event.title,
-        start: event.startDate,
-        end: event.endDate,
-        allDay: event.isAllDay,
-        resource: {
-          type: 'calendar-event' as const,
-          data: event,
-        },
-      }));
+const calendarEventItems: TaskEvent[] = calendarEvents
+       .filter(event => visibleCalendars.includes(event.calendarId))
+       .map(event => ({
+         id: event.id,
+         title: event.title,
+         start: event.startDate,
+         end: event.endDate,
+         allDay: event.isAllDay,
+         resource: {
+           type: 'calendar-event' as const,
+           data: event,
+           conferenceSolution: event.conferenceSolution,
+           conferenceLink: event.conferenceLink,
+           visibility: event.visibility,
+           participants: event.participants,
+         },
+       }));
 
     return [...taskEvents, ...calendarEventItems];
   }, [tasks, calendarEvents, visibleCalendars]);
 
-  // Convert to Twenty format
-  const twentyEvents: TimelineCalendarEvent[] = useMemo(() => {
-    return events.map(event => ({
-      id: event.id,
-      title: event.title,
-      isFullDay: event.allDay,
-      startsAt: event.start.toISOString(),
-      endsAt: event.end?.toISOString(),
-      visibility: 'SHARE_EVERYTHING' as const,
-      participants: event.resource.type === 'calendar-event' && event.resource.data.attendees
-        ? event.resource.data.attendees.map((attendee: string) => ({
-            displayName: attendee,
-            firstName: '',
-            lastName: '',
-          }))
-        : [],
-    }));
-  }, [events]);
+// Convert to Twenty format for enhanced modal display
+   const twentyEvents: TimelineCalendarEvent[] = useMemo(() => {
+     return events.map(event => {
+       if (event.resource.type === 'calendar-event') {
+         const calendarEventData = event.resource.data as CalendarEvent;
+         return toTimelineCalendarEvent({
+           ...calendarEventData,
+           participants: calendarEventData.participants || [],
+         });
+       }
+       return {
+         id: event.id,
+         title: event.title,
+         isFullDay: event.allDay,
+         startsAt: event.start.toISOString(),
+         endsAt: event.end?.toISOString(),
+         visibility: 'SHARE_EVERYTHING' as const,
+         participants: [],
+       };
+     });
+   }, [events]);
 
-  // Group events by day for Twenty context
-  const calendarEventsByDayTime = useMemo(() => {
-    const grouped: Record<number, TimelineCalendarEvent[]> = {};
-    twentyEvents.forEach(event => {
-      const dayTime = new Date(event.startsAt).setHours(0, 0, 0, 0);
-      if (!grouped[dayTime]) grouped[dayTime] = [];
-      grouped[dayTime].push(event);
-    });
-    return grouped;
-  }, [twentyEvents]);
-
-  // Generate dayTimes for current month
-  const dayTimes = useMemo(() => {
-    const days: number[] = [];
-    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-      days.push(d.setHours(0, 0, 0, 0));
-    }
-    return days;
-  }, [currentDate]);
-
-  const handleSelectEvent = (event: TaskEvent) => {
-    setSelectedEvent(event);
-    setShowEventModal(true);
-  };
+   const handleSelectEvent = (event: TaskEvent) => {
+     setSelectedEvent(event);
+     setShowEventModal(true);
+   };
 
   const handleEditEvent = () => {
     if (!selectedEvent) return;
@@ -467,10 +514,23 @@ export const BigTaskCalendar: React.FC = () => {
         onNavigate={(action) => handleNavigate(action === 'DATE' ? currentDate : action === 'PREV' ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
         onView={handleViewChange}
       />
-      <div className="flex-1 p-6">
-        <CalendarContext.Provider value={{ calendarEventsByDayTime }}>
-          <CalendarMonthCardAdapter dayTimes={dayTimes} />
-        </CalendarContext.Provider>
+      <div className="flex-1 relative">
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          view={currentView}
+          onView={handleViewChange}
+          date={currentDate}
+          onNavigate={handleNavigate}
+          onSelectEvent={handleSelectEvent}
+          eventPropGetter={eventStyleGetter}
+          components={{
+            toolbar: () => null, // We use custom toolbar
+          }}
+          className="h-full bg-white dark:bg-gray-900"
+        />
       </div>
 
       {/* Event Details Modal */}
