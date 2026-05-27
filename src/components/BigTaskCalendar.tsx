@@ -269,21 +269,21 @@ export const BigTaskCalendar: React.FC = () => {
 
   // Convert tasks and calendar events to calendar events
   const events: TaskEvent[] = useMemo(() => {
-    const taskEvents: TaskEvent[] = Object.values(tasks)
-      .filter(task => task.dueDate)
-      .map(task => ({
-        id: task.id,
-        title: task.title,
-        start: task.dueDate!,
-        end: task.dueDate!,
-        allDay: true,
-        resource: {
-          type: 'task' as const,
-          data: task,
-          priority: task.priority,
-          status: task.status,
-        },
-      }));
+const taskEvents: TaskEvent[] = Object.values(tasks)
+       .filter(task => task.dueDate || task.startTime)
+       .map(task => ({
+         id: task.id,
+         title: task.title,
+         start: task.startTime || task.dueDate!,
+         end: task.endTime || task.dueDate!,
+         allDay: !task.startTime || !task.endTime,
+         resource: {
+           type: 'task' as const,
+           data: task,
+           priority: task.priority,
+           status: task.status,
+         },
+       }));
 
 const calendarEventItems: TaskEvent[] = calendarEvents
        .filter(event => visibleCalendars.includes(event.calendarId))

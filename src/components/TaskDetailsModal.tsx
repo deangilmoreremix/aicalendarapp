@@ -80,6 +80,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         title: '',
         description: '',
         dueDate: new Date(),
+        startTime: undefined,
+        endTime: undefined,
         priority: 'medium',
         status: defaultStatus || 'pending',
         category: 'other',
