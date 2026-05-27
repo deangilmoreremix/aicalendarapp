@@ -4,6 +4,8 @@ export interface Task {
   title: string;
   description?: string;
   dueDate?: Date;
+  startTime?: Date;
+  endTime?: Date;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in-progress' | 'on-hold' | 'completed' | 'cancelled' | 'overdue';
   category: 'call' | 'email' | 'meeting' | 'follow-up' | 'other';
@@ -13,8 +15,8 @@ export interface Task {
   completedAt?: Date;
   assignedUserId?: string;
   assignedUserName?: string;
-  estimatedDuration?: number; // in minutes
-  actualDuration?: number; // in minutes
+  estimatedDuration?: number;
+  actualDuration?: number;
   tags: string[];
   attachments: Attachment[];
   subtasks: Subtask[];
