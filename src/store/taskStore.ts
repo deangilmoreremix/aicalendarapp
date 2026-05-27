@@ -121,9 +121,28 @@ const sampleCalendarEvents: CalendarEvent[] = [
     isAllDay: false,
     location: 'Conference Room A',
     attendees: ['john@company.com', 'client@example.com'],
+    participants: [
+      {
+        displayName: 'John Smith',
+        firstName: 'John',
+        lastName: 'Smith',
+        handle: 'john.smith',
+        avatarUrl: 'https://ui-avatars.com/api/?name=John+Smith&background=3b82f6&color=fff',
+      },
+      {
+        displayName: 'Client Contact',
+        firstName: 'Client',
+        lastName: 'Contact',
+        handle: 'client.demo',
+        avatarUrl: 'https://ui-avatars.com/api/?name=Client+Contact&background=10b981&color=fff',
+      },
+    ],
+    conferenceSolution: 'Google Meet',
+    conferenceLink: 'https://meet.google.com/demo-123',
     calendarId: 'work',
     type: 'meeting',
     status: 'scheduled',
+    visibility: 'SHARE_EVERYTHING',
   },
 ];
 

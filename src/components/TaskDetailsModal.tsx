@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Task, Subtask } from '../types';
+import { Task, Subtask, CalendarEvent } from '../types';
 import { useTaskStore } from '../store/taskStore';
 import { AITaskAssistant } from './ui/AITaskAssistant';
 import {
@@ -17,7 +17,8 @@ import {
   Tag,
   Plus,
   Check,
-  Brain
+  Brain,
+  Video,
 } from 'lucide-react';
 
 interface TaskDetailsModalProps {
@@ -179,6 +180,21 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const { calendarEvents } = useTaskStore();
+
+  const getConferenceIcon = (provider?: string) => {
+    switch (provider?.toLowerCase()) {
+      case 'zoom': return '📺';
+      case 'google meet': return '🗺️';
+      case 'microsoft teams': return '💻';
+      default: return '🔗';
+    }
+  };
+
+  const relatedCalendarEvent = task?.relatedTo?.type === 'contact' || task?.relatedTo?.type === 'deal' 
+    ? calendarEvents.find(e => e.id === task.relatedTo?.id)
+    : undefined;
 
   if (!isOpen) return null;
 
@@ -465,17 +481,75 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     </div>
                   )}
 
-                  <div className="flex items-center space-x-2">
-                    <Calendar size={16} className="text-gray-400" />
-                    <div>
-                      <div className="font-medium text-gray-700">Created</div>
-                      <div className="text-gray-600">{task.createdAt.toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                </div>
+<div className="flex items-center space-x-2">
+                     <Calendar size={16} className="text-gray-400" />
+                     <div>
+                       <div className="font-medium text-gray-700">Created</div>
+                       <div className="text-gray-600">{task.createdAt.toLocaleDateString()}</div>
+                     </div>
+                   </div>
+                 </div>
 
-                {/* Tags */}
-                {task.tags.length > 0 && (
+                 {/* Calendar Event Integration - Twenty Enhanced */}
+                 {relatedCalendarEvent && (
+                   <div className="border-t pt-4 mt-4">
+                     <h4 className="font-medium text-gray-700 mb-3 flex items-center">
+                       <Calendar size={16} className="mr-2" />
+                       Linked Calendar Event
+                     </h4>
+                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+                       <div>
+                         <span className="font-medium text-gray-900 dark:text-gray-100">{relatedCalendarEvent.title}</span>
+                       </div>
+                       
+                       {relatedCalendarEvent.conferenceSolution && (
+                         <div className="flex items-center space-x-2 text-sm">
+                           <Video size={14} className="text-gray-500" />
+                           <span className="text-gray-600 dark:text-gray-400">Meeting:</span>
+                           {relatedCalendarEvent.conferenceLink ? (
+                             <a
+                               href={relatedCalendarEvent.conferenceLink}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="text-blue-600 hover:text-blue-700 underline"
+                             >
+                               {relatedCalendarEvent.conferenceSolution} {getConferenceIcon(relatedCalendarEvent.conferenceSolution)}
+                             </a>
+                           ) : (
+                             <span className="text-gray-600">{relatedCalendarEvent.conferenceSolution} {getConferenceIcon(relatedCalendarEvent.conferenceSolution)}</span>
+                           )}
+                         </div>
+                       )}
+
+                       {relatedCalendarEvent.participants && relatedCalendarEvent.participants.length > 0 && (
+                         <div className="flex flex-wrap gap-2">
+                           {relatedCalendarEvent.participants.map((participant, index) => (
+                             <div key={index} className="flex items-center space-x-2 bg-white dark:bg-gray-700 rounded-full px-3 py-1">
+                               {participant.avatarUrl ? (
+                                 <img
+                                   src={participant.avatarUrl}
+                                   alt={participant.displayName}
+                                   className="h-5 w-5 rounded-full"
+                                 />
+                               ) : (
+                                 <div className="h-5 w-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium">
+                                   {participant.displayName.charAt(0) || '?'}
+                                 </div>
+                               )}
+                               <span className="text-sm text-gray-700 dark:text-gray-300">{participant.displayName}</span>
+                               {participant.handle && (
+                                 <span className="text-xs text-gray-500">@{participant.handle}</span>
+                               )}
+                             </div>
+                           ))}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Tags */}
+                 {task.tags.length > 0 && (
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2 flex items-center">
                       <Tag size={16} className="mr-1" />
