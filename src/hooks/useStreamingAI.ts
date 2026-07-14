@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { streamingClient, StreamingOptions } from '../services/streamingClient';
+import { supabase } from '../lib/supabase';
+import { StreamingOptions } from '../services/streamingClient';
 
 export interface StreamingAIOptions extends StreamingOptions {
   operationType?: 'task-suggestion' | 'contact-enrichment' | 'email-composition' | 'meeting-planning' | 'web-research';
@@ -18,6 +19,54 @@ export interface StreamingAIState {
   canCancel: boolean;
 }
 
+type Json = Record<string, unknown>;
+
+// Map a streaming operation to its Supabase Edge Function + request body.
+type OperationSpec = {
+  functionName: string;
+  buildBody: (...args: unknown[]) => Json;
+  extract: (data: unknown) => string;
+};
+
+const OPERATIONS: Record<string, OperationSpec> = {
+  'task-suggestion': {
+    functionName: 'generate_task_suggestions',
+    buildBody: (prompt: string, context?: Json) => ({ prompt, context, stream: true }),
+    extract: (data: unknown) =>
+      Array.isArray(data)
+        ? data
+            .map((s: Json) => `• ${String(s.title ?? '')} — ${String(s.description ?? '')} (priority: ${String(s.priority ?? '')})`)
+            .join('\n')
+        : JSON.stringify(data),
+  },
+  'contact-enrichment': {
+    functionName: 'contacts_enrich',
+    buildBody: (contactData: Json) => ({ contact: contactData }),
+    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+  },
+  'email-composition': {
+    functionName: 'email_compose',
+    buildBody: (recipient: Json, context: string) => ({ recipient, context }),
+    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+  },
+  'meeting-planning': {
+    functionName: 'meetings_plan',
+    buildBody: (attendees: string[], duration: number, topic: string) => ({ attendees, duration, topic }),
+    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+  },
+  'web-research': {
+    functionName: 'research_web',
+    buildBody: (query: string, depth: 'basic' | 'comprehensive' = 'basic') => ({
+      query,
+      depth,
+      includeCitations: true,
+    }),
+    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+  },
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const useStreamingAI = () => {
   const [state, setState] = useState<StreamingAIState>({
     isStreaming: false,
@@ -27,116 +76,97 @@ export const useStreamingAI = () => {
     chunks: [],
     fullResponse: '',
     error: null,
-    canCancel: false
+    canCancel: false,
   });
 
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const abortRef = useRef(false);
 
   const startOperation = useCallback((operationType: string, showThinking = true) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isThinking: showThinking,
       currentOperation: operationType,
       progress: 0,
       error: null,
-      canCancel: true
+      canCancel: true,
     }));
   }, []);
 
-  const streamAIResponse = useCallback(async (
-    endpoint: string,
-    data: any,
-    options: StreamingAIOptions = {}
-  ): Promise<string> => {
-    const { operationType, showThinking = true, enableCancellation = true, ...streamOptions } = options;
+  const runOperation = useCallback(
+    async (operationType: string, args: unknown[], options: StreamingAIOptions = {}): Promise<string> => {
+      const { showThinking = true, enableCancellation = true, ...streamOptions } = options;
+      const spec = OPERATIONS[operationType];
+      if (!spec) {
+        throw new Error(`Unknown streaming operation: ${operationType}`);
+      }
 
-    // Start thinking phase
-    startOperation(operationType || 'ai-operation', showThinking);
+      abortRef.current = false;
+      startOperation(operationType, showThinking);
 
-    // Simulate thinking progress
-    const thinkingInterval = setInterval(() => {
-      setState(prev => ({
-        ...prev,
-        progress: Math.min(prev.progress + Math.random() * 15, 85)
-      }));
-    }, 200);
+      // Simulated "thinking" phase for a natural UX.
+      const thinkingInterval = setInterval(() => {
+        setState((prev) => ({ ...prev, progress: Math.min(prev.progress + Math.random() * 15, 85) }));
+      }, 200);
+      await sleep(1500 + Math.random() * 1000);
+      clearInterval(thinkingInterval);
 
-    // Wait for thinking phase
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+      setState((prev) => ({ ...prev, isThinking: false, isStreaming: true, progress: 85, canCancel: enableCancellation }));
 
-    clearInterval(thinkingInterval);
+      try {
+        const { data, error } = await supabase.functions.invoke(spec.functionName, {
+          body: spec.buildBody(...args),
+        });
 
-    // Start streaming phase
-    setState(prev => ({
-      ...prev,
-      isThinking: false,
-      isStreaming: true,
-      progress: 85,
-      canCancel: enableCancellation
-    }));
-
-    try {
-      const response = await streamingClient.streamAIResponse(endpoint, data, {
-        ...streamOptions,
-        onChunk: (chunk) => {
-          setState(prev => ({
-            ...prev,
-            chunks: [...prev.chunks, chunk],
-            fullResponse: prev.fullResponse + chunk,
-            progress: Math.min(prev.progress + 2, 95)
-          }));
-          streamOptions.onChunk?.(chunk);
-        },
-        onComplete: (fullResponse) => {
-          setState(prev => ({
-            ...prev,
-            isStreaming: false,
-            progress: 100,
-            canCancel: false
-          }));
-          streamOptions.onComplete?.(fullResponse);
-        },
-        onError: (error) => {
-          setState(prev => ({
-            ...prev,
-            isStreaming: false,
-            error,
-            canCancel: false
-          }));
-          streamOptions.onError?.(error);
+        if (error) {
+          throw new Error(error.message || `Edge function ${spec.functionName} failed`);
         }
-      });
 
-      return response;
+        const fullText = spec.extract(data);
 
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isStreaming: false,
-        error: error as Error,
-        canCancel: false
-      }));
-      throw error;
-    }
-  }, [startOperation]);
+        // Simulate token streaming for a natural UX.
+        const tokens = fullText.split(/(\s+)/);
+        let acc = '';
+        for (const token of tokens) {
+          if (abortRef.current) {
+            throw new Error('Operation cancelled by user');
+          }
+          acc += token;
+          setState((prev) => ({
+            ...prev,
+            chunks: [...prev.chunks, token],
+            fullResponse: acc,
+            progress: Math.min(prev.progress + 1, 98),
+          }));
+          streamOptions.onChunk?.(token);
+          await sleep(20);
+        }
+
+        setState((prev) => ({ ...prev, isStreaming: false, progress: 100, canCancel: false }));
+        streamOptions.onComplete?.(acc);
+        return acc;
+      } catch (err) {
+        const error = err as Error;
+        setState((prev) => ({ ...prev, isStreaming: false, error, canCancel: false }));
+        streamOptions.onError?.(error);
+        throw error;
+      }
+    },
+    [startOperation]
+  );
 
   const cancelOperation = useCallback(() => {
-    if (state.canCancel) {
-      streamingClient.cancel();
-      setState(prev => ({
-        ...prev,
-        isStreaming: false,
-        isThinking: false,
-        canCancel: false,
-        error: new Error('Operation cancelled by user')
-      }));
-    }
-  }, [state.canCancel]);
+    abortRef.current = true;
+    setState((prev) => ({
+      ...prev,
+      isStreaming: false,
+      isThinking: false,
+      canCancel: false,
+      error: new Error('Operation cancelled by user'),
+    }));
+  }, []);
 
   const reset = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    abortRef.current = true;
     setState({
       isStreaming: false,
       isThinking: false,
@@ -145,78 +175,49 @@ export const useStreamingAI = () => {
       chunks: [],
       fullResponse: '',
       error: null,
-      canCancel: false
+      canCancel: false,
     });
   }, []);
 
-  const generateTaskSuggestions = useCallback(async (prompt: string, context?: any) => {
-    return streamAIResponse('/api/ai/tasks/suggest', {
-      prompt,
-      context,
-      stream: true
-    }, {
-      operationType: 'task-suggestion'
-    });
-  }, [streamAIResponse]);
+  const generateTaskSuggestions = useCallback(
+    (prompt: string, context?: Json) =>
+      runOperation('task-suggestion', [prompt, context], { operationType: 'task-suggestion' }),
+    [runOperation]
+  );
 
-  const enrichContact = useCallback(async (contactData: Partial<any>) => {
-    return streamAIResponse('/api/ai/contacts/enrich', {
-      contact: contactData,
-      stream: true
-    }, {
-      operationType: 'contact-enrichment'
-    });
-  }, [streamAIResponse]);
+  const enrichContact = useCallback(
+    (contactData: Json) => runOperation('contact-enrichment', [contactData], { operationType: 'contact-enrichment' }),
+    [runOperation]
+  );
 
-  const composeEmail = useCallback(async (recipient: any, context: string) => {
-    return streamAIResponse('/api/ai/email/compose', {
-      recipient,
-      context,
-      stream: true
-    }, {
-      operationType: 'email-composition'
-    });
-  }, [streamAIResponse]);
+  const composeEmail = useCallback(
+    (recipient: Json, context: string) =>
+      runOperation('email-composition', [recipient, context], { operationType: 'email-composition' }),
+    [runOperation]
+  );
 
-  const planMeeting = useCallback(async (attendees: string[], duration: number, topic: string) => {
-    return streamAIResponse('/api/ai/meetings/plan', {
-      attendees,
-      duration,
-      topic,
-      stream: true
-    }, {
-      operationType: 'meeting-planning'
-    });
-  }, [streamAIResponse]);
+  const planMeeting = useCallback(
+    (attendees: string[], duration: number, topic: string) =>
+      runOperation('meeting-planning', [attendees, duration, topic], { operationType: 'meeting-planning' }),
+    [runOperation]
+  );
 
-  const researchWeb = useCallback(async (query: string, depth: 'basic' | 'comprehensive' = 'basic') => {
-    return streamAIResponse('/api/ai/research/web', {
-      query,
-      depth,
-      stream: true,
-      includeCitations: true
-    }, {
-      operationType: 'web-research'
-    });
-  }, [streamAIResponse]);
+  const researchWeb = useCallback(
+    (query: string, depth: 'basic' | 'comprehensive' = 'basic') =>
+      runOperation('web-research', [query, depth], { operationType: 'web-research' }),
+    [runOperation]
+  );
 
   return {
-    // State
     ...state,
-
-    // Actions
-    streamAIResponse,
+    streamAIResponse: runOperation,
     cancelOperation,
     reset,
-
-    // Specialized AI operations
     generateTaskSuggestions,
     enrichContact,
     composeEmail,
     planMeeting,
     researchWeb,
-
-    // Utilities
-    startOperation
+    startOperation,
   };
 };
