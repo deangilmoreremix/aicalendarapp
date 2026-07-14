@@ -5,13 +5,6 @@ import federation from '@originjs/vite-plugin-federation';
 // Module Federation Configuration for AI Calendar App
 // https://calendar.smartcrm.vip/
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@twenty': '/workspaces/aicalendarapp/twenty/packages/twenty-front/src',
-      '@twenty-shared': '/workspaces/aicalendarapp/twenty/packages/twenty-shared/src',
-      '@twenty-ui': '/workspaces/aicalendarapp/twenty/packages/twenty-ui/src',
-    },
-  },
   plugins: [
     react(),
     federation({
@@ -20,11 +13,7 @@ export default defineConfig({
       exposes: {
         './CalendarApp': './src/CalendarApp.tsx',
         './CalendarModule': './src/CalendarModule.tsx',
-        './App': './src/App.tsx',
-        './ContactsModal': './src/components/ContactsModal.tsx',
-        './TasksAndFunnel': './src/components/TasksAndFunnel.tsx',
-        './BigTaskCalendar': './src/components/BigTaskCalendar.tsx',
-        './CustomerProfile': './src/components/CustomerProfile.tsx',
+        './ContactsModal': './src/remote/ContactsModal.tsx',
       },
       shared: {
         react: {
