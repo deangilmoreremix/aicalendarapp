@@ -487,6 +487,12 @@ export const aiApi = {
     };
   },
 
+  async generateContactImage(contact: Partial<Contact>): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('contacts_image', { body: { contact } });
+    if (error) throw error;
+    return data.url as string;
+  },
+
   async composeEmail(recipient: Partial<Contact>, context: string): Promise<string> {
     const { data, error } = await supabase.functions.invoke('email_compose', { body: { recipient, context } });
     if (error) throw error;

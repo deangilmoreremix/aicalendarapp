@@ -17,6 +17,7 @@ export interface StreamingAIState {
   fullResponse: string;
   error: Error | null;
   canCancel: boolean;
+  citations: { title: string; url: string }[];
 }
 
 type Json = Record<string, unknown>;
@@ -77,6 +78,7 @@ export const useStreamingAI = () => {
     fullResponse: '',
     error: null,
     canCancel: false,
+    citations: [],
   });
 
   const abortRef = useRef(false);
@@ -122,6 +124,8 @@ export const useStreamingAI = () => {
         }
 
         const fullText = spec.extract(data);
+        const citations = Array.isArray((data as Json)?.citations) ? ((data as Json).citations as { title: string; url: string }[]) : [];
+        setState((prev) => ({ ...prev, citations }));
 
         // Simulate token streaming for a natural UX.
         const tokens = fullText.split(/(\s+)/);
@@ -176,6 +180,7 @@ export const useStreamingAI = () => {
       fullResponse: '',
       error: null,
       canCancel: false,
+      citations: [],
     });
   }, []);
 

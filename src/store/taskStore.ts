@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../utils/avatars';
 import { create } from 'zustand';
 import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
 import { taskApi, activityApi } from '../services/api';
@@ -127,18 +128,17 @@ const sampleCalendarEvents: CalendarEvent[] = [
         firstName: 'John',
         lastName: 'Smith',
         handle: 'john.smith',
-        avatarUrl: 'https://ui-avatars.com/api/?name=John+Smith&background=3b82f6&color=fff',
+        avatarUrl: initialsAvatar('John Smith'),
       },
       {
         displayName: 'Client Contact',
         firstName: 'Client',
         lastName: 'Contact',
         handle: 'client.demo',
-        avatarUrl: 'https://ui-avatars.com/api/?name=Client+Contact&background=10b981&color=fff',
+        avatarUrl: initialsAvatar('Client Contact'),
       },
     ],
-    conferenceSolution: 'Google Meet',
-    conferenceLink: 'https://meet.google.com/demo-123',
+    conferenceSolution: 'Video call',
     calendarId: 'work',
     type: 'meeting',
     status: 'scheduled',
@@ -185,7 +185,6 @@ const sampleActivities: Activity[] = [
         { displayName: 'John Smith', handle: 'john.smith' },
         { displayName: 'Client Contact', handle: 'client.demo' },
       ],
-      conferenceLink: 'https://meet.google.com/demo-123',
       location: 'Conference Room A',
     },
   },

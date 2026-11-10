@@ -1,198 +1,121 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Calendar, Settings, CheckCircle, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
-import { useTaskStore } from '../store/taskStore';
+import { Calendar, Settings, CheckCircle } from 'lucide-react';
 
-interface CalendarAccount {
-  id: string;
-  provider: 'google' | 'microsoft';
-  email: string;
-  connected: boolean;
-  lastSync?: Date;
+// Calendar preferences are stored locally. No third-party calendar providers are used:
+// the app's stack is Netlify + Supabase + OpenAI only.
+interface CalendarPreferences {
+  timezone: string;
+  workdayStart: string;
+  workdayEnd: string;
+  defaultMeetingMinutes: number;
+  weekStartsOn: 0 | 1;
 }
 
+const STORAGE_KEY = 'calendar-preferences';
+
+const defaults: CalendarPreferences = {
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  workdayStart: '09:00',
+  workdayEnd: '17:00',
+  defaultMeetingMinutes: 30,
+  weekStartsOn: 1,
+};
+
+const load = (): CalendarPreferences => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+  } catch {
+    return defaults;
+  }
+};
+
 export const CalendarSettings: React.FC = () => {
-  const [accounts, setAccounts] = useState<CalendarAccount[]>([
-    {
-      id: '1',
-      provider: 'google',
-      email: 'user@gmail.com',
-      connected: false,
-    },
-    {
-      id: '2',
-      provider: 'microsoft',
-      email: 'user@outlook.com',
-      connected: false,
+  const [prefs, setPrefs] = useState<CalendarPreferences>(load);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(t);
+  }, [saved]);
+
+  const update = <K extends keyof CalendarPreferences>(key: K, value: CalendarPreferences[K]) =>
+    setPrefs(prev => ({ ...prev, [key]: value }));
+
+  const handleSave = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    } catch (error) {
+      console.error('Could not save calendar preferences:', error);
     }
-  ]);
-
-  // Enhanced OAuth connection handler (AI Calendar style)
-  const handleConnect = async (account: CalendarAccount) => {
-    const providerName = account.provider === 'google' ? 'Google' : 'Microsoft';
-    
-    // Open OAuth popup window (following AI Calendar design pattern)
-    // In production, this would use actual OAuth endpoints
-    const authUrl = account.provider === 'google'
-      ? 'https://accounts.google.com/o/oauth2/v2/auth?client_id=mock&redirect_uri=mock&scope=calendar'
-      : 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=mock&redirect_uri=mock&scope=calendar';
-    
-    // Simulate OAuth flow with mock connection
-    console.log(`Initiating ${providerName} Calendar OAuth...`);
-    
-    // Mock successful connection
-    setAccounts(prev => prev.map(acc =>
-      acc.id === account.id
-        ? { ...acc, connected: true, lastSync: new Date() }
-        : acc
-    ));
+    setSaved(true);
   };
 
-  const handleSync = async (account: CalendarAccount) => {
-    // Simulate sync process
-    console.log('Syncing calendar for', account.email);
-    
-    setAccounts(prev => prev.map(acc =>
-      acc.id === account.id
-        ? { ...acc, lastSync: new Date() }
-        : acc
-    ));
-  };
-
-const handleDisconnect = (accountId: string) => {
-    setAccounts(prev => prev.map(acc =>
-      acc.id === accountId
-        ? { ...acc, connected: false, lastSync: undefined }
-        : acc
-    ));
-  };
+  const inputClass =
+    'w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Settings className="h-6 w-6 text-gray-600" />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Calendar Settings
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Calendar Settings</h2>
       </div>
 
-      <div className="grid gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Connected Accounts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {accounts.map((account) => (
-              <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    account.provider === 'google' ? 'bg-red-500' : 'bg-blue-500'
-                  }`} />
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
-                      {account.provider === 'google' ? 'Google Calendar' : 'Microsoft Outlook'}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {account.email}
-                    </p>
-                    {account.lastSync && (
-                      <p className="text-xs text-gray-500 dark:text-gray-500">
-                        Last synced: {account.lastSync.toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-                  <Badge
-                    className={`${
-                      account.connected
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                    }`}
-                  >
-                    {account.connected ? (
-                      <>
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Connected
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        Not Connected
-                      </>
-                    )}
-                  </Badge>
-                </div>
-
-                <div className="flex gap-2">
-{account.connected ? (
-                     <>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => handleSync(account)}
-                       >
-                         <RefreshCw className="w-3 h-3 mr-1" />
-                         Sync Now
-                       </Button>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => handleDisconnect(account.id)}
-                         className="text-red-600 hover:text-red-700"
-                       >
-                         Disconnect
-                       </Button>
-                     </>
-                   ) : (
-                     <Button
-                       size="sm"
-                       onClick={() => handleConnect(account)}
-                     >
-                       <ExternalLink className="w-3 h-3 mr-1" />
-                       Connect
-                     </Button>
-                   )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Sync Preferences</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Auto-sync</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Automatically sync calendar events every hour
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Enable
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Two-way Sync</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Sync changes both ways between app and external calendar
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Enable
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700 dark:text-gray-300">Time zone</span>
+            <input className={inputClass} value={prefs.timezone} onChange={e => update('timezone', e.target.value)} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700 dark:text-gray-300">Week starts on</span>
+            <select
+              className={inputClass}
+              value={prefs.weekStartsOn}
+              onChange={e => update('weekStartsOn', Number(e.target.value) as 0 | 1)}
+            >
+              <option value={1}>Monday</option>
+              <option value={0}>Sunday</option>
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700 dark:text-gray-300">Workday starts</span>
+            <input type="time" className={inputClass} value={prefs.workdayStart} onChange={e => update('workdayStart', e.target.value)} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700 dark:text-gray-300">Workday ends</span>
+            <input type="time" className={inputClass} value={prefs.workdayEnd} onChange={e => update('workdayEnd', e.target.value)} />
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block text-gray-700 dark:text-gray-300">Default meeting length (minutes)</span>
+            <input
+              type="number"
+              min={5}
+              step={5}
+              className={inputClass}
+              value={prefs.defaultMeetingMinutes}
+              onChange={e => update('defaultMeetingMinutes', Math.max(5, Number(e.target.value) || 30))}
+            />
+          </label>
+          <div className="flex items-end gap-3">
+            <Button onClick={handleSave}>Save</Button>
+            {saved && (
+              <span className="flex items-center text-sm text-green-700">
+                <CheckCircle className="mr-1 h-4 w-4" /> Saved
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

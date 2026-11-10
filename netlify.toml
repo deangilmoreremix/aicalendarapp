@@ -1,12 +1,17 @@
-[[headers]]
-for = "/*"
-
-[headers.values]
-X-Frame-Options = "ALLOWALL"
-Access-Control-Allow-Origin = "*"
-Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-Access-Control-Allow-Headers = "Content-Type, Authorization, X-Client-Info, Apikey"
+# Stack: Netlify (hosting/build) + Supabase (DB, Storage, Edge Functions) + OpenAI (called only from Supabase Edge Functions).
+# Netlify build env needed: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY. OpenAI keys live in Supabase secrets, never here.
 
 [build]
 command = "rm -rf twenty && npx vite build"
 publish = "dist"
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+# This app is embedded by a host app and exposes a Module Federation remote, so it must stay frameable/CORS-readable.
+Access-Control-Allow-Origin = "*"
+Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+Access-Control-Allow-Headers = "Content-Type, Authorization, X-Client-Info, Apikey"
+# Network access limited to this origin and Supabase (no other third-party hosts).
+Content-Security-Policy = "connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob: https://*.supabase.co"

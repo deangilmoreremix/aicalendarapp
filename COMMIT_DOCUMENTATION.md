@@ -13,7 +13,7 @@ This document provides a comprehensive summary of all commits made during the en
 **Changes Made:**
 - **Calendar System Overhaul**: Replaced basic react-big-calendar with Twenty's professional calendar components
 - **Advanced Event Management**: Added TimelineCalendarEvent data model with participants, conferencing, and visibility controls
-- **AI Intelligence Upgrade**: Enhanced task suggestions from rule-based to OpenAI GPT-4o-mini powered analysis
+- **AI Intelligence Upgrade**: Enhanced task suggestions from rule-based to OpenAI Responses API powered analysis
 - **Contact Enrichment**: Added social media profiling fields (LinkedIn, Twitter, Website, Phone)
 - **Technical Infrastructure**: Integrated Twenty's component library with custom adapters
 - **Database Schema**: Extended Supabase with enhanced event fields and indexes

@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
@@ -121,7 +122,7 @@ export const CustomerProfile: React.FC = () => {
       <div className="text-center mb-6">
         <div className="relative inline-block mb-4">
           <AvatarWithStatus
-            src={selectedContact.avatarSrc || selectedContact.avatar || "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2"}
+            src={selectedContact.avatarSrc || selectedContact.avatar || initialsAvatar(selectedContact.name)}
             alt={selectedContact.name}
             size="xl"
             status="active"

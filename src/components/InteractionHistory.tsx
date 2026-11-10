@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../utils/avatars';
 import React from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { MoreHorizontal, ArrowRight } from 'lucide-react';
@@ -12,9 +13,9 @@ const interactions = [
     bgColor: 'bg-blue-500',
     textColor: 'text-white',
     participants: [
-      'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   },
   {
@@ -26,10 +27,10 @@ const interactions = [
     bgColor: 'bg-teal-500',
     textColor: 'text-white',
     participants: [
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   },
   {
@@ -41,9 +42,9 @@ const interactions = [
     bgColor: 'bg-black',
     textColor: 'text-white',
     participants: [
-      'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   },
   {
@@ -55,8 +56,8 @@ const interactions = [
     bgColor: 'bg-yellow-400',
     textColor: 'text-black',
     participants: [
-      'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   },
   {
@@ -68,8 +69,8 @@ const interactions = [
     bgColor: 'bg-gray-300',
     textColor: 'text-black',
     participants: [
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   },
   {
@@ -81,9 +82,9 @@ const interactions = [
     bgColor: 'bg-gray-300',
     textColor: 'text-black',
     participants: [
-      'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2'
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member'),
+      initialsAvatar('Team Member')
     ]
   }
 ];

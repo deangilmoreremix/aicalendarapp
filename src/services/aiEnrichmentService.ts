@@ -1,5 +1,6 @@
 import { Contact } from '../types';
 import { aiApi } from './api';
+import { initialsAvatar } from '../utils/avatars';
 
 export interface ContactEnrichmentData {
   firstName?: string;
@@ -48,10 +49,14 @@ export class AIEnrichmentService {
     return this.enrich({ firstName, lastName, company });
   }
 
-  /** Deterministic initials avatar (no image search backend is available). */
+  /** Generates an avatar with the OpenAI Images API (via the contacts_image edge function). */
   static async findContactImage(name: string, company?: string): Promise<string> {
-    const label = encodeURIComponent((name || company || '?').trim());
-    return `https://ui-avatars.com/api/?name=${label}&size=150&background=random`;
+    try {
+      return await aiApi.generateContactImage({ name, company });
+    } catch (error) {
+      console.error('Image generation failed, using initials avatar:', error);
+      return initialsAvatar(name || company || '?');
+    }
   }
 
   /** Backed by the `contacts_enrich` edge function (OpenAI Responses API + web search). */

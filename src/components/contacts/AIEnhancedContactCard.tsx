@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Contact } from '../../types';
 import { useAI } from '../../contexts/AIContext';
@@ -143,7 +144,7 @@ export const AIEnhancedContactCard: React.FC<AIEnhancedContactCardProps> = ({
         <div className="flex items-center space-x-3">
           <div className="relative">
             <img
-              src={contact.avatarSrc || contact.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+              src={contact.avatarSrc || contact.avatar || initialsAvatar(contact.name)}
               alt={contact.name}
               className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
             />

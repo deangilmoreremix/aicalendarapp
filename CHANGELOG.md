@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calendar Settings**: Added comprehensive settings UI for external calendar integrations
 
 #### AI Intelligence Upgrade
-- **LLM-Powered Task Suggestions**: Upgraded from rule-based to OpenAI GPT-4o-mini for intelligent task analysis
+- **LLM-Powered Task Suggestions**: Upgraded from rule-based to the OpenAI Responses API for intelligent task analysis
 - **Smart Task Breakdown**: Enhanced task suggestions with automatic subtasks, priority assessment, and due date recommendations
 - **Contextual Reasoning**: Improved AI responses with sophisticated analysis of task prompts and requirements
 
@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Calendar synchronization preparation (Google/Microsoft)
 
 ### AI Features Enhanced:
-- ✅ GPT-4 powered task suggestions
+- ✅ OpenAI Responses API powered task suggestions
 - ✅ Intelligent priority and category detection
 - ✅ Automatic subtask generation
 - ✅ Context-aware due date recommendations
@@ -104,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies Added
 - `@floating-ui/react`, `@nivo/calendar`, `framer-motion`
-- `@radix-ui/colors`, `@tabler/icons-react`, `googleapis`
+- `@radix-ui/colors`, `@tabler/icons-react`
 - `deep-equal`, `type-fest`, `react-responsive`
 
 ---

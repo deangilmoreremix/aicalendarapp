@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { useContactStore } from '../store/contactStore';
@@ -232,7 +233,7 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
       contact.status = contact.status || 'lead';
       contact.company = contact.company || 'Unknown Company';
       contact.title = contact.title || 'Professional';
-      contact.avatarSrc = `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2`;
+      contact.avatarSrc = initialsAvatar(contact.name || `${contact.firstName ?? ''} ${contact.lastName ?? ''}`);
       contact.tags = contact.tags ? contact.tags.split(',').map((t: string) => t.trim()) : [];
 
       // Check for duplicate emails within the CSV

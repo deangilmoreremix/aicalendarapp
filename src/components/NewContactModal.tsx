@@ -1,3 +1,5 @@
+import { initialsAvatar } from '../utils/avatars';
+import { AIEnrichmentService } from '../services/aiEnrichmentService';
 import React, { useState } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { AIAutoFillButton } from './ui/AIAutoFillButton';
@@ -316,7 +318,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
         title: formData.title,
         company: formData.company,
         industry: formData.industry || undefined,
-        avatarSrc: formData.avatarSrc || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2`,
+        avatarSrc: formData.avatarSrc || initialsAvatar(`${formData.firstName} ${formData.lastName}`),
         sources: formData.sources.length > 0 ? formData.sources : ['Manual Entry'],
         interestLevel: formData.interestLevel,
         status: formData.status,
@@ -511,11 +513,13 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        // Trigger new image search
+                      onClick={async () => {
                         if (formData.firstName || formData.lastName) {
-                          // Find new image logic would go here
-                          console.log('Finding new image...');
+                          const url = await AIEnrichmentService.findContactImage(
+                            `${formData.firstName} ${formData.lastName}`.trim(),
+                            formData.company
+                          );
+                          setFormData(prev => ({ ...prev, avatarSrc: url }));
                         }
                       }}
                       className="absolute -bottom-1 -right-1 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-lg"
@@ -1072,7 +1076,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
             <div className="flex items-center justify-between pt-6 border-t border-gray-200 bg-gray-50 -mx-6 -mb-6 px-6 py-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Brain className="w-4 h-4 text-purple-500" />
-                <span>Powered by OpenAI & Gemini AI</span>
+                <span>Powered by OpenAI</span>
               </div>
               
               <div className="flex items-center space-x-4">

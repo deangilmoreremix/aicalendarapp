@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
@@ -434,7 +435,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
                         <div className="flex items-center space-x-2">
                           {contact && (
                             <img
-                              src={contact.avatarSrc || contact.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+                              src={contact.avatarSrc || contact.avatar || initialsAvatar(contact.name)}
                               alt={contact.name}
                               className="w-6 h-6 rounded-full object-cover"
                             />

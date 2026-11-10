@@ -1,3 +1,4 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
@@ -14,8 +15,8 @@ const taskData = [
     day: 'Mon',
     tasks: 2,
     assignees: [
-      { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'inactive' }
+      { id: '1', name: 'Jane Doe', avatar: initialsAvatar('Jane Doe'), status: 'active' },
+      { id: '2', name: 'John Smith', avatar: initialsAvatar('John Smith'), status: 'inactive' }
     ]
   },
   {
@@ -27,41 +28,41 @@ const taskData = [
     day: 'Wed',
     tasks: 3,
     assignees: [
-      { id: '3', name: 'Darlene Robertson', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'pending' }
+      { id: '3', name: 'Darlene Robertson', avatar: initialsAvatar('Darlene Robertson'), status: 'active' },
+      { id: '4', name: 'Eva Robinson', avatar: initialsAvatar('Eva Robinson'), status: 'active' },
+      { id: '5', name: 'Wade Warren', avatar: initialsAvatar('Wade Warren'), status: 'pending' }
     ]
   },
   {
     day: 'Thu',
     tasks: 1,
     assignees: [
-      { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
+      { id: '6', name: 'Jonah Jude', avatar: initialsAvatar('Jonah Jude'), status: 'active' }
     ]
   },
   {
     day: 'Fri',
     tasks: 4,
     assignees: [
-      { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '3', name: 'Darlene Robertson', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
+      { id: '1', name: 'Jane Doe', avatar: initialsAvatar('Jane Doe'), status: 'active' },
+      { id: '2', name: 'John Smith', avatar: initialsAvatar('John Smith'), status: 'active' },
+      { id: '3', name: 'Darlene Robertson', avatar: initialsAvatar('Darlene Robertson'), status: 'active' },
+      { id: '4', name: 'Eva Robinson', avatar: initialsAvatar('Eva Robinson'), status: 'active' }
     ]
   },
   {
     day: 'Sat',
     tasks: 2,
     assignees: [
-      { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
+      { id: '5', name: 'Wade Warren', avatar: initialsAvatar('Wade Warren'), status: 'active' },
+      { id: '6', name: 'Jonah Jude', avatar: initialsAvatar('Jonah Jude'), status: 'active' }
     ]
   },
   {
     day: 'Sun',
     tasks: 1,
     assignees: [
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
+      { id: '2', name: 'John Smith', avatar: initialsAvatar('John Smith'), status: 'active' }
     ]
   },
 ];

@@ -26,11 +26,7 @@ export const StreamingContainer: React.FC<StreamingContainerProps> = ({
 }) => {
   const streamingAI = useStreamingAI();
   const [citations, setCitations] = useState<Citation[]>([]);
-  const [researchStats, setResearchStats] = useState({
-    sourcesFound: 0,
-    citationsCollected: 0,
-    currentSource: ''
-  });
+  const researchStats = { sourcesFound: 0, citationsCollected: 0, currentSource: 'OpenAI web search' };
 
   // Handle streaming completion
   useEffect(() => {
@@ -45,21 +41,6 @@ export const StreamingContainer: React.FC<StreamingContainerProps> = ({
       onError?.(streamingAI.error);
     }
   }, [streamingAI.error, onError]);
-
-  // Simulate research stats for web research
-  useEffect(() => {
-    if (operationType === 'web-research' && streamingAI.isStreaming) {
-      const interval = setInterval(() => {
-        setResearchStats(prev => ({
-          sourcesFound: Math.min(prev.sourcesFound + Math.floor(Math.random() * 3), 15),
-          citationsCollected: Math.min(prev.citationsCollected + Math.floor(Math.random() * 2), 8),
-          currentSource: ['Google Scholar', 'ResearchGate', 'PubMed', 'ArXiv', 'Semantic Scholar'][Math.floor(Math.random() * 5)]
-        }));
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [operationType, streamingAI.isStreaming]);
 
   const handleCancel = () => {
     streamingAI.cancelOperation();
@@ -161,32 +142,17 @@ export const WebResearchContainer: React.FC<{
 
   useEffect(() => {
     if (!streamingAI.isStreaming && !streamingAI.isThinking && streamingAI.fullResponse && !streamingAI.error) {
-      // Parse citations from the response (in a real implementation, this would come from the API)
-      const mockCitations: Citation[] = [
-        {
-          id: '1',
-          title: 'Advanced AI Techniques in Task Management',
-          url: 'https://example.com/ai-task-management',
-          source: 'Journal of AI Research',
-          publishDate: '2024-01-15',
-          relevanceScore: 0.95,
-          excerpt: 'This paper explores various AI techniques for optimizing task management workflows...'
-        },
-        {
-          id: '2',
-          title: 'Machine Learning Applications in Productivity',
-          url: 'https://example.com/ml-productivity',
-          source: 'Tech Review',
-          publishDate: '2024-02-20',
-          relevanceScore: 0.88,
-          excerpt: 'Recent studies show significant productivity improvements through ML integration...'
-        }
-      ];
+      // Real citations returned by the research_web edge function (OpenAI web search).
+      const realCitations: Citation[] = streamingAI.citations.map((c, idx) => {
+        let host = c.url;
+        try { host = new URL(c.url).hostname; } catch { /* keep url */ }
+        return { id: String(idx + 1), title: c.title, url: c.url, source: host, relevanceScore: 1 };
+      });
 
-      setCitations(mockCitations);
-      onResult?.(streamingAI.fullResponse, mockCitations);
+      setCitations(realCitations);
+      onResult?.(streamingAI.fullResponse, realCitations);
     }
-  }, [streamingAI.isStreaming, streamingAI.isThinking, streamingAI.fullResponse, streamingAI.error, onResult]);
+  }, [streamingAI.isStreaming, streamingAI.isThinking, streamingAI.fullResponse, streamingAI.error, streamingAI.citations, onResult]);
 
   return (
     <StreamingContainer

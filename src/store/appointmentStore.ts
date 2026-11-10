@@ -48,7 +48,6 @@ const sampleAppointments: Record<string, Appointment> = {
     status: 'scheduled',
     attendees: ['john@example.com', 'jane@example.com'],
     location: 'Conference Room A',
-    meetingLink: 'https://meet.google.com/abc-defg-hij',
     reminders: [15, 5], // 15 minutes and 5 minutes before
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -61,3 +61,37 @@ describe('OpenAI Responses helper', () => {
     await expect(callResponses({ instructions: 'a', input: 'b' })).rejects.toThrow('OPENAI_API_KEY');
   });
 });
+
+import { buildImageBody, callImages } from './openai.ts';
+
+describe('OpenAI Images helper', () => {
+  beforeEach(() => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+  });
+
+  it('builds an images request body', () => {
+    const body = buildImageBody({ prompt: 'p', safetyIdentifier: 'u1' }, 'gpt-image-2.6-flare');
+    expect(body).toMatchObject({ model: 'gpt-image-2.6-flare', prompt: 'p', size: '1024x1024', quality: 'medium', output_format: 'webp', safety_identifier: 'u1' });
+  });
+
+  it('calls /v1/images/generations and decodes b64_json', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('abc') }] }) });
+    const out = await callImages({ prompt: 'p', fetchImpl: fetchImpl as any });
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/generations');
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).model).toBe('gpt-image-2.6-flare');
+    expect(new TextDecoder().decode(out.bytes)).toBe('abc');
+    expect(out.contentType).toBe('image/webp');
+  });
+
+  it('uses /v1/images/edits with reference images', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('x') }] }) });
+    await callImages({ prompt: 'p', referenceImages: [{ bytes: new Uint8Array([1]), type: 'image/png', name: 'a.png' }], fetchImpl: fetchImpl as any });
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/edits');
+  });
+
+  it('surfaces image errors', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { message: 'moderation_blocked' } }) });
+    await expect(callImages({ prompt: 'p', fetchImpl: fetchImpl as any })).rejects.toThrow('moderation_blocked');
+  });
+});

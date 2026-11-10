@@ -143,8 +143,7 @@ Make sure the following environment variables are set:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-# OpenAI is server-side only: set OPENAI_API_KEY (and optionally OPENAI_MODEL, default gpt-6-astra) as Supabase Edge Function secrets.
-VITE_GEMINI_API_KEY=your_gemini_key (optional)
+# OpenAI is server-side only: set OPENAI_API_KEY (optionally OPENAI_MODEL, default gpt-6-astra, and OPENAI_IMAGE_MODEL, default gpt-image-2.6-flare) as Supabase Edge Function secrets.
 ```
 
 ## Features Included

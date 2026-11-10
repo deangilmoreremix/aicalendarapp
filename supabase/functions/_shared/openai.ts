@@ -2,7 +2,10 @@
 // Docs: https://developers.openai.com/api/docs/guides/migrate-to-responses
 
 export const OPENAI_URL = "https://api.openai.com/v1/responses";
+export const IMAGES_URL = "https://api.openai.com/v1/images/generations";
+export const IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 export const DEFAULT_MODEL = "gpt-6-astra";
+export const DEFAULT_IMAGE_MODEL = "gpt-image-2.6-flare";
 
 export type Effort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 
@@ -102,4 +105,64 @@ export async function callResponsesJson<T = any>(opts: ResponsesOptions): Promis
   } catch {
     throw new OpenAIError("OpenAI returned invalid JSON");
   }
+}
+
+export interface ImageOptions {
+  prompt: string;
+  size?: string;
+  quality?: "low" | "medium" | "high" | "xhigh" | "max" | "auto";
+  outputFormat?: "png" | "jpeg" | "webp";
+  background?: "transparent" | "opaque" | "auto";
+  /** Stable, privacy-preserving end-user id (<=128 chars). */
+  safetyIdentifier?: string;
+  /** Reference image(s) for /v1/images/edits. */
+  referenceImages?: { bytes: Uint8Array; type: string; name: string }[];
+  fetchImpl?: typeof fetch;
+}
+
+export function buildImageBody(opts: ImageOptions, model: string): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model,
+    prompt: opts.prompt,
+    size: opts.size ?? "1024x1024",
+    quality: opts.quality ?? "medium",
+    output_format: opts.outputFormat ?? "webp",
+  };
+  if (opts.background) body.background = opts.background;
+  if (opts.safetyIdentifier) body.safety_identifier = opts.safetyIdentifier.slice(0, 128);
+  return body;
+}
+
+/** Generate (or edit, when referenceImages is given) an image. Returns raw bytes. */
+export async function callImages(opts: ImageOptions): Promise<{ bytes: Uint8Array; contentType: string; revisedPrompt?: string }> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
+  const model = Deno.env.get("OPENAI_IMAGE_MODEL") ?? DEFAULT_IMAGE_MODEL;
+  const body = buildImageBody(opts, model);
+  const doFetch = opts.fetchImpl ?? fetch;
+
+  let res: Response;
+  if (opts.referenceImages?.length) {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(body)) form.append(k, String(v));
+    for (const img of opts.referenceImages) {
+      form.append("image[]", new Blob([img.bytes], { type: img.type }), img.name);
+    }
+    res = await doFetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
+  } else {
+    res = await doFetch(IMAGES_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new OpenAIError(data?.error?.message ?? `OpenAI image request failed (${res.status})`, res.status);
+  const b64: string | undefined = data?.data?.[0]?.b64_json;
+  if (!b64) throw new OpenAIError("OpenAI returned no image data");
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const fmt = String(body.output_format);
+  return { bytes, contentType: `image/${fmt}`, revisedPrompt: data?.data?.[0]?.revised_prompt };
 }
