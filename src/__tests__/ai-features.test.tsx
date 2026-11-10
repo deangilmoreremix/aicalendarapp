@@ -19,6 +19,11 @@ vi.mock('../services/api', () => ({
     enrichContact: vi.fn(),
     scoreContact: vi.fn(),
   },
+  activityApi: {
+    getAll: vi.fn().mockResolvedValue([
+      { id: 'a1', type: 'meeting_scheduled', title: 't', entityType: 'contact', entityId: 'contact-1', userId: 'u', userName: 'u', createdAt: new Date() },
+    ]),
+  },
 }));
 
 // Get access to the mocked module
@@ -63,7 +68,7 @@ describe('AI Features', () => {
       confidence: 90
     }));
     (aiApi.scoreContact as any).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ score: 82, reasoning: 'ok', nextBestAction: 'Call' }), 50))
+      () => new Promise((resolve) => setTimeout(() => resolve({ score: 82, reasoning: 'ok', nextBestAction: 'Call' }), 300))
     );
     (aiApi.predictDealSuccess as any).mockResolvedValue(75);
     (aiApi.optimizeMeetingTime as any).mockResolvedValue([new Date()]);
@@ -441,7 +446,8 @@ describe('AI Features', () => {
 
       expect(analysis).toHaveProperty('totalInteractions');
       expect(analysis).toHaveProperty('lastInteraction');
-      expect(analysis).toHaveProperty('preferredChannel');
+      expect(analysis.totalInteractions).toBe(1);
+      expect(analysis.meetingCount).toBe(1);
       expect(analysis).toHaveProperty('engagementTrend');
     });
 
@@ -469,11 +475,8 @@ describe('AI Features', () => {
 
       const insights = await result.current.getSocialMediaInsights('contact-1');
 
-      expect(insights).toHaveProperty('totalPlatforms');
-      expect(insights).toHaveProperty('activePlatforms');
-      expect(insights).toHaveProperty('totalFollowers');
-      expect(insights).toHaveProperty('engagementRate');
-      expect(insights).toHaveProperty('topPlatform');
+      expect(insights.recommendations).toEqual(['Call']);
+      expect(insights.summary).toBe('ok');
     });
   });
 });
