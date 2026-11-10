@@ -34,17 +34,8 @@ export const AIAutoFillButton: React.FC<AIAutoFillButtonProps> = ({
     try {
       let enrichmentData: ContactEnrichmentData | null = null;
 
-      // Try different enrichment methods in order of preference
-      if (formData.email) {
-        enrichmentData = await AIEnrichmentService.enrichContactByEmail(formData.email);
-      } else if (formData.socialProfiles?.linkedin) {
-        enrichmentData = await AIEnrichmentService.enrichContactByLinkedIn(formData.socialProfiles.linkedin);
-      } else if (formData.firstName && formData.lastName) {
-        enrichmentData = await AIEnrichmentService.enrichContactByName(
-          formData.firstName,
-          formData.lastName
-        );
-      }
+      // One web-search enrichment using everything we know (email domain, name, company, LinkedIn)
+      enrichmentData = await AIEnrichmentService.enrich(formData as any);
 
       if (enrichmentData) {
         onAutoFill(enrichmentData);

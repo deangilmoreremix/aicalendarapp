@@ -25,6 +25,10 @@ export interface ContactEnrichmentData {
   avatar?: string;
   bio?: string;
   notes?: string;
+  /** Short explanation of what was found and how the person was matched. */
+  summary?: string;
+  /** Public web pages the enrichment is based on. */
+  sources?: { title: string; url: string }[];
   confidence: number;
 }
 
@@ -60,7 +64,7 @@ export class AIEnrichmentService {
   }
 
   /** Backed by the `contacts_enrich` edge function (OpenAI Responses API + web search). */
-  private static async enrich(contact: Partial<Contact>): Promise<ContactEnrichmentData | null> {
+  static async enrich(contact: Partial<Contact>): Promise<ContactEnrichmentData | null> {
     try {
       return await aiApi.enrichContact(contact);
     } catch (error) {

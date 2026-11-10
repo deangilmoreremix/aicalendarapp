@@ -16,9 +16,18 @@ export interface ResponsesOptions {
   schema?: { name: string; schema: Record<string, unknown> };
   effort?: Effort;
   maxOutputTokens?: number;
-  /** Enable the built-in web search tool. */
-  webSearch?: boolean;
+  /** Enable the built-in web search tool (true, or tool options). */
+  webSearch?: boolean | WebSearchOptions;
+  /** "required" forces at least one search. */
+  toolChoice?: "auto" | "required";
   fetchImpl?: typeof fetch;
+}
+
+export interface WebSearchOptions {
+  searchContextSize?: "low" | "medium" | "high";
+  userLocation?: { country?: string; city?: string; region?: string; timezone?: string };
+  allowedDomains?: string[];
+  blockedDomains?: string[];
 }
 
 export class OpenAIError extends Error {
@@ -46,7 +55,22 @@ export function buildRequestBody(opts: ResponsesOptions, model: string): Record<
       format: { type: "json_schema", name: opts.schema.name, strict: true, schema: opts.schema.schema },
     };
   }
-  if (opts.webSearch) body.tools = [{ type: "web_search" }];
+  if (opts.webSearch) {
+    const o: WebSearchOptions = typeof opts.webSearch === "object" ? opts.webSearch : {};
+    const tool: Record<string, unknown> = { type: "web_search" };
+    if (o.searchContextSize) tool.search_context_size = o.searchContextSize;
+    if (o.userLocation) tool.user_location = { type: "approximate", ...o.userLocation };
+    if (o.allowedDomains?.length || o.blockedDomains?.length) {
+      tool.filters = {
+        ...(o.allowedDomains?.length ? { allowed_domains: o.allowedDomains.slice(0, 100) } : {}),
+        ...(o.blockedDomains?.length ? { blocked_domains: o.blockedDomains.slice(0, 100) } : {}),
+      };
+    }
+    body.tools = [tool];
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+    // Full list of URLs the model consulted (citations alone can be empty with structured output).
+    body.include = ["web_search_call.action.sources"];
+  }
   return body;
 }
 
@@ -76,6 +100,19 @@ export function extractCitations(data: any): { title: string; url: string }[] {
   return [...seen].map(([url, title]) => ({ url, title }));
 }
 
+/** Sources consulted by web search (web_search_call.action.sources) merged with url_citation annotations. */
+export function extractSources(data: any): { title: string; url: string }[] {
+  const seen = new Map<string, string>();
+  for (const c of extractCitations(data)) seen.set(c.url, c.title);
+  for (const item of data?.output ?? []) {
+    if (item?.type !== "web_search_call") continue;
+    for (const src of item.action?.sources ?? []) {
+      if (src?.url && !seen.has(src.url)) seen.set(src.url, src.title ?? src.url);
+    }
+  }
+  return [...seen].map(([url, title]) => ({ url, title }));
+}
+
 export async function callResponses(opts: ResponsesOptions): Promise<{ text: string; data: any }> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
@@ -99,9 +136,14 @@ export async function callResponses(opts: ResponsesOptions): Promise<{ text: str
 
 /** Call with a JSON schema and return the parsed object. */
 export async function callResponsesJson<T = any>(opts: ResponsesOptions): Promise<T> {
-  const { text } = await callResponses(opts);
+  return (await callResponsesJsonWithData<T>(opts)).value;
+}
+
+/** Same as callResponsesJson, but also returns the raw payload (for sources/citations). */
+export async function callResponsesJsonWithData<T = any>(opts: ResponsesOptions): Promise<{ value: T; data: any }> {
+  const { text, data } = await callResponses(opts);
   try {
-    return JSON.parse(text) as T;
+    return { value: JSON.parse(text) as T, data };
   } catch {
     throw new OpenAIError("OpenAI returned invalid JSON");
   }

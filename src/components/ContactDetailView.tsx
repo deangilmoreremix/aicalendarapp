@@ -385,22 +385,31 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
       // Apply enrichment data to contact
       const updates: any = {};
       
-      if (enrichmentData.phone && !editedContact.phone) {
-        updates.phone = enrichmentData.phone;
-      }
-      if (enrichmentData.industry && !editedContact.industry) {
-        updates.industry = enrichmentData.industry;
-      }
+      // Only fill fields that are empty; never overwrite what the user already entered.
+      if (enrichmentData.title && !editedContact.title) updates.title = enrichmentData.title;
+      if (enrichmentData.company && !editedContact.company) updates.company = enrichmentData.company;
+      if (enrichmentData.phone && !editedContact.phone) updates.phone = enrichmentData.phone;
+      if (enrichmentData.industry && !editedContact.industry) updates.industry = enrichmentData.industry;
       if (enrichmentData.avatar && enrichmentData.avatar !== editedContact.avatarSrc) {
         updates.avatarSrc = enrichmentData.avatar;
       }
-      if (enrichmentData.notes) {
-        updates.notes = editedContact.notes ? 
-          `${editedContact.notes}\n\nAI Research: ${enrichmentData.notes}` : 
-          enrichmentData.notes;
+
+      // Research notes: bio/summary, location and the public sources used (appended, dated).
+      const noteLines: string[] = [];
+      if (enrichmentData.bio) noteLines.push(enrichmentData.bio);
+      if (enrichmentData.summary) noteLines.push(enrichmentData.summary);
+      if (enrichmentData.notes) noteLines.push(enrichmentData.notes);
+      const loc = [enrichmentData.location?.city, enrichmentData.location?.state, enrichmentData.location?.country].filter(Boolean).join(', ');
+      if (loc) noteLines.push(`Location: ${loc}`);
+      if (enrichmentData.sources?.length) {
+        noteLines.push('Sources:\n' + enrichmentData.sources.slice(0, 8).map(src => `- ${src.title}: ${src.url}`).join('\n'));
       }
-      
-      // Social profiles
+      if (noteLines.length) {
+        const entry = `AI Research (${new Date().toLocaleDateString()}, confidence ${Math.round(enrichmentData.confidence)}%):\n${noteLines.join('\n')}`;
+        updates.notes = editedContact.notes ? `${editedContact.notes}\n\n${entry}` : entry;
+      }
+
+      // Social profiles (fill empty ones only)
       if (enrichmentData.socialProfiles) {
         const socialUpdates: any = {};
         Object.entries(enrichmentData.socialProfiles).forEach(([key, value]) => {
@@ -412,12 +421,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
           updates.socialProfiles = { ...editedContact.socialProfiles, ...socialUpdates };
         }
       }
-      
-      // Update AI score if provided
-      if (enrichmentData.confidence) {
-        updates.aiScore = Math.round(enrichmentData.confidence);
-      }
-      
+
       const updatedContact = { ...editedContact, ...updates };
       setEditedContact(updatedContact);
       
@@ -672,7 +676,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   } else {
                     setIsEnriching(true);
                     aiEnrichmentService
-                      .enrichContactByName(editedContact.firstName, editedContact.lastName, editedContact.company)
+                      .enrich(editedContact)
                       .then((result) => {
                         if (result) {
                           setLastEnrichment(result);

@@ -54,17 +54,13 @@ export const AIResearchButton: React.FC<AIResearchButtonProps> = ({
           }
           break;
         case 'auto':
-          if (searchQuery.email) {
-            enrichmentData = await AIEnrichmentService.enrichContactByEmail(searchQuery.email);
-          } else if (searchQuery.linkedinUrl) {
-            enrichmentData = await AIEnrichmentService.enrichContactByLinkedIn(searchQuery.linkedinUrl);
-          } else if (searchQuery.firstName && searchQuery.lastName) {
-            enrichmentData = await AIEnrichmentService.enrichContactByName(
-              searchQuery.firstName,
-              searchQuery.lastName,
-              searchQuery.company
-            );
-          }
+          enrichmentData = await AIEnrichmentService.enrich({
+            email: searchQuery.email,
+            firstName: searchQuery.firstName,
+            lastName: searchQuery.lastName,
+            company: searchQuery.company,
+            socialProfiles: searchQuery.linkedinUrl ? { linkedin: searchQuery.linkedinUrl } : undefined
+          });
           break;
       }
 

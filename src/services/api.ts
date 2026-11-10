@@ -483,6 +483,8 @@ export const aiApi = {
         website: nz(data.website)
       },
       bio: nz(data.bio),
+      summary: nz(data.summary),
+      sources: Array.isArray(data.sources) ? data.sources.filter((x: { url?: string }) => x?.url) : [],
       confidence: Number(data.confidence) || 0
     };
   },

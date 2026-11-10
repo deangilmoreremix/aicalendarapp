@@ -292,11 +292,13 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
       }
     }
     
-    // Notes
-    if (enrichmentData.notes && !formData.notes) {
-      updates.notes = enrichmentData.notes;
-    } else if (enrichmentData.bio && !formData.notes) {
-      updates.notes = enrichmentData.bio;
+    // Notes: bio/summary plus the public sources used
+    if (!formData.notes) {
+      const lines = [enrichmentData.bio, enrichmentData.summary, enrichmentData.notes].filter(Boolean) as string[];
+      if (enrichmentData.sources?.length) {
+        lines.push('Sources:\n' + enrichmentData.sources.slice(0, 8).map(src => `- ${src.title}: ${src.url}`).join('\n'));
+      }
+      if (lines.length) updates.notes = lines.join('\n');
     }
     
     setFormData(prev => ({ ...prev, ...updates }));

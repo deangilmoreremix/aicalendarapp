@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
+import { callResponses, callResponsesJsonWithData, hasOpenAIKey, extractSources } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,32 +15,42 @@ Deno.serve(async (req) => {
     const title = contact.title ?? "";
 
     if (body.format === "structured") {
-      // Structured enrichment with real web search for profile URLs.
+      // Public-information enrichment using the OpenAI Responses API web_search tool.
       if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured", fallback: true }, 503);
       const nullableStr = { type: ["string", "null"] };
+      const emailDomain = String(contact.email ?? "").split("@")[1]?.toLowerCase();
       try {
-        const out = await callResponsesJson({
+        const { value, data } = await callResponsesJsonWithData<Record<string, unknown>>({
           instructions:
-            "You are a B2B contact enrichment assistant. Use web search to find publicly available professional information about the contact. " +
-            "Only return values you found evidence for; use null for anything unknown. Never invent URLs, phone numbers or emails. confidence is 0-100.",
-          input: `Enrich this contact: ${JSON.stringify(contact)}`,
-          maxOutputTokens: 4000,
-          webSearch: true,
+            "You are a B2B contact enrichment assistant. Search the public web for professional information about the contact: " +
+            "current job title, employer, industry, business location, official profile pages (LinkedIn, X/Twitter, Facebook, Instagram, personal or company website) and a short professional bio. " +
+            "Rules: (1) Use only publicly available professional information; never return home addresses, personal phone numbers, personal emails or other private data. " +
+            "(2) Verify the person is the right one using the provided email domain, company and title; if several people match or you are unsure, return null for uncertain fields and a low confidence. " +
+            "(3) Only return URLs you actually found in search results. (4) Use null for anything unknown. " +
+            "(5) confidence is 0-100 for how sure you are that the details describe this exact person. " +
+            "(6) summary: 1-3 sentences on what you found and how you matched the person.",
+          input: `Find public information for this contact${emailDomain ? ` (email domain: ${emailDomain})` : ""}: ${JSON.stringify({
+            name, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, company, title, linkedin: contact.socialProfiles?.linkedin, website: contact.socialProfiles?.website,
+          })}`,
+          effort: "medium",
+          maxOutputTokens: 6000,
+          webSearch: { searchContextSize: "medium" },
+          toolChoice: "required",
           schema: {
             name: "contact_enrichment",
             schema: {
               type: "object", additionalProperties: false,
-              required: ["firstName","lastName","title","company","industry","city","state","country","linkedin","twitter","facebook","instagram","website","bio","confidence"],
+              required: ["firstName","lastName","title","company","industry","city","state","country","linkedin","twitter","facebook","instagram","website","bio","summary","confidence"],
               properties: {
                 firstName: nullableStr, lastName: nullableStr, title: nullableStr, company: nullableStr, industry: nullableStr,
                 city: nullableStr, state: nullableStr, country: nullableStr,
                 linkedin: nullableStr, twitter: nullableStr, facebook: nullableStr, instagram: nullableStr, website: nullableStr,
-                bio: nullableStr, confidence: { type: "number" },
+                bio: nullableStr, summary: nullableStr, confidence: { type: "number" },
               },
             },
           },
         });
-        return json(out);
+        return json({ ...value, sources: extractSources(data) });
       } catch (error) {
         console.error("OpenAI error:", error);
         return json({ error: error.message ?? "Enrichment failed" }, 502);
@@ -61,8 +71,7 @@ Deno.serve(async (req) => {
     }
 
     const fallback = `${name} is a ${title || "professional"}${company ? ` at ${company}` : ""}. ` +
-      `No enrichment API key is configured, so this is a best-effort placeholder profile. ` +
-      `Likely social profiles: https://linkedin.com/in/${String(name).toLowerCase().replace(/[^a-z]+/g, "-")}.`;
+      `No enrichment API key is configured, so this is a best-effort placeholder profile. `;
     return new Response(JSON.stringify({ text: fallback }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -95,3 +95,38 @@ describe('OpenAI Images helper', () => {
     await expect(callImages({ prompt: 'p', fetchImpl: fetchImpl as any })).rejects.toThrow('moderation_blocked');
   });
 });
+
+import { extractSources } from './openai.ts';
+
+describe('web_search tool', () => {
+  it('configures the web_search tool and requests sources', () => {
+    const body = buildRequestBody(
+      { instructions: 'a', input: 'b', webSearch: { searchContextSize: 'medium', allowedDomains: ['linkedin.com'], userLocation: { country: 'US' } }, toolChoice: 'required' },
+      'gpt-6-astra',
+    ) as any;
+    expect(body.tools).toEqual([
+      { type: 'web_search', search_context_size: 'medium', user_location: { type: 'approximate', country: 'US' }, filters: { allowed_domains: ['linkedin.com'] } },
+    ]);
+    expect(body.tool_choice).toBe('required');
+    expect(body.include).toEqual(['web_search_call.action.sources']);
+  });
+
+  it('merges consulted sources with citations without duplicates', () => {
+    const data = {
+      output: [
+        { type: 'web_search_call', action: { type: 'search', sources: [{ url: 'https://a.com', title: 'A' }, { url: 'https://b.com' }] } },
+        { type: 'message', content: [{ type: 'output_text', text: '{}', annotations: [{ type: 'url_citation', url: 'https://a.com', title: 'A cited' }] }] },
+      ],
+    };
+    expect(extractSources(data)).toEqual([
+      { url: 'https://a.com', title: 'A cited' },
+      { url: 'https://b.com', title: 'https://b.com' },
+    ]);
+  });
+
+  it('omits web_search fields when disabled', () => {
+    const body = buildRequestBody({ instructions: 'a', input: 'b' }, 'gpt-6-astra') as any;
+    expect(body.tools).toBeUndefined();
+    expect(body.include).toBeUndefined();
+  });
+});
