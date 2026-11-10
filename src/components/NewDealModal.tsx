@@ -1,34 +1,9 @@
 import React, { useState } from 'react';
 import { ModernButton } from './ui/ModernButton';
-import { AIAutoFillButton } from './ui/AIAutoFillButton';
-import { AIResearchButton } from './ui/AIResearchButton';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
-import { Deal, Contact } from '../types';
-import {
-  X,
-  DollarSign,
-  Building,
-  Target,
-  Tag,
-  Calendar,
-  TrendingUp,
-  Save,
-  User,
-  AlertCircle,
-  CheckCircle,
-  Heart,
-  Percent,
-  Clock,
-  Star,
-  Briefcase,
-  Brain,
-  Sparkles,
-  Wand2,
-  RefreshCw,
-  Users,
-  Plus
-} from 'lucide-react';
+import { Contact } from '../types';
+import { X, DollarSign, Target, Tag, TrendingUp, Save, User, AlertCircle, CheckCircle, Brain, Sparkles } from 'lucide-react';
 
 interface NewDealModalProps {
   isOpen: boolean;

@@ -25,8 +25,6 @@ import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
 import { CalendarSettings } from './components/CalendarSettings';
 import { SkeletonCard } from './components/ui/Skeleton';
-import ErrorBoundary from './components/ui/ErrorBoundary';
-import Toast from './components/ui/Toast';
 
 const App: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
@@ -288,6 +286,8 @@ const App: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to light mode (sun)' : 'Switch to dark mode (moon)'}
+              title={isDark ? 'Light mode' : 'Dark mode'}
               className={`p-2 rounded-xl transition-colors ${
                 isDark
                   ? 'bg-white/10 text-white hover:bg-white/20'

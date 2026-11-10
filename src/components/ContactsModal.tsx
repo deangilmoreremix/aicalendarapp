@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAI } from '../contexts/AIContext';
-import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { ContactDetailView } from './ContactDetailView';
 import { ImportContactsModal } from './ImportContactsModal';
@@ -10,36 +9,7 @@ import { Contact } from '../types';
 import { AIEnhancedContactCard } from './contacts/AIEnhancedContactCard';
 import { DarkModeToggle } from './ui/DarkModeToggle';
 import Fuse from 'fuse.js';
-import { 
-  X, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Edit,
-  Plus,
-  Users,
-  ChevronDown,
-  Brain,
-  Download,
-  Upload,
-  Zap,
-  CheckCheck,
-  Grid3X3,
-  List,
-  ArrowUp,
-  ArrowDown,
-  Settings,
-  Target,
-  BarChart3,
-  RefreshCw,
-  Sparkles,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  Info,
-  TrendingUp,
-  Award
-} from 'lucide-react';
+import { X, Search, Filter, Plus, Users, ChevronDown, Brain, Download, Upload, Zap, CheckCheck, Grid3X3, List, Target, Sparkles, AlertCircle, CheckCircle, Loader2, TrendingUp, Award } from 'lucide-react';
 
 interface ContactsModalProps {
   isOpen: boolean;

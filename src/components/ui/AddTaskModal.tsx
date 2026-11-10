@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogHeader } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Textarea } from './textarea';
@@ -7,23 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './badge';
 import { useContactStore } from '../../store/contactStore';
 import { useTaskStore } from '../../store/taskStore';
-import { Contact } from '../../types';
-import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
-import {
-  X,
-  Plus,
-  Calendar,
-  Clock,
-  User,
-  Tag,
-  Flag,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Users,
-  Sparkles,
-  Wand2
-} from 'lucide-react';
+import { UniversalAIAssistant } from './UniversalAIAssistant';
+import { X, Plus, Tag, Loader2, Sparkles } from 'lucide-react';
 
 interface AddTaskModalProps {
   isOpen: boolean;

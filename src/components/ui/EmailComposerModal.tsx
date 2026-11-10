@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogHeader } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';

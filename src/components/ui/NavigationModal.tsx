@@ -3,25 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
-import {
-  X,
-  Search,
-  Calendar,
-  Users,
-  BarChart3,
-  Settings,
-  Home,
-  ArrowRight,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Filter,
-  SortAsc,
-  Grid,
-  List,
-  MapPin,
-  Loader2
-} from 'lucide-react';
+import { X, Search, Calendar, Users, BarChart3, Settings, Home, ArrowRight, Clock, CheckCircle, Grid, List, Loader2 } from 'lucide-react';
 
 interface NavigationModalProps {
   isOpen: boolean;

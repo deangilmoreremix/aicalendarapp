@@ -72,6 +72,7 @@ export const AIAutoFillButton: React.FC<AIAutoFillButtonProps> = ({
 
   return (
     <button
+      type="button"
       onClick={handleEnrichment}
       disabled={isEnriching || !canEnrich()}
       className={`

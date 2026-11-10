@@ -5,17 +5,7 @@ import { Input } from './input';
 import { Badge } from './badge';
 import { useContactStore } from '../../store/contactStore';
 import { Contact } from '../../types';
-import {
-  X,
-  User,
-  Search,
-  Plus,
-  Check,
-  Loader2,
-  Users,
-  Mail,
-  Phone
-} from 'lucide-react';
+import { X, User, Search, Plus, Check, Loader2, Users, Mail } from 'lucide-react';
 
 interface AddUserModalProps {
   isOpen: boolean;

@@ -6,23 +6,7 @@ import { useAI } from '../../contexts/AIContext';
 import { useContactStore } from '../../store/contactStore';
 import { useDealStore } from '../../store/dealStore';
 import { useTaskStore } from '../../store/taskStore';
-import {
-  X,
-  Brain,
-  TrendingUp,
-  AlertTriangle,
-  Target,
-  Users,
-  BarChart3,
-  Calendar,
-  DollarSign,
-  RefreshCw,
-  Loader2,
-  Sparkles,
-  CheckCircle,
-  Clock,
-  Zap
-} from 'lucide-react';
+import { X, Brain, TrendingUp, AlertTriangle, Target, Users, BarChart3, DollarSign, RefreshCw, Loader2, CheckCircle, Clock, Zap } from 'lucide-react';
 
 interface AIInsightsDashboardModalProps {
   isOpen: boolean;
@@ -31,7 +15,7 @@ interface AIInsightsDashboardModalProps {
 
 interface AIInsight {
   id: string;
-  type: 'engagement' | 'conversion' | 'risk' | 'opportunity';
+  type: 'engagement' | 'conversion' | 'risk' | 'opportunity' | 'prediction' | 'recommendation';
   title: string;
   description: string;
   confidence: number;
@@ -74,6 +58,8 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
       setInsights(
         result.map(insight => ({
           ...insight,
+          actionable: insight.actionable ?? true,
+          suggestedActions: insight.suggestedActions ?? [],
           category: ((insight as any).category ?? 'general') as any,
           impact: (insight.confidence > 80 ? 'high' : insight.confidence > 60 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
           createdAt: insight.createdAt ?? new Date()

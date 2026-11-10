@@ -5,27 +5,7 @@ import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { useAI } from '../contexts/AIContext';
 import { useContactStore } from '../store/contactStore';
-import { 
-  Edit, 
-  Mail, 
-  Phone, 
-  Plus, 
-  MessageSquare,
-  FileText,
-  Calendar,
-  MoreHorizontal,
-  User,
-  Globe,
-  Clock,
-  Brain,
-  Target,
-  TrendingUp,
-  Zap,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+import { Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, MoreHorizontal, User, Globe, Clock, Brain, Target, Sparkles, Loader2 } from 'lucide-react';
 
 const socialPlatforms = [
   { icon: MessageSquare, color: 'bg-green-500', name: 'WhatsApp' },
@@ -36,7 +16,8 @@ const socialPlatforms = [
 
 export const CustomerProfile: React.FC = () => {
   const { predictNextBestAction, analyzeInteractionHistory, isProcessing } = useAI();
-  const { contacts } = useContactStore();
+  const { contacts: contactsById } = useContactStore();
+  const contacts = React.useMemo(() => Object.values(contactsById), [contactsById]);
   const [selectedContact, setSelectedContact] = useState(contacts[0] || null);
   const [nextBestAction, setNextBestAction] = useState<string | null>(null);
   const [interactionData, setInteractionData] = useState<any>(null);

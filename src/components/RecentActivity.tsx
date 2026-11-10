@@ -5,8 +5,6 @@ import { useDealViews } from '../hooks/useDealViews';
 import { useContactStore } from '../store/contactStore';
 import { Calendar, CheckCircle, AlertCircle, TrendingUp, ArrowRight, Brain, Sparkles, Loader2, Zap } from 'lucide-react';
 import Avatar from './ui/Avatar';
-import { getInitials } from '../utils/avatars';
-import { Contact } from '../types';
 import { DealDetailsModal } from './ui/DealDetailsModal';
 import { DealsManagementModal } from './ui/DealsManagementModal';
 import { AIInsightsDashboardModal } from './ui/AIInsightsDashboardModal';

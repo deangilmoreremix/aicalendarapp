@@ -34,7 +34,7 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
-import { Card, CardContent, CardHeader } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { SkeletonList } from './ui/Skeleton';
 
@@ -204,7 +204,7 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) 
 TaskCard.displayName = 'TaskCard';
 
 interface ColumnHeaderProps {
-  column: typeof statusColumns[0];
+  column: { id: string; title: string; headerColor: string };
   taskCount: number;
   onAddTask: () => void;
 }
@@ -237,9 +237,11 @@ export const TaskKanbanBoard: React.FC = () => {
     filters,
     setFilters,
     setSelectedTask,
-    selectedTask,
+    selectedTask: selectedTaskId,
+    tasks: allTasks,
     isLoading
   } = useTaskStore();
+  const selectedTask = selectedTaskId ? allTasks[selectedTaskId] ?? null : null;
   const { predictNextBestAction, generateInsights, isProcessing } = useAI();
   
   const [searchTerm, setSearchTerm] = useState('');

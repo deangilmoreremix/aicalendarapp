@@ -2,27 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
 import { Badge } from './badge';
-import {
-  X,
-  Settings,
-  Share,
-  Download,
-  Upload,
-  Archive,
-  Trash2,
-  Copy,
-  Filter,
-  SortAsc,
-  Bell,
-  BellOff,
-  Star,
-  StarOff,
-  Calendar,
-  Users,
-  BarChart3,
-  FileText,
-  Loader2
-} from 'lucide-react';
+import { X, Settings, Share, Download, Archive, Trash2, Copy, Bell, Star, Calendar, Users, BarChart3, FileText, Loader2 } from 'lucide-react';
 
 interface MoreOptionsModalProps {
   isOpen: boolean;

@@ -76,7 +76,7 @@ describe('UniversalAIAssistant', () => {
     it('should display the correct title and icon', () => {
       render(<UniversalAIAssistant {...defaultProps} />);
       expect(screen.getByText('AI Contact Assistant')).toBeInTheDocument();
-      expect(screen.getByTestId('brain-icon')).toBeInTheDocument();
+      expect(screen.getAllByTestId('brain-icon').length).toBeGreaterThan(0);
     });
   });
 
@@ -107,7 +107,7 @@ describe('UniversalAIAssistant', () => {
         jobTitle: 'CEO'
       });
 
-      render(<UniversalAIAssistant {...defaultProps} />);
+      render(<UniversalAIAssistant {...defaultProps} config={{ ...defaultConfig, mode: 'task' as const }} />);
 
       const input = screen.getByPlaceholderText('Describe the contact you want to add...');
       const button = screen.getByText('Generate');
@@ -174,7 +174,7 @@ describe('UniversalAIAssistant', () => {
     it('should handle AI errors gracefully', async () => {
       mockUseAI.streamTaskSuggestions.mockRejectedValue(new Error('AI Error'));
 
-      render(<UniversalAIAssistant {...defaultProps} />);
+      render(<UniversalAIAssistant {...defaultProps} config={{ ...defaultConfig, mode: 'task' as const }} />);
       const input = screen.getByPlaceholderText('Describe the contact you want to add...');
       const button = screen.getByText('Generate');
 

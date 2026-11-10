@@ -3,16 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AIAutoFillButton } from './AIAutoFillButton';
 
 // Mock the AI enrichment service
-const mockEnrichContactByEmail = vi.fn();
-const mockEnrichContactByLinkedIn = vi.fn();
-const mockEnrichContactByName = vi.fn();
+const { mockEnrich } = vi.hoisted(() => ({ mockEnrich: vi.fn() }));
 
+// Enrichment is a single OpenAI web_search lookup using everything known about the contact
 vi.mock('../../services/aiEnrichmentService', () => ({
-  AIEnrichmentService: {
-    enrichContactByEmail: mockEnrichContactByEmail,
-    enrichContactByLinkedIn: mockEnrichContactByLinkedIn,
-    enrichContactByName: mockEnrichContactByName
-  }
+  AIEnrichmentService: { enrich: mockEnrich }
 }));
 
 // Mock lucide-react icons
@@ -36,7 +31,8 @@ describe('AIAutoFillButton', () => {
   describe('Button Visibility and State', () => {
     it('should show hint text when no enrichment data is available', () => {
       render(<AIAutoFillButton {...defaultProps} />);
-      expect(screen.getByText('Enter email or name for AI auto-fill')).toBeInTheDocument();
+      expect(screen.getByRole('button')).toBeDisabled();
+      expect(screen.getByRole('button')).toHaveAttribute('title', expect.stringContaining('Enter email'));
     });
 
     it('should show auto-fill button when email is provided', () => {
@@ -62,7 +58,7 @@ describe('AIAutoFillButton', () => {
   });
 
   describe('Auto-Fill Functionality', () => {
-    it('should call enrichContactByEmail when email is provided', async () => {
+    it('should enrich when email is provided', async () => {
       const mockEnrichmentData = {
         firstName: 'John',
         lastName: 'Smith',
@@ -70,7 +66,7 @@ describe('AIAutoFillButton', () => {
         company: 'TechCorp'
       };
 
-      mockEnrichContactByEmail.mockResolvedValue(mockEnrichmentData);
+      mockEnrich.mockResolvedValue(mockEnrichmentData);
 
       render(<AIAutoFillButton {...defaultProps} formData={{ email: 'john@techcorp.com' }} />);
 
@@ -78,19 +74,19 @@ describe('AIAutoFillButton', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(mockEnrichContactByEmail).toHaveBeenCalledWith('john@techcorp.com');
+        expect(mockEnrich).toHaveBeenCalledWith({ email: 'john@techcorp.com' });
         expect(mockOnAutoFill).toHaveBeenCalledWith(mockEnrichmentData);
       });
     });
 
-    it('should call enrichContactByLinkedIn when LinkedIn URL is provided', async () => {
+    it('should enrich when LinkedIn URL is provided', async () => {
       const mockEnrichmentData = {
         firstName: 'John',
         lastName: 'Smith',
         title: 'CEO'
       };
 
-      mockEnrichContactByLinkedIn.mockResolvedValue(mockEnrichmentData);
+      mockEnrich.mockResolvedValue(mockEnrichmentData);
 
       render(<AIAutoFillButton {...defaultProps} formData={{
         socialProfiles: { linkedin: 'https://linkedin.com/in/johnsmith' }
@@ -100,18 +96,18 @@ describe('AIAutoFillButton', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(mockEnrichContactByLinkedIn).toHaveBeenCalledWith('https://linkedin.com/in/johnsmith');
+        expect(mockEnrich).toHaveBeenCalledWith({ socialProfiles: { linkedin: 'https://linkedin.com/in/johnsmith' } });
         expect(mockOnAutoFill).toHaveBeenCalledWith(mockEnrichmentData);
       });
     });
 
-    it('should call enrichContactByName when name is provided', async () => {
+    it('should enrich when name is provided', async () => {
       const mockEnrichmentData = {
         email: 'john@techcorp.com',
         title: 'CEO'
       };
 
-      mockEnrichContactByName.mockResolvedValue(mockEnrichmentData);
+      mockEnrich.mockResolvedValue(mockEnrichmentData);
 
       render(<AIAutoFillButton {...defaultProps} formData={{
         firstName: 'John',
@@ -123,15 +119,15 @@ describe('AIAutoFillButton', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(mockEnrichContactByName).toHaveBeenCalledWith('John', 'Smith', 'TechCorp');
+        expect(mockEnrich).toHaveBeenCalledWith({ firstName: 'John', lastName: 'Smith', company: 'TechCorp' });
         expect(mockOnAutoFill).toHaveBeenCalledWith(mockEnrichmentData);
       });
     });
 
-    it('should prioritize email over LinkedIn over name', async () => {
+    it('should send all known contact details in one lookup', async () => {
       const mockEnrichmentData = { firstName: 'John' };
 
-      mockEnrichContactByEmail.mockResolvedValue(mockEnrichmentData);
+      mockEnrich.mockResolvedValue(mockEnrichmentData);
 
       render(<AIAutoFillButton {...defaultProps} formData={{
         email: 'john@techcorp.com',
@@ -144,16 +140,15 @@ describe('AIAutoFillButton', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(mockEnrichContactByEmail).toHaveBeenCalledWith('john@techcorp.com');
-        expect(mockEnrichContactByLinkedIn).not.toHaveBeenCalled();
-        expect(mockEnrichContactByName).not.toHaveBeenCalled();
+        expect(mockEnrich).toHaveBeenCalledTimes(1);
+        expect(mockEnrich.mock.calls[0][0]).toMatchObject({ email: 'john@techcorp.com', firstName: 'John', lastName: 'Smith' });
       });
     });
   });
 
   describe('Loading States', () => {
     it('should show loading state during enrichment', async () => {
-      mockEnrichContactByEmail.mockImplementation(() =>
+      mockEnrich.mockImplementation(() =>
         new Promise(resolve => setTimeout(() => resolve({}), 100))
       );
 
@@ -171,13 +166,13 @@ describe('AIAutoFillButton', () => {
     });
 
     it('should disable button during processing', () => {
-      mockEnrichContactByEmail.mockImplementation(() =>
+      mockEnrich.mockImplementation(() =>
         new Promise(() => {}) // Never resolves
       );
 
       render(<AIAutoFillButton {...defaultProps} formData={{ email: 'test@example.com' }} />);
 
-      const button = screen.getByText('AI Auto-Fill');
+      const button = screen.getByRole('button');
       fireEvent.click(button);
 
       expect(button).toBeDisabled();
@@ -188,7 +183,7 @@ describe('AIAutoFillButton', () => {
     it('should handle enrichment errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      mockEnrichContactByEmail.mockRejectedValue(new Error('API Error'));
+      mockEnrich.mockRejectedValue(new Error('API Error'));
 
       render(<AIAutoFillButton {...defaultProps} formData={{ email: 'test@example.com' }} />);
 
@@ -207,14 +202,14 @@ describe('AIAutoFillButton', () => {
     it('should have proper button attributes', () => {
       render(<AIAutoFillButton {...defaultProps} formData={{ email: 'test@example.com' }} />);
 
-      const button = screen.getByText('AI Auto-Fill');
+      const button = screen.getByRole('button');
       expect(button).toHaveAttribute('type', 'button');
     });
 
     it('should support keyboard interaction', () => {
       render(<AIAutoFillButton {...defaultProps} formData={{ email: 'test@example.com' }} />);
 
-      const button = screen.getByText('AI Auto-Fill');
+      const button = screen.getByRole('button');
       button.focus();
       expect(document.activeElement).toBe(button);
     });

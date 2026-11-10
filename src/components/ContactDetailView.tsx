@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
-import { CustomizableAIToolbar } from './ui/CustomizableAIToolbar';
 import { AIResearchButton } from './ui/AIResearchButton';
 import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
 import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
@@ -35,15 +34,7 @@ const ContactEmailPanel = ({ contact }: { contact: Contact }) => (
   </div>
 );
 import { Contact } from '../types';
-import { 
-  X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, MoreHorizontal, 
-  User, Globe, Clock, Building, Tag, Star, ExternalLink, Brain, TrendingUp, 
-  BarChart3, Zap, Users, Activity, Settings, Database, Shield, Target, 
-  Smartphone, Video, Linkedin, Twitter, Facebook, Instagram, Save, 
-  Ambulance as Cancel, Heart, HeartOff, MapPin, Briefcase, Award, 
-  CheckCircle, AlertCircle, Wifi, WifiOff, Search, DollarSign, RefreshCw,
-  Sparkles, Camera, Wand2
-} from 'lucide-react';
+import { X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, User, Globe, Clock, Building, Tag, Brain, TrendingUp, BarChart3, Zap, Activity, Database, Target, Linkedin, Twitter, Facebook, Instagram, Save, Ambulance as Cancel, Heart, HeartOff, Search, Sparkles, Camera, Wand2 } from 'lucide-react';
 
 interface ContactDetailViewProps {
   contact: Contact;
@@ -55,14 +46,14 @@ interface ContactDetailViewProps {
 const interestColors = {
   hot: 'bg-red-500',
   medium: 'bg-yellow-500',
-  low: 'bg-blue-500',
+  warm: 'bg-blue-500',
   cold: 'bg-gray-400'
 };
 
 const interestLabels = {
   hot: 'Hot Client',
   medium: 'Medium Interest',
-  low: 'Low Interest',
+  warm: 'Warm Interest',
   cold: 'Non Interest'
 };
 
@@ -277,7 +268,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     if (!editedContact.socialProfiles) return;
     
     const socialProfiles = { ...editedContact.socialProfiles };
-    delete socialProfiles[platform];
+    delete (socialProfiles as Record<string, string | undefined>)[platform];
     
     setEditedContact(prev => ({
       ...prev,
@@ -329,7 +320,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     }
   };
 
-  const handleChangeInterestLevel = async (level: 'hot' | 'medium' | 'low' | 'cold') => {
+  const handleChangeInterestLevel = async (level: 'hot' | 'medium' | 'warm' | 'cold') => {
     setEditedContact(prev => ({
       ...prev,
       interestLevel: level
@@ -522,7 +513,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   src={editedContact.avatarSrc}
                   alt={editedContact.name}
                   size="xl"
-                  status={editedContact.status}
+                  status={(['active', 'inactive', 'pending'] as const).find(st => st === editedContact.status)}
                 />
                 
                 {/* AI Score Badge */}
@@ -852,7 +843,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                       <div className="flex space-x-1 mt-1">
                         {socialPlatforms.slice(0, 4).map((social, index) => {
                           const Icon = social.icon;
-                          const profileUrl = editedContact.socialProfiles?.[social.key];
+                          const profileUrl = (editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[social.key];
                           return (
                             <div 
                               key={index} 
@@ -942,7 +933,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                       {editingField === 'lastConnected' ? (
                         <input
                           type="text"
-                          value={editedContact.lastConnected || ''}
+                          value={editedContact.customFields?.lastConnected || ''}
                           onChange={(e) => handleEditField('lastConnected', e.target.value)}
                           className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
                           onBlur={handleSaveField}
@@ -950,7 +941,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                         />
                       ) : (
                         <p className="text-sm font-medium text-gray-900 leading-tight">
-                          {editedContact.lastConnected || '06/15/2023 at 7:16 pm'}
+                          {editedContact.customFields?.lastConnected || new Date(editedContact.updatedAt).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -985,7 +976,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                 </div>
                 {editInterestLevel ? (
                   <div className="space-y-2 mb-2">
-                    {(['hot', 'medium', 'low', 'cold'] as const).map(level => (
+                    {(['hot', 'medium', 'warm', 'cold'] as const).map(level => (
                       <button
                         key={level}
                         onClick={() => handleChangeInterestLevel(level)}
@@ -1011,7 +1002,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                         const isActive = 
                           (editedContact.interestLevel === 'hot' && i < 5) ||
                           (editedContact.interestLevel === 'medium' && i < 3) ||
-                          (editedContact.interestLevel === 'low' && i < 2) ||
+                          (editedContact.interestLevel === 'warm' && i < 2) ||
                           (editedContact.interestLevel === 'cold' && i < 1);
                         
                         return (
@@ -1284,7 +1275,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {socialPlatforms.map((platform, index) => {
                       const Icon = platform.icon;
-                      const profileUrl = editedContact.socialProfiles?.[platform.key];
+                      const profileUrl = (editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[platform.key];
                       
                       return (
                         <div key={index} className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -1296,7 +1287,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                             {editingField === `social_${platform.key}` ? (
                               <input
                                 type="text"
-                                value={editedContact.socialProfiles?.[platform.key] || ''}
+                                value={(editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[platform.key] || ''}
                                 onChange={(e) => {
                                   const socialProfiles = {
                                     ...(editedContact.socialProfiles || {}),

@@ -2,24 +2,7 @@ import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Contact } from '../../types';
 import { useAI } from '../../contexts/AIContext';
-import { 
-  User, 
-  Building, 
-  Mail, 
-  Phone, 
-  Linkedin, 
-  Twitter, 
-  Globe,
-  Brain,
-  Sparkles,
-  TrendingUp,
-  Target,
-  Clock,
-  Star,
-  ChevronRight,
-  Loader2,
-  Zap
-} from 'lucide-react';
+import { Mail, Phone, Linkedin, Twitter, Globe, Brain, Sparkles, Clock, Star, ChevronRight, Loader2, Zap } from 'lucide-react';
 
 interface AIEnhancedContactCardProps {
   contact: Contact;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogHeader } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
@@ -8,24 +8,9 @@ import { Textarea } from './textarea';
 import { useContactStore } from '../../store/contactStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
 import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
 import { Calendar, Brain } from 'lucide-react';
-import {
-  X,
-  Clock,
-  Users,
-  MapPin,
-  Video,
-  Phone,
-  Mail,
-  Sparkles,
-  Loader2,
-  Plus,
-  CheckCircle,
-  AlertCircle,
-  Target
-} from 'lucide-react';
+import { X, Clock, Users, MapPin, Video, Phone, Mail, Sparkles, Loader2, Plus, CheckCircle, Target } from 'lucide-react';
 
 interface MeetingSchedulerModalProps {
   isOpen: boolean;

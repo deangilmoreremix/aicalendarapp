@@ -100,15 +100,15 @@ describe('API Mapping Functions', () => {
       type: 'meeting',
       completed: false,
       created_at: '2024-12-20T00:00:00Z',
-      completed_at: null,
+      completed_at: undefined,
       assigned_user_id: 'user1',
       assigned_user_name: 'John Doe',
       estimated_duration: 60,
-      actual_duration: null,
+      actual_duration: undefined,
       tags: ['urgent'],
       attachments: [],
       subtasks: [],
-      related_to: null,
+      related_to: undefined,
       notes: 'Test notes'
     };
 
@@ -148,8 +148,8 @@ describe('API Mapping Functions', () => {
     const dbDeal = {
       id: '1',
       company: 'Tech Corp',
-      value: 50000,
-      probability: 75,
+      value: '50000',
+      probability: '75',
       due_date: '2024-12-31',
       contact_id: 'contact1',
       status: 'active',
@@ -166,16 +166,16 @@ describe('API Mapping Functions', () => {
       const result = mapDealFromDB(dbDeal);
       expect(result.id).toBe('1');
       expect(result.company).toBe('Tech Corp');
-      expect(result.value).toBe(50000);
-      expect(result.probability).toBe(75);
+      expect(result.value).toBe('50000');
+      expect(result.probability).toBe('75');
       expect(result.createdAt).toEqual(new Date('2024-01-01T00:00:00Z'));
     });
 
     it('maps deal to database format', () => {
       const frontendDeal = {
         company: 'Tech Corp',
-        value: 50000,
-        probability: 75,
+        value: '50000',
+        probability: '75',
         dueDate: '2024-12-31',
         contactId: 'contact1',
         status: 'active',
@@ -188,7 +188,7 @@ describe('API Mapping Functions', () => {
 
       const result = mapDealToDB(frontendDeal);
       expect(result.company).toBe('Tech Corp');
-      expect(result.value).toBe(50000);
+      expect(result.value).toBe('50000');
       expect(result.contact_id).toBe('contact1');
     });
   });

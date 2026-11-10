@@ -3,20 +3,8 @@ import { GlassCard } from './ui/GlassCard';
 import { ModernButton } from './ui/ModernButton';
 import { useAI } from '../contexts/AIContext';
 import { aiApi } from '../services/api';
-import {
-  Brain,
-  Sparkles,
-  User,
-  Building,
-  Mail,
-  TrendingUp,
-  Target,
-  CheckCircle,
-  Loader2,
-  Award,
-  AlertCircle
-} from 'lucide-react';
-import { SkeletonText, SkeletonButton } from './ui/Skeleton';
+import { Brain, Sparkles, TrendingUp, CheckCircle, Loader2, Award, AlertCircle } from 'lucide-react';
+import { SkeletonText } from './ui/Skeleton';
 
 export const InteractiveContactScorer: React.FC = React.memo(() => {
   const { generateInsights, isProcessing } = useAI();

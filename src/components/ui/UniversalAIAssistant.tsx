@@ -3,25 +3,7 @@ import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Card, CardContent, CardHeader } from './card';
-import {
-  Brain,
-  Sparkles,
-  Clock,
-  Tag,
-  Calendar,
-  CheckCircle2,
-  ThumbsUp,
-  ThumbsDown,
-  RefreshCw,
-  X,
-  Lightbulb,
-  Target,
-  Zap,
-  DollarSign,
-  Users,
-  Mail,
-  TrendingUp
-} from 'lucide-react';
+import { Sparkles, Calendar, ThumbsUp, ThumbsDown, RefreshCw, X, Lightbulb, Zap, TrendingUp } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
 import { AIEnrichmentService } from '../../services/aiEnrichmentService';
 

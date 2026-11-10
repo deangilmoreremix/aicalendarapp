@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { GlassCard } from './ui/GlassCard';
 import { MeetingSchedulerModal } from './ui/MeetingSchedulerModal';
 import { EmailComposerModal } from './ui/EmailComposerModal';
-import { Plus, UserPlus, Calendar, Mail, Bot, Users } from 'lucide-react';
+import { Plus, UserPlus, Calendar, Mail, Users } from 'lucide-react';
 
 interface QuickActionsProps {
   onNewContact: () => void;

@@ -36,6 +36,7 @@ import { TaskDetailsModal } from './TaskDetailsModal';
 const localizer = momentLocalizer(moment);
 
 interface TaskEvent extends Event {
+  id?: string;
   resource: {
     type: 'task' | 'calendar-event';
     data: Task | any;
@@ -317,10 +318,10 @@ const calendarEventItems: TaskEvent[] = calendarEvents
          });
        }
        return {
-         id: event.id,
-         title: event.title,
+         id: event.id ?? String(event.resource.data?.id ?? ''),
+         title: String(event.title ?? ''),
          isFullDay: event.allDay,
-         startsAt: event.start.toISOString(),
+         startsAt: (event.start ?? new Date()).toISOString(),
          endsAt: event.end?.toISOString(),
          visibility: 'SHARE_EVERYTHING' as const,
          participants: [],
@@ -412,7 +413,7 @@ const calendarEventItems: TaskEvent[] = calendarEvents
   };
 
   // Custom toolbar
-  const CustomToolbar = ({ date, view, onNavigate, onView }: ToolbarProps<TaskEvent, object>) => {
+  const CustomToolbar = ({ date, view, onNavigate, onView }: Pick<ToolbarProps<TaskEvent, object>, 'date' | 'view' | 'onNavigate' | 'onView'>) => {
     const navigate = (action: NavigateAction) => {
       onNavigate(action);
     };

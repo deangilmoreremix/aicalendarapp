@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
 import App from './App';
@@ -180,20 +179,17 @@ describe('App Component - Button Functionality', () => {
     renderApp();
 
     const buttons = screen.getAllByRole('button');
+    const unlabeled: string[] = [];
 
     buttons.forEach(button => {
-      // Check that buttons either have text content or aria-label/title
+      // Buttons need text content, aria-label or title
       const hasText = button.textContent && button.textContent.trim().length > 0;
-      const hasAriaLabel = button.hasAttribute('aria-label');
-      const hasTitle = button.hasAttribute('title');
-
-      // Skip buttons that are icon-only with title (like delete button)
-      if (hasTitle && button.children.length === 1 && button.children[0].tagName === 'svg') {
-        return; // This is acceptable for icon buttons with title
+      if (!(hasText || button.hasAttribute('aria-label') || button.hasAttribute('title'))) {
+        unlabeled.push(button.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '<svg/>').slice(0, 220));
       }
-
-      expect(hasText || hasAriaLabel || hasTitle).toBe(true);
     });
+
+    expect(unlabeled).toEqual([]);
   });
 
   test('buttons are keyboard accessible', () => {

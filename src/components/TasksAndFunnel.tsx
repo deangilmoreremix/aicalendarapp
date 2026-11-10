@@ -8,7 +8,7 @@ import { AddUserModal } from './ui/AddUserModal';
 import { MoreOptionsModal } from './ui/MoreOptionsModal';
 import { NavigationModal } from './ui/NavigationModal';
 import { AddTaskModal } from './ui/AddTaskModal';
-import { MoreHorizontal, ArrowRight, Calendar, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2, TrendingUp } from 'lucide-react';
+import { MoreHorizontal, ArrowRight, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2, TrendingUp } from 'lucide-react';
 
 const taskData = [
   {

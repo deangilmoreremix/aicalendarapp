@@ -7,25 +7,7 @@ import { useDealViews, DealView } from '../../hooks/useDealViews';
 import { activityApi } from '../../services/api';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
-import {
-  X,
-  DollarSign,
-  Calendar,
-  User,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Target,
-  Brain,
-  Loader2,
-  Edit,
-  Archive,
-  Trash2,
-  Mail,
-  FileText
-} from 'lucide-react';
+import { X, DollarSign, Calendar, User, AlertTriangle, CheckCircle, Clock, Target, Brain, Loader2, Edit, Archive, Mail, FileText } from 'lucide-react';
 
 interface DealDetailsModalProps {
   isOpen: boolean;

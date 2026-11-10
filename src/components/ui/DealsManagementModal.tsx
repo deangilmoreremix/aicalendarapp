@@ -5,28 +5,10 @@ import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
-import { useDealViews, DealView as Deal } from '../../hooks/useDealViews';
+import { useDealViews } from '../../hooks/useDealViews';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
-import {
-  X,
-  Search,
-  Filter,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  User,
-  Brain,
-  Loader2,
-  Plus,
-  Download,
-  Upload,
-  BarChart3,
-  Target,
-  AlertTriangle,
-  CheckCircle
-} from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Calendar, Brain, Loader2, Plus, Download, Upload, Target, AlertTriangle } from 'lucide-react';
 
 interface DealsManagementModalProps {
   isOpen: boolean;

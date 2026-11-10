@@ -4,44 +4,10 @@ import React, { useState } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { AIAutoFillButton } from './ui/AIAutoFillButton';
 import { AIResearchButton } from './ui/AIResearchButton';
-import { UniversalAIAssistant, AIAssistantConfig } from './ui/UniversalAIAssistant';
+import { UniversalAIAssistant } from './ui/UniversalAIAssistant';
 import { useContactStore } from '../store/contactStore';
 import { ContactEnrichmentData } from '../services/aiEnrichmentService';
-import { Contact } from '../types';
-import {
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  Building, 
-  Tag, 
-  Globe, 
-  Target,
-  Save,
-  UserPlus,
-  AlertCircle,
-  CheckCircle,
-  Heart,
-  MessageSquare,
-  Linkedin,
-  Twitter,
-  Facebook,
-  Instagram,
-  Plus,
-  Database,
-  Smartphone,
-  Clock,
-  Star,
-  Briefcase,
-  MapPin,
-  Calendar,
-  Brain,
-  Sparkles,
-  Wand2,
-  RefreshCw,
-  Camera,
-  Loader2
-} from 'lucide-react';
+import { X, User, Building, Tag, Globe, Target, Save, UserPlus, AlertCircle, CheckCircle, Heart, MessageSquare, Linkedin, Twitter, Facebook, Instagram, Plus, Database, Briefcase, MapPin, Brain, Sparkles, RefreshCw } from 'lucide-react';
 
 interface NewContactModalProps {
   isOpen: boolean;

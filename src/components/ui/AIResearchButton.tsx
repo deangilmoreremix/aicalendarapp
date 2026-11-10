@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Brain, Loader2, Search, Linkedin, Globe } from 'lucide-react';
+import { Brain, Loader2, Search, Linkedin } from 'lucide-react';
 import { AIEnrichmentService, ContactEnrichmentData } from '../../services/aiEnrichmentService.ts';
 
 interface AIResearchButtonProps {

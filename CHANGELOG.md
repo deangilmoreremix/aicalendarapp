@@ -5,7 +5,16 @@ All notable changes to the AI Calendar App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-04-27
+## [Unreleased]
+
+### OpenAI Responses API migration
+- All AI runs through the OpenAI Responses API (`gpt-6-astra`) via a shared Supabase Edge Function helper: strict JSON schemas, `web_search` for contact enrichment and research (with sources), real SSE streaming (`ai_stream`), GPT Image 2.6 avatars stored in Supabase Storage.
+- Removed non-stack services (Gemini copy, `googleapis`, Pexels/ui-avatars hotlinks, mock Google/Microsoft OAuth).
+- Replaced mocked AI screens with real data (insights, deals, scoring, interaction timeline, email composer saves to activity log).
+- Fixed: `useHostDataSync` store writes, CSV import header mapping and error display, contact interest level `warm`, kanban selected task, activity feed/contact profile record handling, missing `calendar_events` migration.
+- See `DEPLOY.md` for deployment.
+
+## [Earlier] - 2026-04-27
 
 ### 🚀 Major Enhancements
 

@@ -1,6 +1,5 @@
 import { initialsAvatar } from '../utils/avatars';
 import React from 'react';
-import { GlassCard } from './ui/GlassCard';
 import { MoreHorizontal, ArrowRight } from 'lucide-react';
 
 const interactions = [
@@ -95,10 +94,10 @@ export const InteractionHistory: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Interaction History</h2>
         <div className="flex items-center space-x-2">
-          <button className="p-2 text-gray-600 hover:bg-white/50 rounded-lg transition-colors">
+          <button type="button" aria-label="More options" className="p-2 text-gray-600 hover:bg-white/50 rounded-lg transition-colors">
             <MoreHorizontal className="w-5 h-5" />
           </button>
-          <button className="p-2 text-gray-600 hover:bg-white/50 rounded-lg transition-colors">
+          <button type="button" aria-label="View all interactions" className="p-2 text-gray-600 hover:bg-white/50 rounded-lg transition-colors">
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -116,7 +115,7 @@ export const InteractionHistory: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium opacity-90">{interaction.date}</span>
-              <button className={`p-1.5 rounded-lg transition-colors ${
+              <button type="button" aria-label="Interaction options" className={`p-1.5 rounded-lg transition-colors ${
                 interaction.textColor === 'text-white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
               }`}>
                 <MoreHorizontal className="w-4 h-4" />

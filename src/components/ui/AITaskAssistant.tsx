@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Card, CardContent, CardHeader } from './card';
-import { StreamingContainer } from './StreamingContainer';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import {
   Brain,
