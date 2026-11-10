@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Contact } from '../types';
+import { Contact, Deal, Task } from '../types';
 import { aiApi, activityApi } from '../services/api';
 
 export type { AIInsight } from '../types';
@@ -84,7 +84,7 @@ interface AIContextType {
   insights: AIInsight[];
   scoreContact: (contact: Contact) => Promise<number>;
   enrichContact: (contactData: Partial<Contact>) => Promise<ContactEnrichmentData>;
-  generateInsights: (contacts: Contact[]) => Promise<AIInsight[]>;
+  generateInsights: (contacts: Contact[], extra?: { deals?: Deal[]; tasks?: Task[] }) => Promise<AIInsight[]>;
   analyzeInteractionHistory: (contactId: string) => Promise<any>;
   predictNextBestAction: (contactId: string, contact?: Partial<Contact>) => Promise<string>;
   scoreBulkContacts: (contacts: Contact[]) => Promise<void>;
@@ -199,10 +199,10 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, []);
 
-  const generateInsights = useCallback(async (contacts: Contact[]): Promise<AIInsight[]> => {
+  const generateInsights = useCallback(async (contacts: Contact[], extra: { deals?: Deal[]; tasks?: Task[] } = {}): Promise<AIInsight[]> => {
     setIsProcessing(true);
     try {
-      const newInsights = await aiApi.generateInsights(contacts);
+      const newInsights = await aiApi.generateInsights(contacts, extra);
       setInsights(prev => [...newInsights, ...prev]);
       return newInsights;
     } catch (error) {

@@ -130,3 +130,39 @@ describe('web_search tool', () => {
     expect(body.include).toBeUndefined();
   });
 });
+
+import { parseSseData, streamResponses } from './openai.ts';
+
+describe('streaming', () => {
+  it('parses SSE data blocks', () => {
+    expect(parseSseData('event: x\ndata: {"a":1}')).toEqual({ a: 1 });
+    expect(parseSseData('data: [DONE]')).toBeNull();
+    expect(parseSseData('event: ping')).toBeNull();
+  });
+
+  it('re-emits output_text deltas and a final done event with sources', async () => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+    const events = [
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hel"}\n\n',
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"lo"}\n\n',
+      'event: response.completed\ndata: {"type":"response.completed","response":{"output":[{"type":"web_search_call","action":{"sources":[{"url":"https://a.com","title":"A"}]}}]}}\n\n',
+    ];
+    const body = new ReadableStream({ start(c) { events.forEach((e) => c.enqueue(new TextEncoder().encode(e))); c.close(); } });
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, body });
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).stream).toBe(true);
+    expect(out).toContain('data: {"content":"Hel"}');
+    expect(out).toContain('data: {"content":"lo"}');
+    expect(out).toContain('"done":true');
+    expect(out).toContain('https://a.com');
+  });
+
+  it('reports upstream errors as an error event', async () => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
+    expect(out).toContain('"error":"bad key"');
+  });
+});

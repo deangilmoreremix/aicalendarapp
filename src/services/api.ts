@@ -501,15 +501,15 @@ export const aiApi = {
     return data.text;
   },
 
-  async scoreContact(contact: Partial<Contact>): Promise<{ score: number; reasoning: string; nextBestAction: string }> {
+  async scoreContact(contact: Partial<Contact>): Promise<{ score: number; reasoning: string; nextBestAction: string; fitScore: number; engagementScore: number; conversionProbability: number; urgencyScore: number }> {
     const { data, error } = await supabase.functions.invoke('contacts_score', { body: { contact } });
     if (error) throw error;
     return data;
   },
 
-  async generateInsights(contacts: Contact[]): Promise<AIInsight[]> {
+  async generateInsights(contacts: Contact[], extra: { deals?: Deal[]; tasks?: Task[] } = {}): Promise<AIInsight[]> {
     const { data, error } = await supabase.functions.invoke('generate_ai_insights', {
-      body: { contacts }
+      body: { contacts, deals: extra.deals, tasks: extra.tasks }
     });
 
     if (error) throw error;
@@ -556,21 +556,10 @@ export const aiApi = {
   },
 
   async streamTaskSuggestions(prompt: string, onChunk?: (chunk: string) => void): Promise<TaskSuggestion> {
-    // For now, implement as regular call - streaming can be added later with WebSockets/SSE
-    const { data, error } = await supabase.functions.invoke('generate_task_suggestions', {
-      body: { prompt, stream: true }
-    });
-
-    if (error) throw error;
-
-    // Simulate streaming by calling onChunk for each part
-    if (onChunk && typeof data === 'string') {
-      const chunks = data.split(' ');
-      chunks.forEach((chunk: string, index: number) => {
-        setTimeout(() => onChunk(chunk + ' '), index * 100);
-      });
-    }
-
-    return data;
+    // Structured result in one call (token streaming lives in useStreamingAI -> ai_stream).
+    const suggestions = await aiApi.generateTaskSuggestions(prompt);
+    const first = suggestions[0];
+    if (first) onChunk?.(`${first.title}${first.description ? ` - ${first.description}` : ''}`);
+    return first;
   }
 };

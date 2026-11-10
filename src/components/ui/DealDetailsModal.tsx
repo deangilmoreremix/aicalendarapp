@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
 import { Badge } from './badge';
+import { useDealViews, DealView } from '../../hooks/useDealViews';
+import { activityApi } from '../../services/api';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
 import { Contact } from '../../types';
@@ -28,25 +30,11 @@ import {
 interface DealDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dealId?: number;
+  dealId?: string | number;
   onDealUpdated?: (deal: any) => void;
 }
 
-interface Deal {
-  id: number;
-  company: string;
-  value: string;
-  probability: string;
-  dueDate: string;
-  contactId: string;
-  status: 'online' | 'offline';
-  description?: string;
-  stage: 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost';
-  priority: 'low' | 'medium' | 'high';
-  aiPrediction?: number;
-  createdAt: string;
-  updatedAt: string;
-  notes?: string;
+interface DealDetails extends DealView {
   activities: DealActivity[];
 }
 
@@ -68,138 +56,51 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
   const { contacts } = useContactStore();
   const { predictDealSuccess, isProcessing } = useAI();
 
-  const [deal, setDeal] = useState<Deal | null>(null);
+  const { deals: dealViews } = useDealViews(isOpen);
+  const [deal, setDeal] = useState<DealDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [aiPrediction, setAiPrediction] = useState<number | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
 
-  // Mock deal data - in a real app, this would come from an API
-  const mockDeals: Record<number, Deal> = {
-    1: {
-      id: 1,
-      company: 'TechCorp Solutions',
-      value: '$85,000',
-      probability: '85%',
-      dueDate: 'Tomorrow',
-      contactId: '1',
-      status: 'online',
-      description: 'Enterprise software implementation project for TechCorp Solutions. This is a high-value deal involving custom development and integration services.',
-      stage: 'negotiation',
-      priority: 'high',
-      aiPrediction: 87,
-      createdAt: '2024-01-15',
-      updatedAt: '2024-12-20',
-      notes: 'Client is very interested in our AI capabilities. Key decision maker is the CTO. Follow up on technical requirements.',
-      activities: [
-        {
-          id: '1',
-          type: 'meeting',
-          title: 'Product Demo',
-          description: 'Demonstrated AI capabilities and integration options',
-          date: '2024-12-18',
-          user: 'John Doe'
-        },
-        {
-          id: '2',
-          type: 'email',
-          title: 'Proposal Sent',
-          description: 'Sent detailed technical proposal and pricing',
-          date: '2024-12-16',
-          user: 'Jane Smith'
-        },
-        {
-          id: '3',
-          type: 'call',
-          title: 'Follow-up Call',
-          description: 'Discussed implementation timeline and next steps',
-          date: '2024-12-14',
-          user: 'John Doe'
-        }
-      ]
-    },
-    2: {
-      id: 2,
-      company: 'Innovation Labs',
-      value: '$120,000',
-      probability: '60%',
-      dueDate: 'Friday',
-      contactId: '2',
-      status: 'offline',
-      description: 'AI-powered analytics platform implementation for Innovation Labs. Focus on data integration and custom reporting features.',
-      stage: 'proposal',
-      priority: 'medium',
-      aiPrediction: 72,
-      createdAt: '2024-02-10',
-      updatedAt: '2024-12-18',
-      notes: 'Client needs extensive customization. Budget approval pending from CFO.',
-      activities: [
-        {
-          id: '1',
-          type: 'meeting',
-          title: 'Requirements Gathering',
-          description: 'Detailed discussion of analytics requirements',
-          date: '2024-12-15',
-          user: 'Jane Smith'
-        },
-        {
-          id: '2',
-          type: 'task',
-          title: 'Custom Proposal',
-          description: 'Prepared customized proposal with specific features',
-          date: '2024-12-12',
-          user: 'Mike Johnson'
-        }
-      ]
-    },
-    3: {
-      id: 3,
-      company: 'Global Dynamics',
-      value: '$95,500',
-      probability: '75%',
-      dueDate: 'Next Week',
-      contactId: '3',
-      status: 'online',
-      description: 'Cloud migration and modernization project for Global Dynamics. Includes legacy system migration and new feature development.',
-      stage: 'qualification',
-      priority: 'high',
-      aiPrediction: 81,
-      createdAt: '2024-03-05',
-      updatedAt: '2024-12-19',
-      notes: 'Strong technical fit. Client has urgent timeline requirements.',
-      activities: [
-        {
-          id: '1',
-          type: 'call',
-          title: 'Initial Consultation',
-          description: 'Discussed migration requirements and timeline',
-          date: '2024-12-19',
-          user: 'John Doe'
-        },
-        {
-          id: '2',
-          type: 'email',
-          title: 'Technical Assessment',
-          description: 'Sent detailed technical assessment report',
-          date: '2024-12-17',
-          user: 'Mike Johnson'
-        }
-      ]
-    }
-  };
-
-  // Load deal data when modal opens
+  // Real deal from the store + its activities from Supabase
   useEffect(() => {
-    if (isOpen && dealId) {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        const dealData = mockDeals[dealId];
-        setDeal(dealData || null);
-        setAiPrediction(dealData?.aiPrediction || null);
-        setIsLoading(false);
-      }, 500);
+    if (!isOpen || dealId === undefined) return;
+    let cancelled = false;
+    const found = dealViews.find(d => d.id === String(dealId));
+    if (!found) {
+      setDeal(null);
+      return;
     }
-  }, [isOpen, dealId]);
+    setIsLoading(true);
+    activityApi
+      .getAll()
+      .then(all => {
+        if (cancelled) return;
+        const activities: DealActivity[] = all
+          .filter(a => a.entityType === 'deal' && a.entityId === found.id)
+          .map(a => ({
+            id: a.id,
+            type: /email/.test(a.type) ? 'email' : /call/.test(a.type) ? 'call' : /meeting/.test(a.type) ? 'meeting' : /task/.test(a.type) ? 'task' : 'note',
+            title: a.title,
+            description: a.description ?? '',
+            date: a.createdAt.toISOString(),
+            user: a.userName
+          }));
+        setDeal({ ...found, activities });
+        setAiPrediction(found.aiPrediction ?? null);
+      })
+      .catch(error => {
+        console.error('Failed to load deal activities:', error);
+        if (!cancelled) {
+          setDeal({ ...found, activities: [] });
+          setAiPrediction(found.aiPrediction ?? null);
+        }
+      })
+      .finally(() => !cancelled && setIsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, dealId, dealViews]);
 
   const handleAIPrediction = async () => {
     if (!deal) return;

@@ -21,6 +21,7 @@ interface AIInsight {
   description: string;
   confidence: number;
   actionable: boolean;
+  category?: string;
   suggestedActions: string[];
   createdAt: string;
 }
@@ -33,13 +34,15 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const contacts: ContactInput[] = body.contacts ?? [];
+    const deals: unknown[] = (body.deals ?? []).slice(0, 50);
+    const tasks: unknown[] = (body.tasks ?? []).slice(0, 50);
     if (hasOpenAIKey()) {
       try {
         const parsed = await callResponsesJson<{ insights: any[] }>({
-          instructions: "You are a CRM analyst. Given a list of contacts, return the most valuable actionable insights.",
-          input: `Analyze these contacts and surface the most valuable insights: ${JSON.stringify(contacts)}`,
+          instructions: "You are a CRM analyst. Given contacts, deals and tasks, return the most valuable actionable insights grounded ONLY in the provided data (never invent companies, numbers or trends). Set category to the data the insight is about.",
+          input: `Analyze this CRM data and surface the most valuable insights: ${JSON.stringify({ contacts, deals, tasks })}`,
           maxOutputTokens: 4000,
-          schema: { name: "insights", schema: { type: "object", additionalProperties: false, required: ["insights"], properties: { insights: { type: "array", items: { type: "object", additionalProperties: false, required: ["type","title","description","confidence","suggestedActions"], properties: { type: { type: "string", enum: ["engagement","conversion","risk","opportunity"] }, title: { type: "string" }, description: { type: "string" }, confidence: { type: "number" }, suggestedActions: { type: "array", items: { type: "string" } } } } } } } },
+          schema: { name: "insights", schema: { type: "object", additionalProperties: false, required: ["insights"], properties: { insights: { type: "array", items: { type: "object", additionalProperties: false, required: ["type","title","description","confidence","suggestedActions","category"], properties: { category: { type: "string", enum: ["contacts","deals","tasks","general"] }, type: { type: "string", enum: ["engagement","conversion","risk","opportunity"] }, title: { type: "string" }, description: { type: "string" }, confidence: { type: "number" }, suggestedActions: { type: "array", items: { type: "string" } } } } } } } },
         });
         const insights: AIInsight[] = (parsed.insights ?? []).map((i: any, idx: number) => ({
           id: String(idx + 1),
@@ -48,6 +51,7 @@ Deno.serve(async (req) => {
           description: i.description ?? "",
           confidence: Number(i.confidence ?? 80),
           actionable: true,
+          category: i.category ?? "general",
           suggestedActions: i.suggestedActions ?? [],
           createdAt: new Date().toISOString(),
         }));

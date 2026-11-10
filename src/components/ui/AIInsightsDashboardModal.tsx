@@ -4,6 +4,8 @@ import { Button } from './button';
 import { Badge } from './badge';
 import { useAI } from '../../contexts/AIContext';
 import { useContactStore } from '../../store/contactStore';
+import { useDealStore } from '../../store/dealStore';
+import { useTaskStore } from '../../store/taskStore';
 import {
   X,
   Brain,
@@ -46,6 +48,8 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
 }) => {
   const { generateInsights, isProcessing } = useAI();
   const { contacts } = useContactStore();
+  const { deals } = useDealStore();
+  const { tasks } = useTaskStore();
 
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,74 +66,19 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
   const loadInsights = async () => {
     setIsLoading(true);
     try {
-      // Generate insights from contacts
-      const contactInsights = await generateInsights(Object.values(contacts));
-
-      // Mock additional insights for deals, tasks, and general
-      const mockInsights: AIInsight[] = [
-        ...contactInsights.map(insight => ({
+      // Real insights from the OpenAI-backed edge function, grounded in the stores' data.
+      const result = await generateInsights(Object.values(contacts), {
+        deals: Object.values(deals),
+        tasks: Object.values(tasks)
+      });
+      setInsights(
+        result.map(insight => ({
           ...insight,
-          category: 'contacts' as const,
+          category: ((insight as any).category ?? 'general') as any,
           impact: (insight.confidence > 80 ? 'high' : insight.confidence > 60 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
-          createdAt: new Date()
-        })),
-
-        // Deal insights
-        {
-          id: 'deal-1',
-          type: 'opportunity',
-          title: 'High-Value Deal Opportunity',
-          description: 'TechCorp Solutions shows 87% likelihood of closing within 2 weeks',
-          confidence: 87,
-          actionable: true,
-          suggestedActions: ['Schedule final demo', 'Prepare contract', 'Follow up on technical requirements'],
-          createdAt: new Date(),
-          category: 'deals',
-          impact: 'high'
-        },
-        {
-          id: 'deal-2',
-          type: 'risk',
-          title: 'Deal at Risk',
-          description: 'Innovation Labs deal probability dropped to 45%',
-          confidence: 78,
-          actionable: true,
-          suggestedActions: ['Re-engage decision maker', 'Address outstanding concerns', 'Offer additional value'],
-          createdAt: new Date(),
-          category: 'deals',
-          impact: 'high'
-        },
-
-        // Task insights
-        {
-          id: 'task-1',
-          type: 'engagement',
-          title: 'Task Completion Pattern',
-          description: 'Team shows 40% higher productivity on Wednesday mornings',
-          confidence: 82,
-          actionable: true,
-          suggestedActions: ['Schedule important tasks for Wednesday AM', 'Optimize meeting times'],
-          createdAt: new Date(),
-          category: 'tasks',
-          impact: 'medium'
-        },
-
-        // General insights
-        {
-          id: 'general-1',
-          type: 'conversion',
-          title: 'Lead Conversion Trend',
-          description: 'Conversion rate improved by 15% this month',
-          confidence: 91,
-          actionable: false,
-          suggestedActions: ['Continue current strategy', 'Analyze successful patterns'],
-          createdAt: new Date(),
-          category: 'general',
-          impact: 'medium'
-        }
-      ];
-
-      setInsights(mockInsights);
+          createdAt: insight.createdAt ?? new Date()
+        }))
+      );
     } catch (error) {
       console.error('Failed to load AI insights:', error);
     } finally {

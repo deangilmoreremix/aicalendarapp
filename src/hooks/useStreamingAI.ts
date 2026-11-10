@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
-import { StreamingOptions } from '../services/streamingClient';
+import { StreamingClient, StreamingOptions } from '../services/streamingClient';
 
 export interface StreamingAIOptions extends StreamingOptions {
   operationType?: 'task-suggestion' | 'contact-enrichment' | 'email-composition' | 'meeting-planning' | 'web-research';
@@ -22,51 +21,30 @@ export interface StreamingAIState {
 
 type Json = Record<string, unknown>;
 
-// Map a streaming operation to its Supabase Edge Function + request body.
+// Streaming operations map to the `ai_stream` edge function (OpenAI Responses API, SSE).
 type OperationSpec = {
-  functionName: string;
   buildBody: (...args: never[]) => Json;
-  extract: (data: unknown) => string;
 };
 
 const OPERATIONS: Record<string, OperationSpec> = {
   'task-suggestion': {
-    functionName: 'generate_task_suggestions',
-    buildBody: (prompt: string, context?: Json) => ({ prompt, context, stream: true }),
-    extract: (data: unknown) =>
-      Array.isArray(data)
-        ? data
-            .map((s: Json) => `• ${String(s.title ?? '')} — ${String(s.description ?? '')} (priority: ${String(s.priority ?? '')})`)
-            .join('\n')
-        : JSON.stringify(data),
+    buildBody: (prompt: string, context?: Json) => ({ operation: 'task-suggestion', prompt, context }),
   },
   'contact-enrichment': {
-    functionName: 'contacts_enrich',
-    buildBody: (contactData: Json) => ({ contact: contactData }),
-    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+    buildBody: (contactData: Json) => ({ operation: 'contact-enrichment', contact: contactData }),
   },
   'email-composition': {
-    functionName: 'email_compose',
-    buildBody: (recipient: Json, context: string) => ({ recipient, context }),
-    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+    buildBody: (recipient: Json, context: string) => ({ operation: 'email-composition', recipient, context }),
   },
   'meeting-planning': {
-    functionName: 'meetings_plan',
-    buildBody: (attendees: string[], duration: number, topic: string) => ({ attendees, duration, topic }),
-    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+    buildBody: (attendees: string[], duration: number, topic: string) => ({ operation: 'meeting-planning', attendees, duration, topic }),
   },
   'web-research': {
-    functionName: 'research_web',
-    buildBody: (query: string, depth: 'basic' | 'comprehensive' = 'basic') => ({
-      query,
-      depth,
-      includeCitations: true,
-    }),
-    extract: (data: unknown) => ((data as Json)?.text != null ? String((data as Json).text) : JSON.stringify(data)),
+    buildBody: (query: string, depth: 'basic' | 'comprehensive' = 'basic') => ({ operation: 'web-research', query, depth }),
   },
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const STREAM_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai_stream`;
 
 export const useStreamingAI = () => {
   const [state, setState] = useState<StreamingAIState>({
@@ -81,7 +59,7 @@ export const useStreamingAI = () => {
     citations: [],
   });
 
-  const abortRef = useRef(false);
+  const clientRef = useRef<StreamingClient | null>(null);
 
   const startOperation = useCallback((operationType: string, showThinking = true) => {
     setState((prev) => ({
@@ -102,55 +80,42 @@ export const useStreamingAI = () => {
         throw new Error(`Unknown streaming operation: ${operationType}`);
       }
 
-      abortRef.current = false;
       startOperation(operationType, showThinking);
+      const client = new StreamingClient();
+      clientRef.current = client;
 
-      // Simulated "thinking" phase for a natural UX.
-      const thinkingInterval = setInterval(() => {
-        setState((prev) => ({ ...prev, progress: Math.min(prev.progress + Math.random() * 15, 85) }));
-      }, 200);
-      await sleep(1500 + Math.random() * 1000);
-      clearInterval(thinkingInterval);
-
-      setState((prev) => ({ ...prev, isThinking: false, isStreaming: true, progress: 85, canCancel: enableCancellation }));
-
+      let acc = '';
       try {
-        const { data, error } = await supabase.functions.invoke(spec.functionName, {
-          body: spec.buildBody(...(args as never[])),
-        });
-
-        if (error) {
-          throw new Error(error.message || `Edge function ${spec.functionName} failed`);
-        }
-
-        const fullText = spec.extract(data);
-        const citations = Array.isArray((data as Json)?.citations) ? ((data as Json).citations as { title: string; url: string }[]) : [];
-        setState((prev) => ({ ...prev, citations }));
-
-        // Simulate token streaming for a natural UX.
-        const tokens = fullText.split(/(\s+)/);
-        let acc = '';
-        for (const token of tokens) {
-          if (abortRef.current) {
-            throw new Error('Operation cancelled by user');
+        await client.streamAIResponse(
+          STREAM_URL,
+          spec.buildBody(...(args as never[])),
+          {
+            headers: {
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            onChunk: (chunk) => {
+              acc += chunk;
+              setState((prev) => ({
+                ...prev,
+                isThinking: false,
+                isStreaming: true,
+                canCancel: enableCancellation,
+                chunks: [...prev.chunks, chunk],
+                fullResponse: acc,
+                progress: Math.min(prev.progress + 1, 95),
+              }));
+              streamOptions.onChunk?.(chunk);
+            },
+            onCitations: (citations) => setState((prev) => ({ ...prev, citations })),
           }
-          acc += token;
-          setState((prev) => ({
-            ...prev,
-            chunks: [...prev.chunks, token],
-            fullResponse: acc,
-            progress: Math.min(prev.progress + 1, 98),
-          }));
-          streamOptions.onChunk?.(token);
-          await sleep(20);
-        }
-
-        setState((prev) => ({ ...prev, isStreaming: false, progress: 100, canCancel: false }));
+        );
+        setState((prev) => ({ ...prev, isThinking: false, isStreaming: false, progress: 100, canCancel: false }));
         streamOptions.onComplete?.(acc);
         return acc;
       } catch (err) {
-        const error = err as Error;
-        setState((prev) => ({ ...prev, isStreaming: false, error, canCancel: false }));
+        const error = (err as Error).name === 'AbortError' ? new Error('Operation cancelled by user') : (err as Error);
+        setState((prev) => ({ ...prev, isThinking: false, isStreaming: false, error, canCancel: false }));
         streamOptions.onError?.(error);
         throw error;
       }
@@ -159,7 +124,7 @@ export const useStreamingAI = () => {
   );
 
   const cancelOperation = useCallback(() => {
-    abortRef.current = true;
+    clientRef.current?.cancel();
     setState((prev) => ({
       ...prev,
       isStreaming: false,
@@ -170,7 +135,7 @@ export const useStreamingAI = () => {
   }, []);
 
   const reset = useCallback(() => {
-    abortRef.current = true;
+    clientRef.current?.cancel();
     setState({
       isStreaming: false,
       isThinking: false,

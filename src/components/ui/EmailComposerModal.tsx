@@ -7,6 +7,7 @@ import { Textarea } from './textarea';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
 import { Contact } from '../../types';
+import { aiApi, activityApi } from '../../services/api';
 import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
 import { Mail, Brain } from 'lucide-react';
 import {
@@ -145,24 +146,16 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
 
     setIsLoading(true);
     try {
-      // Simulate AI email generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const recipientNames = formData.to.map(id => {
-        const contact = contacts[id];
-        return contact ? contact.name : 'Valued Contact';
-      });
-
-      const generatedSubject = `Follow-up: ${recipientNames.join(', ')}`;
-      const generatedBody = `Dear ${recipientNames.join(', ')},
-
-I hope this email finds you well. I wanted to follow up on our recent conversation and discuss how we can work together to achieve your goals.
-
-Please let me know if you'd like to schedule a call or if you have any questions in the meantime.
-
-Best regards,
-Your Name
-Contact Information`;
+      const recipients = formData.to.map(id => contacts[id]).filter(Boolean) as Contact[];
+      const target = recipients.length === 1 ? recipients[0] : { name: recipients.map(c => c.name).join(', ') };
+      const body = await aiApi.composeEmail(
+        target as Partial<Contact>,
+        formData.subject ? `Subject idea: ${formData.subject}. ${formData.body}`.trim() : formData.body || 'Friendly follow-up'
+      );
+      // First line "Subject: ..." is used as the subject when present.
+      const m = body.match(/^\s*Subject:\s*(.+)\n+/i);
+      const generatedSubject = m ? m[1].trim() : formData.subject || `Follow-up: ${recipients.map(c => c.name).join(', ')}`;
+      const generatedBody = m ? body.slice(m[0].length) : body;
 
       setAiSuggestions({ subject: generatedSubject, body: generatedBody });
       setFormData(prev => ({ ...prev, aiGenerated: true }));
@@ -229,21 +222,36 @@ Contact Information`;
 
     setIsLoading(true);
     try {
-      // Simulate email sending
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      // No email delivery provider exists in the Netlify/Supabase/OpenAI stack:
+      // the email is saved to each recipient's activity log, not delivered.
       const email = {
         id: `email_${Date.now()}`,
         ...formData,
         sentAt: new Date(),
-        status: 'sent'
+        status: 'logged'
       };
+      await Promise.all(
+        formData.to
+          .filter(id => contacts[id])
+          .map(id =>
+            activityApi.create({
+              type: 'email_sent',
+              title: `Email: ${formData.subject}`,
+              description: formData.body,
+              userId: 'current-user',
+              userName: 'You',
+              entityType: 'contact',
+              entityId: id,
+              metadata: { subject: formData.subject, aiGenerated: !!formData.aiGenerated }
+            })
+          )
+      );
 
       onEmailSent?.(email);
       onClose();
     } catch (error) {
       console.error('Failed to send email:', error);
-      alert('Failed to send email. Please try again.');
+      alert('Failed to save email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -566,7 +574,7 @@ Contact Information`;
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              <span>{isLoading ? 'Sending...' : 'Send Email'}</span>
+              <span>{isLoading ? 'Saving...' : 'Save to Activity Log'}</span>
             </Button>
           </div>
         </form>

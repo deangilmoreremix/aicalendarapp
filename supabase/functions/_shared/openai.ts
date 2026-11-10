@@ -208,3 +208,71 @@ export async function callImages(opts: ImageOptions): Promise<{ bytes: Uint8Arra
   const fmt = String(body.output_format);
   return { bytes, contentType: `image/${fmt}`, revisedPrompt: data?.data?.[0]?.revised_prompt };
 }
+
+/** Parse one SSE block ("event: x\ndata: {...}") into its JSON payload. */
+export function parseSseData(block: string): any | null {
+  const dataLines = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim());
+  if (!dataLines.length) return null;
+  const raw = dataLines.join("\n");
+  if (raw === "[DONE]") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stream a Responses API call. Emits SSE lines to the browser:
+ *   data: {"content":"<delta>"}   (matches src/services/streamingClient.ts)
+ *   data: {"done":true,"citations":[...]}  at the end, or {"error":"..."} on failure.
+ */
+export function streamResponses(opts: ResponsesOptions): ReadableStream<Uint8Array> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  const model = Deno.env.get("OPENAI_MODEL") ?? DEFAULT_MODEL;
+  const enc = new TextEncoder();
+  const send = (c: ReadableStreamDefaultController<Uint8Array>, obj: unknown) =>
+    c.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
+        const res = await (opts.fetchImpl ?? fetch)(OPENAI_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ...buildRequestBody(opts, model), stream: true }),
+        });
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({}));
+          throw new OpenAIError(data?.error?.message ?? `OpenAI request failed (${res.status})`, res.status);
+        }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        let final: any = null;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const blocks = buf.split("\n\n");
+          buf = blocks.pop() ?? "";
+          for (const block of blocks) {
+            const ev = parseSseData(block);
+            if (!ev) continue;
+            if (ev.type === "response.output_text.delta" && ev.delta) send(controller, { content: ev.delta });
+            else if (ev.type === "response.completed") final = ev.response;
+            else if (ev.type === "response.failed" || ev.type === "error") {
+              throw new OpenAIError(ev.error?.message ?? ev.response?.error?.message ?? "OpenAI stream failed");
+            }
+          }
+        }
+        send(controller, { done: true, citations: final ? extractSources(final) : [] });
+      } catch (error) {
+        send(controller, { error: (error as Error).message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+}

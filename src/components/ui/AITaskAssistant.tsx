@@ -21,7 +21,6 @@ import {
   Zap
 } from 'lucide-react';
 import { useAI, TaskSuggestion } from '../../contexts/AIContext';
-import { useStreamingAI } from '../../hooks/useStreamingAI';
 import { Task } from '../../types';
 
 interface AITaskAssistantProps {
@@ -39,7 +38,8 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
   currentTaskData
 }) => {
   const { generateTaskSuggestions } = useAI();
-  const streamingAI = useStreamingAI();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState<TaskSuggestion | null>(null);
@@ -62,35 +62,23 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
     if (!prompt.trim()) return;
 
     setSuggestions([]);
+    setError(null);
+    setIsGenerating(true);
 
     try {
-      // Use the new streaming AI hook
-      const result = await streamingAI.generateTaskSuggestions(prompt, currentTaskData);
-
-      // Parse the result (in a real implementation, this would be properly structured)
-      // For now, create a mock suggestion based on the result
-      const mockSuggestion: TaskSuggestion = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: prompt.length > 50 ? prompt.substring(0, 47) + '...' : prompt,
-        description: `AI-generated task based on: "${prompt}". ${result}`,
-        priority: 'medium',
-        suggestedDueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        estimatedDuration: 60,
-        subtasks: [
-          { title: 'Initial planning', estimatedDuration: 15 },
-          { title: 'Execute main task', estimatedDuration: 30 },
-          { title: 'Review and finalize', estimatedDuration: 15 }
-        ],
-        tags: ['ai-generated', 'task'],
-        category: 'other',
-        type: 'other',
-        reasoning: result,
-        confidence: 85
-      };
-
-      setSuggestions([mockSuggestion]);
-    } catch (error) {
-      console.error('Failed to generate suggestions:', error);
+      // Structured suggestions from the OpenAI-backed edge function
+      const result = await generateTaskSuggestions(prompt, currentTaskData);
+      setSuggestions(
+        result.map(r => ({
+          ...r,
+          suggestedDueDate: r.suggestedDueDate ? new Date(r.suggestedDueDate as unknown as string) : undefined
+        }))
+      );
+    } catch (err) {
+      console.error('Failed to generate suggestions:', err);
+      setError('Could not generate suggestions. Please try again.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -172,10 +160,10 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
               </div>
               <Button
                 onClick={handleGenerateSuggestions}
-                disabled={!prompt.trim() || streamingAI.isStreaming || streamingAI.isThinking}
+                disabled={!prompt.trim() || isGenerating}
                 className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
-                {streamingAI.isStreaming || streamingAI.isThinking ? (
+                {isGenerating ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
                     <span>Thinking...</span>
@@ -192,24 +180,17 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
 
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6">
+            {error && !isGenerating && <div className="mb-4 text-sm text-red-600">{error}</div>}
             {/* Thinking Animation */}
-            {(streamingAI.isStreaming || streamingAI.isThinking) && (
+            {(isGenerating) && (
               <div className="mb-6">
                 <ThinkingIndicator
                   type="dots"
                   size="md"
                   color="purple"
-                  showProgress={true}
-                  progress={streamingAI.progress}
                   className="mb-4"
                 />
-                {streamingAI.fullResponse && (
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="text-purple-800 text-sm">
-                      {streamingAI.fullResponse}
-                    </div>
-                  </div>
-                )}
+                {error && <div className="text-sm text-red-600">{error}</div>}
               </div>
             )}
 
@@ -344,7 +325,7 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
             )}
 
             {/* Empty State */}
-            {suggestions.length === 0 && !streamingAI.isStreaming && !streamingAI.isThinking && (
+            {suggestions.length === 0 && !isGenerating && (
               <div className="text-center py-12">
                 <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to help!</h3>

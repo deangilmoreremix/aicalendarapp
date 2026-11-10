@@ -142,18 +142,6 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
     }
   }, [isOpen, preselectedContacts]);
 
-  // Auto-generate meeting link for video calls
-  useEffect(() => {
-    if (formData.type === 'demo' || formData.type === 'presentation') {
-      if (!formData.meetingLink) {
-        setFormData(prev => ({
-          ...prev,
-          meetingLink: `https://meet.example.com/${Math.random().toString(36).substr(2, 9)}`
-        }));
-      }
-    }
-  }, [formData.type]);
-
   // Calculate end time based on start time and duration
   useEffect(() => {
     if (formData.startTime && formData.duration) {
@@ -478,7 +466,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                 <Input
                   value={formData.meetingLink}
                   onChange={(e) => setFormData(prev => ({ ...prev, meetingLink: e.target.value }))}
-                  placeholder="https://meet.example.com/..."
+                  placeholder="Paste your video call link"
                   className="pl-10"
                 />
               </div>

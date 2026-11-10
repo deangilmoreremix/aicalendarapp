@@ -3,22 +3,10 @@ import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { CustomizableAIToolbar } from './ui/CustomizableAIToolbar';
 import { AIResearchButton } from './ui/AIResearchButton';
+import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
+import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
 import { aiEnrichmentService, ContactEnrichmentData } from '../services/aiEnrichmentService';
 // Placeholder components for missing imports
-const ContactJourneyTimeline = ({ contact }: { contact: Contact }) => (
-  <div className="p-4 bg-gray-50 rounded-lg">
-    <h3 className="text-lg font-semibold mb-2">Contact Journey Timeline</h3>
-    <p className="text-gray-600">Timeline functionality coming soon...</p>
-  </div>
-);
-
-const AIInsightsPanel = ({ contact }: { contact: Contact }) => (
-  <div className="p-4 bg-gray-50 rounded-lg">
-    <h3 className="text-lg font-semibold mb-2">AI Insights Panel</h3>
-    <p className="text-gray-600">AI insights functionality coming soon...</p>
-  </div>
-);
-
 const CommunicationHub = ({ contact }: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Communication Hub</h3>

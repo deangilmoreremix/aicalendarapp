@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAI } from '../contexts/AIContext';
+import { useDealViews } from '../hooks/useDealViews';
 import { useContactStore } from '../store/contactStore';
 import { Calendar, CheckCircle, AlertCircle, TrendingUp, ArrowRight, Brain, Sparkles, Loader2, Zap } from 'lucide-react';
 import Avatar from './ui/Avatar';
@@ -22,13 +23,13 @@ const RecentActivity: React.FC = () => {
   const [showDealDetailsModal, setShowDealDetailsModal] = useState(false);
   const [showDealsManagementModal, setShowDealsManagementModal] = useState(false);
   const [showAIInsightsModal, setShowAIInsightsModal] = useState(false);
-  const [selectedDealId, setSelectedDealId] = useState<number | undefined>();
+  const [selectedDealId, setSelectedDealId] = useState<string | undefined>();
 
   const handleViewAllDeals = () => {
     setShowDealsManagementModal(true);
   };
 
-  const handleDealClick = (dealId: number) => {
+  const handleDealClick = (dealId: string) => {
     setSelectedDealId(dealId);
     setShowDealDetailsModal(true);
   };
@@ -69,36 +70,9 @@ const RecentActivity: React.FC = () => {
     }
   };
 
-  // Updated upcomingDeals with contactId instead of direct avatar
-  const upcomingDeals = [
-    {
-      id: 1,
-      company: 'TechCorp Solutions',
-      value: '$85,000',
-      probability: '85%',
-      dueDate: 'Tomorrow',
-      contactId: '1', // Changed from contact+avatar to contactId
-      status: 'online'
-    },
-    {
-      id: 2,
-      company: 'Innovation Labs',
-      value: '$120,000',
-      probability: '60%',
-      dueDate: 'Friday',
-      contactId: '2',
-      status: 'offline'
-    },
-    {
-      id: 3,
-      company: 'Global Dynamics',
-      value: '$95,500',
-      probability: '75%',
-      dueDate: 'Next Week',
-      contactId: '3',
-      status: 'online'
-    }
-  ];
+  // Real deals (closing soonest first)
+  const { deals: allDeals } = useDealViews();
+  const upcomingDeals = allDeals.filter(d => !d.stage.startsWith('closed')).slice(0, 5);
 
   // Combine regular activities with AI-generated alerts
   const baseActivities = [

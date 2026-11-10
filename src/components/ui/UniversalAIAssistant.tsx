@@ -133,47 +133,10 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
         };
       }
 
-      // Fallback: generate mock contact suggestion based on prompt
-      const nameMatch = prompt.match(/([A-Z][a-z]+)\s+([A-Z][a-z]+)/);
-      const emailMatch = prompt.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        firstName: nameMatch ? nameMatch[1] : (contactData.firstName || ''),
-        lastName: nameMatch ? nameMatch[2] : (contactData.lastName || ''),
-        email: emailMatch ? emailMatch[1] : (contactData.email || ''),
-        phone: '',
-        title: 'Professional',
-        company: contactData.company || 'Unknown Company',
-        industry: 'Technology',
-        notes: `Generated contact based on: "${prompt}"`,
-        tags: [],
-        socialProfiles: {},
-        interestLevel: 'medium',
-        status: 'lead',
-        reasoning: 'Contact profile generated from prompt analysis.',
-        confidence: 60
-      };
+      throw new Error('No public information found for this contact.');
     } catch (error) {
       console.error('Failed to generate contact suggestion:', error);
-      // Return a basic suggestion
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        firstName: contactData.firstName || '',
-        lastName: contactData.lastName || '',
-        email: contactData.email || '',
-        phone: '',
-        title: '',
-        company: contactData.company || '',
-        industry: '',
-        notes: '',
-        tags: [],
-        socialProfiles: {},
-        interestLevel: 'medium',
-        status: 'lead',
-        reasoning: 'Basic contact suggestion generated.',
-        confidence: 50
-      };
+      throw error;
     }
   };
 
@@ -199,18 +162,7 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
           company: currentData?.company || ''
         };
 
-        // Simulate streaming for contact enrichment
-        let streamedText = '';
-        const words = ['Analyzing', 'contact', 'information...', 'Generating', 'contact', 'profile...', 'Finalizing', 'suggestions...'];
-
-        for (const word of words) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          streamedText += word + ' ';
-          setStreamingState(prev => ({
-            ...prev,
-            currentText: streamedText
-          }));
-        }
+        setStreamingState(prev => ({ ...prev, currentText: 'Searching public sources... ' }));
 
         suggestion = await generateContactSuggestion(prompt, contactData);
       } else {
@@ -234,7 +186,11 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
       });
     } catch (error) {
       console.error('Failed to generate suggestions:', error);
-      setStreamingState(prev => ({ ...prev, isStreaming: false }));
+      setStreamingState({
+        isStreaming: false,
+        currentText: '',
+        completedText: `Could not generate suggestions: ${(error as Error).message}`
+      });
     }
   };
 
