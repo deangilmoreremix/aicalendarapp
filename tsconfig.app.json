@@ -22,6 +22,7 @@
 
     /* Path mapping */
     "baseUrl": ".",
+    "types": ["vitest/globals"],
     "paths": {
       "@twenty/*": ["twenty/packages/twenty-front/src/*"],
       "@twenty-shared/*": ["twenty/packages/twenty-shared/src/*"],

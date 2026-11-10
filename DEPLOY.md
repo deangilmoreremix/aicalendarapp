@@ -36,3 +36,8 @@ supabase secrets set OPENAI_API_KEY=... OPENAI_MODEL=gpt-6-astra OPENAI_IMAGE_MO
 ## Notes
 - Emails composed in the app are saved to the contact's activity log; no email delivery provider is part of this stack.
 - `npm test` includes a stack allowlist test that fails if other services (Gemini, Google APIs, image CDNs, ...) are referenced.
+
+## Calendar (ported from Twenty)
+The contact view has a **Calendar** tab (timeline grouped by month/day, "New event" composer) and Calendar Settings has a default
+event visibility (Everything / Metadata). The migration `20251229000000_calendar_timeline.sql` adds participants, event targets,
+settings and the `get_timeline_calendar_events` RPC. There is no Google/Microsoft sync. See `src/vendor/twenty/README.md`.

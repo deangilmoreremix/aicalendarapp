@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { AIResearchButton } from './ui/AIResearchButton';
+import { CalendarEventsCard } from './calendar/CalendarEventsCard';
 import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
 import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
 import { aiEnrichmentService, ContactEnrichmentData } from '../services/aiEnrichmentService';
@@ -107,6 +108,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'journey', label: 'Journey', icon: TrendingUp },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'automation', label: 'Automation', icon: Zap },
@@ -1434,6 +1436,22 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
             {activeTab === 'journey' && (
               <div className="p-6">
                 <ContactJourneyTimeline contact={editedContact} />
+              </div>
+            )}
+
+            {activeTab === 'calendar' && (
+              <div className="p-6">
+                <CalendarEventsCard
+                  targetType="contact"
+                  targetId={editedContact.id}
+                  objectName="contact"
+                  composerContext={{
+                    targets: [{ type: 'contact', id: editedContact.id }],
+                    defaultAttendee: editedContact.email
+                      ? { handle: editedContact.email, displayName: editedContact.name, contactId: editedContact.id }
+                      : undefined
+                  }}
+                />
               </div>
             )}
 

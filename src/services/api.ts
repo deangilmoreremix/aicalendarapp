@@ -1,4 +1,9 @@
 import { supabase } from '../lib/supabase';
+import type {
+  TimelineCalendarEvent,
+  TimelineCalendarEventsWithTotal
+} from '../vendor/twenty/calendar/types/generated';
+import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import { Contact, Task, Deal, Activity, AIInsight } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
@@ -561,5 +566,117 @@ export const aiApi = {
     const first = suggestions[0];
     if (first) onChunk?.(`${first.title}${first.description ? ` - ${first.description}` : ''}`);
     return first;
+  }
+};
+// ---------------------------------------------------------------------------
+// Calendar events (timeline, composer, blocklist, visibility)
+// Data model/behaviour follows twentyhq/twenty's calendar module (AGPL-3.0, used with permission).
+// ---------------------------------------------------------------------------
+
+export type CalendarTargetType = 'contact' | 'deal' | 'task';
+
+export interface CreateCalendarEventInput {
+  title: string;
+  description?: string;
+  location?: string;
+  /** ISO instant, or YYYY-MM-DD when isFullDay */
+  startsAt: string;
+  endsAt: string;
+  isFullDay: boolean;
+  timeZone: string;
+  visibility: CalendarChannelVisibility;
+  conferenceLink?: string;
+  attendees: { handle: string; displayName?: string; contactId?: string }[];
+  targets: { type: CalendarTargetType; id: string }[];
+}
+
+const toStorageInstant = (value: string, isFullDay: boolean): string =>
+  isFullDay ? new Date(`${value}T00:00:00`).toISOString() : new Date(value).toISOString();
+
+export const calendarEventApi = {
+  async getTimeline(
+    targetType: CalendarTargetType,
+    targetId: string,
+    pageSize = 10,
+    offset = 0
+  ): Promise<TimelineCalendarEventsWithTotal> {
+    const { data, error } = await supabase.rpc('get_timeline_calendar_events', {
+      p_target_type: targetType,
+      p_target_id: targetId,
+      p_page_size: pageSize,
+      p_offset: offset
+    });
+    if (error) throw error;
+
+    const result = data as TimelineCalendarEventsWithTotal;
+    return {
+      totalNumberOfCalendarEvents: Number(result.totalNumberOfCalendarEvents ?? 0),
+      timelineCalendarEvents: (result.timelineCalendarEvents ?? []).map((event: TimelineCalendarEvent) => ({
+        ...event,
+        title: event.title ?? undefined,
+        endsAt: event.endsAt ?? undefined,
+        description: event.description ?? undefined,
+        location: event.location ?? undefined,
+        conferenceSolution: event.conferenceSolution ?? undefined,
+        participants: (event.participants ?? []).map(p => ({ ...p, lastName: p.lastName ?? '' }))
+      }))
+    };
+  },
+
+  async create(input: CreateCalendarEventInput): Promise<string> {
+    const { data: event, error } = await supabase
+      .from('calendar_events')
+      .insert({
+        title: input.title,
+        description: input.description || null,
+        location: input.location || null,
+        start_date: toStorageInstant(input.startsAt, input.isFullDay),
+        end_date: toStorageInstant(input.endsAt, input.isFullDay),
+        is_all_day: input.isFullDay,
+        time_zone: input.timeZone,
+        visibility: input.visibility,
+        conference_link: input.conferenceLink || null
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    const eventId = event.id as string;
+
+    if (input.attendees.length > 0) {
+      const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
+        input.attendees.map(a => ({
+          calendar_event_id: eventId,
+          handle: a.handle,
+          display_name: a.displayName ?? '',
+          contact_id: a.contactId ?? null
+        }))
+      );
+      if (participantsError) throw participantsError;
+    }
+
+    if (input.targets.length > 0) {
+      const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
+        input.targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
+      );
+      if (targetsError) throw targetsError;
+    }
+
+    return eventId;
+  },
+
+  async getSettings(): Promise<{ defaultVisibility: CalendarChannelVisibility }> {
+    const { data, error } = await supabase.from('calendar_settings').select('default_visibility').maybeSingle();
+    if (error) throw error;
+    return {
+      defaultVisibility: (data?.default_visibility as CalendarChannelVisibility) ?? CalendarChannelVisibility.SHARE_EVERYTHING
+    };
+  },
+
+  async setDefaultVisibility(visibility: CalendarChannelVisibility): Promise<void> {
+    const { error } = await supabase
+      .from('calendar_settings')
+      .upsert({ default_visibility: visibility, updated_at: new Date().toISOString() });
+    if (error) throw error;
   }
 };
