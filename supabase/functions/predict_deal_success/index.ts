@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,40 +16,16 @@ Deno.serve(async (req) => {
       throw new Error("contact_id is required");
     }
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a sales forecasting model. Given a contact context and a deal value, return ONLY a JSON number (0-100) representing the probability the deal will close successfully.",
-              },
-              {
-                role: "user",
-                content: `Predict deal success probability for contact ${contactId} with deal value ${dealValue}. Respond with only the number.`,
-              },
-            ],
-            temperature: 0.2,
-            max_tokens: 20,
-          }),
+        const out = await callResponsesJson<{ probability: number }>({
+          instructions: "You are a sales forecasting model. Given a contact and a deal value, estimate the probability (0-100) that the deal closes successfully.",
+          input: `Predict deal success probability for contact ${contactId} with deal value ${dealValue}.`,
+          maxOutputTokens: 500,
+          schema: { name: "deal_probability", schema: { type: "object", additionalProperties: false, required: ["probability"], properties: { probability: { type: "number" } } } },
         });
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content ?? "";
-        const parsed = parseFloat(content.replace(/[^0-9.]/g, ""));
-        if (!Number.isNaN(parsed)) {
-          const probability = Math.max(5, Math.min(95, Math.round(parsed)));
-          return new Response(JSON.stringify(probability), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+        if (Number.isFinite(out.probability)) {
+          return json(Math.max(5, Math.min(95, Math.round(out.probability))));
         }
       } catch (error) {
         console.error("OpenAI error:", error);

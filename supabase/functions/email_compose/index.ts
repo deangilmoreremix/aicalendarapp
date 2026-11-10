@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,39 +12,14 @@ Deno.serve(async (req) => {
     const recipient = body.recipient ?? {};
     const context: string = body.context ?? "";
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are an email copywriting assistant. Given a recipient and context, compose a concise, professional, personalized email. Respond with plain text only (no subject line needed separately).",
-              },
-              {
-                role: "user",
-                content: `Compose an email for ${JSON.stringify(recipient)}. Context: ${context}`,
-              },
-            ],
-            temperature: 0.6,
-            max_tokens: 600,
-          }),
+        const { text } = await callResponses({
+          instructions: "You are an email copywriting assistant. Given a recipient and context, compose a concise, professional, personalized email. Respond with plain text only (no subject line needed separately).",
+          input: `Compose an email for ${JSON.stringify(recipient)}. Context: ${context}`,
+          maxOutputTokens: 1500,
         });
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          return new Response(JSON.stringify({ text }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        return json({ text });
       } catch (error) {
         console.error("OpenAI error:", error);
       }

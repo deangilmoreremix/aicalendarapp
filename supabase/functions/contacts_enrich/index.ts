@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,39 +14,47 @@ Deno.serve(async (req) => {
     const company = contact.company ?? "";
     const title = contact.title ?? "";
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (body.format === "structured") {
+      // Structured enrichment with real web search for profile URLs.
+      if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured", fallback: true }, 503);
+      const nullableStr = { type: ["string", "null"] };
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
+        const out = await callResponsesJson({
+          instructions:
+            "You are a B2B contact enrichment assistant. Use web search to find publicly available professional information about the contact. " +
+            "Only return values you found evidence for; use null for anything unknown. Never invent URLs, phone numbers or emails. confidence is 0-100.",
+          input: `Enrich this contact: ${JSON.stringify(contact)}`,
+          maxOutputTokens: 4000,
+          webSearch: true,
+          schema: {
+            name: "contact_enrichment",
+            schema: {
+              type: "object", additionalProperties: false,
+              required: ["firstName","lastName","title","company","industry","city","state","country","linkedin","twitter","facebook","instagram","website","bio","confidence"],
+              properties: {
+                firstName: nullableStr, lastName: nullableStr, title: nullableStr, company: nullableStr, industry: nullableStr,
+                city: nullableStr, state: nullableStr, country: nullableStr,
+                linkedin: nullableStr, twitter: nullableStr, facebook: nullableStr, instagram: nullableStr, website: nullableStr,
+                bio: nullableStr, confidence: { type: "number" },
+              },
+            },
           },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a B2B contact enrichment assistant. Given partial contact data, produce a concise professional enrichment summary (bio, likely company, suggested social profiles). Respond with plain text only.",
-              },
-              {
-                role: "user",
-                content: `Enrich this contact: ${JSON.stringify(contact)}`,
-              },
-            ],
-            temperature: 0.5,
-            max_tokens: 500,
-          }),
         });
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          return new Response(JSON.stringify({ text }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        return json(out);
+      } catch (error) {
+        console.error("OpenAI error:", error);
+        return json({ error: error.message ?? "Enrichment failed" }, 502);
+      }
+    }
+
+    if (hasOpenAIKey()) {
+      try {
+        const { text } = await callResponses({
+          instructions: "You are a B2B contact enrichment assistant. Given partial contact data, produce a concise professional enrichment summary (bio, likely company, suggested social profiles). Only state facts you are confident about; say when unknown. Respond with plain text only.",
+          input: `Enrich this contact: ${JSON.stringify(contact)}`,
+          maxOutputTokens: 1500,
+        });
+        return json({ text });
       } catch (error) {
         console.error("OpenAI error:", error);
       }

@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,40 +16,17 @@ Deno.serve(async (req) => {
       throw new Error("attendee_ids must be a non-empty array");
     }
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a scheduling assistant. Given attendee ids and a meeting duration in minutes, return ONLY a JSON array of ISO 8601 datetime strings (length 3) representing the best suggested meeting start times within the next 14 days during business hours.",
-              },
-              {
-                role: "user",
-                content: `Suggest ${duration}-minute meeting times for attendees ${JSON.stringify(attendeeIds)}.`,
-              },
-            ],
-            temperature: 0.3,
-            max_tokens: 300,
-          }),
+        const out = await callResponsesJson<{ times: string[] }>({
+          instructions:
+            `You are a scheduling assistant. Today is ${new Date().toISOString()}. Return exactly 3 ISO 8601 datetime strings: the best suggested meeting start times within the next 14 days during business hours.`,
+          input: `Suggest ${duration}-minute meeting times for attendees ${JSON.stringify(attendeeIds)}.`,
+          maxOutputTokens: 1000,
+          schema: { name: "meeting_times", schema: { type: "object", additionalProperties: false, required: ["times"], properties: { times: { type: "array", items: { type: "string" } } } } },
         });
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content ?? "";
-        const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length) {
-          return new Response(JSON.stringify(parsed.slice(0, 5)), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        const times = (out.times ?? []).filter((t) => !Number.isNaN(Date.parse(t)));
+        if (times.length) return json(times.slice(0, 5));
       } catch (error) {
         console.error("OpenAI error:", error);
       }

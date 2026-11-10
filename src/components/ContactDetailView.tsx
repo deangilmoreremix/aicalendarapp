@@ -670,17 +670,16 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   if (lastEnrichment) {
                     handleAIEnrichment(lastEnrichment);
                   } else {
-                    const mockEnrichment: ContactEnrichmentData = {
-                      firstName: editedContact.firstName,
-                      lastName: editedContact.lastName,
-                      email: editedContact.email,
-                      company: editedContact.company,
-                      phone: editedContact.phone || `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-                      industry: editedContact.industry || ['Technology', 'Finance', 'Healthcare', 'Education'][Math.floor(Math.random() * 4)],
-                      notes: "Auto-enriched with AI on " + new Date().toLocaleDateString(),
-                      confidence: 85
-                    };
-                    handleAIEnrichment(mockEnrichment);
+                    setIsEnriching(true);
+                    aiEnrichmentService
+                      .enrichContactByName(editedContact.firstName, editedContact.lastName, editedContact.company)
+                      .then((result) => {
+                        if (result) {
+                          setLastEnrichment(result);
+                          return handleAIEnrichment(result);
+                        }
+                      })
+                      .finally(() => setIsEnriching(false));
                   }
                 }}
                 className="w-full flex items-center justify-center py-2 px-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 text-sm font-medium transition-all duration-200 border border-purple-300/50 shadow-sm hover:shadow-md hover:scale-105"

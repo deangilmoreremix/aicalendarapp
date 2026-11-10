@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,40 +16,17 @@ Deno.serve(async (req) => {
       throw new Error("query is required");
     }
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a web research assistant. Given a query, return a concise plain-text research brief with key findings and cited source URLs in brackets. " +
-                  (depth === "comprehensive" ? "Be thorough." : "Be brief."),
-              },
-              {
-                role: "user",
-                content: `Research: ${query}`,
-              },
-            ],
-            temperature: 0.4,
-            max_tokens: depth === "comprehensive" ? 900 : 500,
-          }),
+        const { text, data } = await callResponses({
+          instructions:
+            "You are a web research assistant. Use web search and return a concise plain-text research brief with key findings. " +
+            (depth === "comprehensive" ? "Be thorough." : "Be brief."),
+          input: `Research: ${query}`,
+          maxOutputTokens: depth === "comprehensive" ? 4000 : 2000,
+          webSearch: true,
         });
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          return new Response(JSON.stringify({ text }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        return json({ text, citations: extractCitations(data) });
       } catch (error) {
         console.error("OpenAI error:", error);
       }

@@ -13,107 +13,66 @@ export interface InitialDataSync {
   user?: any;
 }
 
-export function useHostDataSync() {
-  const { setContacts } = useContactStore();
-  const { setDeals } = useDealStore();
-  const { setTasks } = useTaskStore();
-  const { setAppointments } = useAppointmentStore();
+const toRecord = <T extends { id: string }>(items: T[]): Record<string, T> =>
+  Object.fromEntries(items.map((item) => [item.id, item]));
 
+// Stores keep entities as Record<id, entity>; these helpers write to them directly.
+const setContacts = (items: any[]) => useContactStore.setState({ contacts: toRecord(items) });
+const setDeals = (items: any[]) => useDealStore.setState({ deals: toRecord(items) });
+const setTasks = (items: any[]) => useTaskStore.setState({ tasks: toRecord(items) });
+const setAppointments = (items: any[]) => useAppointmentStore.setState({ appointments: toRecord(items) });
+
+function applyEntityChange<T extends { id: string }>(
+  current: Record<string, T>,
+  operation: string,
+  payload: T
+): Record<string, T> {
+  if (operation === 'create' || operation === 'update') {
+    return { ...current, [payload.id]: payload };
+  }
+  if (operation === 'delete') {
+    const next = { ...current };
+    delete next[payload.id];
+    return next;
+  }
+  return current;
+}
+
+export function useHostDataSync() {
   const handleInitialDataSync = useCallback((data: InitialDataSync) => {
     console.log('[CRM Embed] Received initial data sync:', data);
 
-    if (data.contacts) {
-      setContacts(data.contacts);
-    }
-
-    if (data.deals) {
-      setDeals(data.deals);
-    }
-
-    if (data.tasks) {
-      setTasks(data.tasks);
-    }
-
-    if (data.appointments) {
-      setAppointments(data.appointments);
-    }
+    if (data.contacts) setContacts(data.contacts);
+    if (data.deals) setDeals(data.deals);
+    if (data.tasks) setTasks(data.tasks);
+    if (data.appointments) setAppointments(data.appointments);
 
     if (data.user) {
       console.log('[CRM Embed] User data received:', data.user);
     }
-  }, [setContacts, setDeals, setTasks, setAppointments]);
+  }, []);
 
   const handleDataUpdate = useCallback((data: any) => {
     console.log('[CRM Embed] Received data update:', data);
 
     const { entityType, operation, payload } = data;
+    if (!payload) return;
 
     switch (entityType) {
       case 'contact':
-        if (operation === 'create' || operation === 'update') {
-          const contacts = useContactStore.getState().contacts;
-          const existingIndex = contacts.findIndex(c => c.id === payload.id);
-          if (existingIndex >= 0) {
-            contacts[existingIndex] = payload;
-            setContacts([...contacts]);
-          } else {
-            setContacts([...contacts, payload]);
-          }
-        } else if (operation === 'delete') {
-          const contacts = useContactStore.getState().contacts;
-          setContacts(contacts.filter(c => c.id !== payload.id));
-        }
+        useContactStore.setState((s) => ({ contacts: applyEntityChange(s.contacts, operation, payload) }));
         break;
-
       case 'deal':
-        if (operation === 'create' || operation === 'update') {
-          const deals = useDealStore.getState().deals;
-          const existingIndex = deals.findIndex(d => d.id === payload.id);
-          if (existingIndex >= 0) {
-            deals[existingIndex] = payload;
-            setDeals([...deals]);
-          } else {
-            setDeals([...deals, payload]);
-          }
-        } else if (operation === 'delete') {
-          const deals = useDealStore.getState().deals;
-          setDeals(deals.filter(d => d.id !== payload.id));
-        }
+        useDealStore.setState((s) => ({ deals: applyEntityChange(s.deals, operation, payload) }));
         break;
-
       case 'task':
-        if (operation === 'create' || operation === 'update') {
-          const tasks = useTaskStore.getState().tasks;
-          const existingIndex = tasks.findIndex(t => t.id === payload.id);
-          if (existingIndex >= 0) {
-            tasks[existingIndex] = payload;
-            setTasks([...tasks]);
-          } else {
-            setTasks([...tasks, payload]);
-          }
-        } else if (operation === 'delete') {
-          const tasks = useTaskStore.getState().tasks;
-          setTasks(tasks.filter(t => t.id !== payload.id));
-        }
+        useTaskStore.setState((s) => ({ tasks: applyEntityChange(s.tasks, operation, payload) }));
         break;
-
       case 'appointment':
-        if (operation === 'create' || operation === 'update') {
-          const appointments = useAppointmentStore.getState().appointments;
-          const existingIndex = appointments.findIndex(a => a.id === payload.id);
-          if (existingIndex >= 0) {
-            appointments[existingIndex] = payload;
-            setAppointments([...appointments]);
-          } else {
-            setAppointments([...appointments, payload]);
-          }
-        } else if (operation === 'delete') {
-          const appointments = useAppointmentStore.getState().appointments;
-          setAppointments(appointments.filter(a => a.id !== payload.id));
-        }
+        useAppointmentStore.setState((s) => ({ appointments: applyEntityChange(s.appointments, operation, payload) }));
         break;
     }
-  }, [setContacts, setDeals, setTasks, setAppointments]);
+  }, []);
 
   useEffect(() => {
     if (!hostCommunication.getIsEmbedded()) {

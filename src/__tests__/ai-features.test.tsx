@@ -16,6 +16,8 @@ vi.mock('../services/api', () => ({
     generateMeetingAgenda: vi.fn(),
     generateTaskSuggestions: vi.fn(),
     streamTaskSuggestions: vi.fn(),
+    enrichContact: vi.fn(),
+    scoreContact: vi.fn(),
   },
 }));
 
@@ -54,6 +56,15 @@ describe('AI Features', () => {
       }
     ]);
 
+    (aiApi.enrichContact as any).mockImplementation(async (contact: any) => ({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      socialProfiles: { linkedin: 'https://linkedin.com/in/john-doe' },
+      confidence: 90
+    }));
+    (aiApi.scoreContact as any).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ score: 82, reasoning: 'ok', nextBestAction: 'Call' }), 50))
+    );
     (aiApi.predictDealSuccess as any).mockResolvedValue(75);
     (aiApi.optimizeMeetingTime as any).mockResolvedValue([new Date()]);
     (aiApi.generateMeetingAgenda as any).mockResolvedValue(['Welcome', 'Discussion', 'Next steps']);
@@ -354,8 +365,7 @@ describe('AI Features', () => {
       expect(enriched).not.toBeNull();
       if (enriched) {
         expect(enriched).toHaveProperty('confidence');
-        expect(enriched).toHaveProperty('email');
-        expect(enriched.email).toBe('john@techcorp.com');
+        expect(aiApi.enrichContact).toHaveBeenCalledWith({ email: 'john@techcorp.com' });
       }
     });
 

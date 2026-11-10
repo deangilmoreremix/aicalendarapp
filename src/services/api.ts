@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Contact, Task, Deal, Activity, AIInsight } from '../types';
+import type { ContactEnrichmentData } from './aiEnrichmentService';
 
 // TaskSuggestion interface for AI API
 interface TaskSuggestion {
@@ -460,13 +461,54 @@ export const activityApi = {
 
 // AI API (Edge Functions)
 export const aiApi = {
+  async enrichContact(contact: Partial<Contact>): Promise<ContactEnrichmentData> {
+    const { data, error } = await supabase.functions.invoke('contacts_enrich', {
+      body: { contact, format: 'structured' }
+    });
+    if (error) throw error;
+    const nz = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
+    const hasLocation = data.city || data.state || data.country;
+    return {
+      firstName: nz(data.firstName),
+      lastName: nz(data.lastName),
+      title: nz(data.title),
+      company: nz(data.company),
+      industry: nz(data.industry),
+      location: hasLocation ? { city: nz(data.city), state: nz(data.state), country: nz(data.country) } : undefined,
+      socialProfiles: {
+        linkedin: nz(data.linkedin),
+        twitter: nz(data.twitter),
+        facebook: nz(data.facebook),
+        instagram: nz(data.instagram),
+        website: nz(data.website)
+      },
+      bio: nz(data.bio),
+      confidence: Number(data.confidence) || 0
+    };
+  },
+
+  async composeEmail(recipient: Partial<Contact>, context: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('email_compose', { body: { recipient, context } });
+    if (error) throw error;
+    return data.text;
+  },
+
+  async scoreContact(contact: Partial<Contact>): Promise<{ score: number; reasoning: string; nextBestAction: string }> {
+    const { data, error } = await supabase.functions.invoke('contacts_score', { body: { contact } });
+    if (error) throw error;
+    return data;
+  },
+
   async generateInsights(contacts: Contact[]): Promise<AIInsight[]> {
     const { data, error } = await supabase.functions.invoke('generate_ai_insights', {
       body: { contacts }
     });
 
     if (error) throw error;
-    return data;
+    return (data as Array<AIInsight & { createdAt: string | Date }>).map((insight) => ({
+      ...insight,
+      createdAt: new Date(insight.createdAt)
+    }));
   },
 
   async predictDealSuccess(contactId: string, dealValue: number): Promise<number> {

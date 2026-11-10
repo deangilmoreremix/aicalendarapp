@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,39 +13,14 @@ Deno.serve(async (req) => {
     const duration: number = Number(body.duration ?? 60);
     const topic: string = body.topic ?? "our meeting";
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a meeting planning assistant. Given attendees, duration and topic, return a short plain-text plan: objectives, agenda, and prep items. Respond with plain text only.",
-              },
-              {
-                role: "user",
-                content: `Plan a ${duration}-minute meeting on \"${topic}\" with ${JSON.stringify(attendees)}.`,
-              },
-            ],
-            temperature: 0.5,
-            max_tokens: 500,
-          }),
+        const { text } = await callResponses({
+          instructions: "You are a meeting planning assistant. Given attendees, duration and topic, return a short plain-text plan: objectives, agenda, and prep items. Respond with plain text only.",
+          input: `Plan a ${duration}-minute meeting on "${topic}" with ${JSON.stringify(attendees)}.`,
+          maxOutputTokens: 1500,
         });
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) {
-          return new Response(JSON.stringify({ text }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        return json({ text });
       } catch (error) {
         console.error("OpenAI error:", error);
       }

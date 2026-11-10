@@ -1,4 +1,4 @@
-import { CalendarEvent, CalendarEventParticipant } from '../../types';
+import { CalendarEvent, CalendarEventParticipant } from '../../../types';
 import { TimelineCalendarEvent, TimelineCalendarEventParticipant } from './types';
 
 export const toTimelineCalendarEvent = (

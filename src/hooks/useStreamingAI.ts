@@ -24,7 +24,7 @@ type Json = Record<string, unknown>;
 // Map a streaming operation to its Supabase Edge Function + request body.
 type OperationSpec = {
   functionName: string;
-  buildBody: (...args: unknown[]) => Json;
+  buildBody: (...args: never[]) => Json;
   extract: (data: unknown) => string;
 };
 
@@ -114,7 +114,7 @@ export const useStreamingAI = () => {
 
       try {
         const { data, error } = await supabase.functions.invoke(spec.functionName, {
-          body: spec.buildBody(...args),
+          body: spec.buildBody(...(args as never[])),
         });
 
         if (error) {

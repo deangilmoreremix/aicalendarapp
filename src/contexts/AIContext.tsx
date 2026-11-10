@@ -2,16 +2,8 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Contact } from '../types';
 import { aiApi } from '../services/api';
 
-export interface AIInsight {
-  id: string;
-  type: 'engagement' | 'conversion' | 'risk' | 'opportunity';
-  title: string;
-  description: string;
-  confidence: number;
-  actionable: boolean;
-  suggestedActions: string[];
-  createdAt: Date;
-}
+export type { AIInsight } from '../types';
+import type { AIInsight } from '../types';
 
 export interface ContactEnrichmentData {
   firstName?: string;
@@ -94,7 +86,7 @@ interface AIContextType {
   enrichContact: (contactData: Partial<Contact>) => Promise<ContactEnrichmentData>;
   generateInsights: (contacts: Contact[]) => Promise<AIInsight[]>;
   analyzeInteractionHistory: (contactId: string) => Promise<any>;
-  predictNextBestAction: (contactId: string) => Promise<string>;
+  predictNextBestAction: (contactId: string, contact?: Partial<Contact>) => Promise<string>;
   scoreBulkContacts: (contacts: Contact[]) => Promise<void>;
   generateBulkInsights: (contacts: Contact[]) => Promise<void>;
   optimizeMeetingTime: (attendeeIds: string[], duration: number) => Promise<Date[]>;
@@ -119,9 +111,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const scoreContact = useCallback(async (contact: Contact): Promise<number> => {
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-      
-      // Advanced AI scoring algorithm simulation
+      try {
+        const result = await aiApi.scoreContact(contact);
+        return result.score;
+      } catch (error) {
+        console.error('AI scoring failed, using heuristic fallback:', error);
+      }
+
+      // Heuristic fallback (used only when the AI call fails)
       let score = 50; // Base score
       
       // Title-based scoring
@@ -161,9 +158,6 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       if (contact.socialProfiles?.linkedin) score += 8;
       if (contact.socialProfiles?.website) score += 5;
       
-      // Random AI confidence factor
-      score += (Math.random() - 0.5) * 10;
-      
       return Math.max(0, Math.min(100, Math.round(score)));
     } finally {
       setIsProcessing(false);
@@ -173,11 +167,15 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const enrichContact = useCallback(async (contactData: Partial<Contact>): Promise<ContactEnrichmentData> => {
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate AI enrichment with realistic data
+      try {
+        return await aiApi.enrichContact(contactData);
+      } catch (error) {
+        console.error('AI enrichment failed, using heuristic fallback:', error);
+      }
+
+      // Heuristic fallback (used only when the AI call fails): low confidence, no invented data
       const enrichmentData: ContactEnrichmentData = {
-        confidence: 75 + Math.random() * 20,
+        confidence: 10,
       };
 
       // Enrich based on email domain
@@ -195,20 +193,6 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         };
       }
 
-      // Add professional avatar
-      if (!contactData.avatarSrc) {
-        const avatars = [
-          'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'
-        ];
-        enrichmentData.avatar = avatars[Math.floor(Math.random() * avatars.length)];
-      }
-
-      // Generate professional bio
-      enrichmentData.bio = `${contactData.firstName} ${contactData.lastName} is a ${contactData.title || 'professional'} at ${contactData.company || 'their company'}. ${contactData.firstName} has extensive experience in their field and is known for driving results and innovation.`;
-      
       return enrichmentData;
     } finally {
       setIsProcessing(false);
@@ -256,16 +240,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
   }, []);
 
-  const predictNextBestAction = useCallback(async (contactId: string): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const actions = [
-      'Schedule discovery call within 48 hours',
-      'Send personalized case study',
-      'Invite to product demo',
-      'Connect on LinkedIn with personal note',
-      'Follow up with pricing information'
-    ];
-    return actions[Math.floor(Math.random() * actions.length)];
+  const predictNextBestAction = useCallback(async (contactId: string, contact?: Partial<Contact>): Promise<string> => {
+    try {
+      const result = await aiApi.scoreContact(contact ?? { id: contactId });
+      if (result.nextBestAction) return result.nextBestAction;
+    } catch (error) {
+      console.error('Next best action failed:', error);
+    }
+    return 'Schedule a follow-up call';
   }, []);
 
   const scoreBulkContacts = useCallback(async (contacts: Contact[]): Promise<void> => {

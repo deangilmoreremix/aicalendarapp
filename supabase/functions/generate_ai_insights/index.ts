@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders, json } from "../_shared/cors.ts";
+import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
 
 interface ContactInput {
   id?: string;
@@ -37,54 +33,25 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const contacts: ContactInput[] = body.contacts ?? [];
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-
-    if (openaiApiKey) {
+    if (hasOpenAIKey()) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a CRM analyst. Given a list of contacts, return actionable insights as JSON: " +
-                  '{ "insights": [ { "type": "engagement"|"conversion"|"risk"|"opportunity", "title": string, "description": string, "confidence": number(0-100), "suggestedActions": string[] } ] }',
-              },
-              {
-                role: "user",
-                content: `Analyze these contacts and surface the most valuable insights: ${JSON.stringify(contacts)}`,
-              },
-            ],
-            temperature: 0.3,
-            max_tokens: 1200,
-          }),
+        const parsed = await callResponsesJson<{ insights: any[] }>({
+          instructions: "You are a CRM analyst. Given a list of contacts, return the most valuable actionable insights.",
+          input: `Analyze these contacts and surface the most valuable insights: ${JSON.stringify(contacts)}`,
+          maxOutputTokens: 4000,
+          schema: { name: "insights", schema: { type: "object", additionalProperties: false, required: ["insights"], properties: { insights: { type: "array", items: { type: "object", additionalProperties: false, required: ["type","title","description","confidence","suggestedActions"], properties: { type: { type: "string", enum: ["engagement","conversion","risk","opportunity"] }, title: { type: "string" }, description: { type: "string" }, confidence: { type: "number" }, suggestedActions: { type: "array", items: { type: "string" } } } } } } } },
         });
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) {
-          const parsed = JSON.parse(content);
-          const insights: AIInsight[] = (parsed.insights ?? []).map((i: any, idx: number) => ({
-            id: String(idx + 1),
-            type: i.type ?? "opportunity",
-            title: i.title ?? "Insight",
-            description: i.description ?? "",
-            confidence: Number(i.confidence ?? 80),
-            actionable: true,
-            suggestedActions: i.suggestedActions ?? [],
-            createdAt: new Date().toISOString(),
-          }));
-          if (insights.length) {
-            return new Response(JSON.stringify(insights), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        }
+        const insights: AIInsight[] = (parsed.insights ?? []).map((i: any, idx: number) => ({
+          id: String(idx + 1),
+          type: i.type ?? "opportunity",
+          title: i.title ?? "Insight",
+          description: i.description ?? "",
+          confidence: Number(i.confidence ?? 80),
+          actionable: true,
+          suggestedActions: i.suggestedActions ?? [],
+          createdAt: new Date().toISOString(),
+        }));
+        if (insights.length) return json(insights);
       } catch (error) {
         console.error("OpenAI error:", error);
       }

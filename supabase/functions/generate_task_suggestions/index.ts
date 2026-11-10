@@ -1,10 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
 
 interface TaskSuggestion {
   id: string
@@ -72,68 +69,45 @@ Deno.serve(async (req) => {
 })
 
 async function generateTaskSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
-  // Use OpenAI for intelligent task analysis
-  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-  if (!openaiApiKey) {
-    // Fallback to rule-based if no API key
+  if (!hasOpenAIKey()) {
     return generateRuleBasedSuggestions(prompt, context)
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
+    const str = { type: 'string' }
+    const num = { type: 'number' }
+    const parsed = await callResponsesJson<{ suggestions: TaskSuggestion[] }>({
+      instructions: `You analyze text prompts and generate structured task suggestions for a productivity app. Today is ${new Date().toISOString().split('T')[0]}.
+- Analyze urgency, complexity and type; suggest priority, due date (YYYY-MM-DD) and duration in minutes
+- Break complex tasks into logical subtasks and add relevant tags
+- Explain your reasoning; confidence is 0-100`,
+      input: `Analyze this task prompt and generate a structured suggestion: "${prompt}"${context ? `\nContext: ${JSON.stringify(context)}` : ''}`,
+      maxOutputTokens: 4000,
+      schema: {
+        name: 'task_suggestions',
+        schema: {
+          type: 'object', additionalProperties: false, required: ['suggestions'],
+          properties: { suggestions: { type: 'array', items: {
+            type: 'object', additionalProperties: false,
+            required: ['id','title','description','priority','suggestedDueDate','estimatedDuration','subtasks','tags','category','type','reasoning','confidence'],
+            properties: {
+              id: str, title: str, description: str,
+              priority: { type: 'string', enum: ['low','medium','high','urgent'] },
+              suggestedDueDate: { type: ['string','null'] },
+              estimatedDuration: num,
+              subtasks: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['title','estimatedDuration'], properties: { title: str, estimatedDuration: num } } },
+              tags: { type: 'array', items: str },
+              category: { type: 'string', enum: ['call','email','meeting','follow-up','other'] },
+              type: { type: 'string', enum: ['follow-up','meeting','call','email','proposal','research','administrative','other'] },
+              reasoning: str, confidence: num,
+            } } } },
+        },
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'system',
-          content: `You are an AI assistant that analyzes text prompts to generate structured task suggestions for a productivity app. 
-
-Your response must be valid JSON with this exact structure:
-{
-  "suggestions": [{
-    "id": "unique_string",
-    "title": "concise_task_title",
-    "description": "brief_description",
-    "priority": "low" | "medium" | "high" | "urgent",
-    "suggestedDueDate": "YYYY-MM-DD" | null,
-    "estimatedDuration": number_in_minutes,
-    "subtasks": [{"title": "subtask_name", "estimatedDuration": number_in_minutes}],
-    "tags": ["tag1", "tag2"],
-    "category": "call" | "email" | "meeting" | "follow-up" | "other",
-    "type": "follow-up" | "meeting" | "call" | "email" | "proposal" | "research" | "administrative" | "other",
-    "reasoning": "explanation_of_analysis",
-    "confidence": number_0_to_100
-  }]
-}
-
-Guidelines:
-- Analyze the prompt for urgency, complexity, and type
-- Suggest appropriate priority, due date, and duration
-- Break down complex tasks into logical subtasks
-- Add relevant tags for organization
-- Provide detailed reasoning for your analysis
-- Set realistic time estimates
-- Use today's date as reference for due dates`
-        }, {
-          role: 'user',
-          content: `Analyze this task prompt and generate a structured suggestion: "${prompt}"`
-        }],
-        temperature: 0.3,
-        max_tokens: 1000
-      })
     })
-
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content
-
-    if (content) {
-      const parsed = JSON.parse(content)
-      return parsed.suggestions || [generateFallbackSuggestion(prompt)]
+    if (parsed.suggestions?.length) {
+      return parsed.suggestions.map((s) => ({ ...s, suggestedDueDate: s.suggestedDueDate ?? undefined }))
     }
+    return [generateFallbackSuggestion(prompt)]
   } catch (error) {
     console.error('OpenAI API error:', error)
   }
