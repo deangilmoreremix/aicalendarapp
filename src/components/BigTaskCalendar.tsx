@@ -618,8 +618,8 @@ export const BigTaskCalendar: React.FC = () => {
     };
 
     return (
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -651,7 +651,7 @@ export const BigTaskCalendar: React.FC = () => {
           </h2>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
           <CalendarFiltersMenu
             filters={filters}
             onFiltersChange={setFilters}

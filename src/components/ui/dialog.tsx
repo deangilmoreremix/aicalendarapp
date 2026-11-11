@@ -24,6 +24,7 @@ const openDialogs: symbol[] = [];
 
 export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
   const id = useRef(Symbol('dialog'));
+  const rootRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onOpenChange);
   onChangeRef.current = onOpenChange;
 
@@ -42,10 +43,18 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
     };
   }, [open]);
 
+  // Name the dialog after its first heading (the shared header component has no id to point aria-labelledby at)
+  useEffect(() => {
+    if (!open) return;
+    const el = rootRef.current;
+    const heading = el?.querySelector('h1, h2, h3');
+    if (el && heading?.textContent) el.setAttribute('aria-label', heading.textContent.trim());
+  });
+
   if (!open) return null;
 
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 overflow-y-auto">
+    <div ref={rootRef} role="dialog" aria-modal="true" aria-label="Dialog" className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => onOpenChange(false)} />
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>

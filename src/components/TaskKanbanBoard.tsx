@@ -353,7 +353,7 @@ export const TaskKanbanBoard: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             Task Board
@@ -372,7 +372,7 @@ export const TaskKanbanBoard: React.FC = () => {
           )}
         </div>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
           {/* AI Task Optimizer */}
           <Button 
             onClick={generateTaskInsights}
@@ -493,7 +493,9 @@ export const TaskKanbanBoard: React.FC = () => {
         )}
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-4 gap-6 h-full">
+          {/* On narrow screens the four columns scroll sideways inside the board instead of widening the whole page */}
+          <div className="overflow-x-auto h-full">
+          <div className="grid grid-cols-4 gap-6 h-full min-w-[960px]">
             {statusColumns.map((column) => {
               const columnTasks = getTasksByStatus(column.id);
               
@@ -545,6 +547,7 @@ export const TaskKanbanBoard: React.FC = () => {
                 </div>
               );
             })}
+          </div>
           </div>
         </DragDropContext>
       </div>
