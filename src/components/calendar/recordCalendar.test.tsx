@@ -36,6 +36,12 @@ vi.mock('../../services/api', async (importOriginal) => {
   };
 });
 
+// The task modal embeds the AI assistant; a stable mock (a fresh object per render would loop effects that depend on it)
+vi.mock('../../contexts/AIContext', () => {
+  const ai = { generateTaskSuggestions: vi.fn(async () => []), generateInsights: vi.fn(async () => []), predictNextBestAction: vi.fn(async () => ''), isProcessing: false };
+  return { useAI: () => ai, AIProvider: ({ children }: any) => <>{children}</> };
+});
+
 // Capture the props BigTaskCalendar passes to the drag-and-drop calendar so drops can be simulated (jsdom cannot drag)
 const dnd = vi.hoisted(() => ({ props: null as any }));
 vi.mock('react-big-calendar/lib/addons/dragAndDrop', () => ({
@@ -365,6 +371,23 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     expect(screen.getByText('TechCorp')).toBeInTheDocument();
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
     expect(screen.getByText('Kickoff')).toBeInTheDocument();
+  });
+
+  it('"Edit Task" from the event details opens the task straight in edit mode (no second Edit press)', async () => {
+    render(<BigTaskCalendar />);
+    fireEvent.click(await screen.findByText('Send proposal'));
+    // event details dialog -> its "Edit Task" button hands over to the task modal
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Task' }));
+    expect(await screen.findByLabelText('Related record')).toBeInTheDocument(); // the edit form, not the read-only view
+    expect(screen.getByRole('button', { name: 'Update Task' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Task' })).toBeNull();
+  });
+
+  it('the context menu "Edit" also opens a task in edit mode', async () => {
+    render(<BigTaskCalendar />);
+    fireEvent.contextMenu(await screen.findByText('Send proposal'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    expect(await screen.findByLabelText('Related record')).toBeInTheDocument();
   });
 
   it('loads events for the visible window', async () => {

@@ -32,6 +32,8 @@ interface TaskDetailsModalProps {
   defaultStatus?: Task['status'];
   /** Pre-links a new task to a record (used by the embedded record tasks widget). */
   defaultRelatedTo?: Task['relatedTo'];
+  /** Open an existing task straight in edit mode (used when the user already pressed "Edit"). */
+  startInEditMode?: boolean;
 }
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ 
@@ -39,10 +41,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   isOpen, 
   onClose, 
   defaultStatus,
-  defaultRelatedTo
+  defaultRelatedTo,
+  startInEditMode = false
 }) => {
   const { createTask, updateTask, deleteTask } = useTaskStore();
-  const [isEditing, setIsEditing] = useState(!task);
+  const [isEditing, setIsEditing] = useState(!task || startInEditMode);
   const [formData, setFormData] = useState<Partial<Task>>({
     title: '',
     description: '',
@@ -81,7 +84,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   useEffect(() => {
     if (task) {
       setFormData(task);
-      setIsEditing(false);
+      setIsEditing(startInEditMode);
     } else {
       setFormData({
         title: '',
@@ -103,7 +106,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     // Keyed on stable ids, not object identity: callers build `task` / `defaultRelatedTo` fresh on each render, and
     // depending on the objects reset the form (and left edit mode) on every parent re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id]);
+  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id, startInEditMode]);
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {

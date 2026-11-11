@@ -804,6 +804,9 @@ export const BigTaskCalendar: React.FC = () => {
       {showTaskModal && (
         <TaskDetailsModal
           task={selectedTask}
+          // Every route to an existing task here is an "Edit" action (event details "Edit Task", context menu "Edit"),
+          // so open in edit mode instead of making the user press Edit a second time.
+          startInEditMode
           isOpen={showTaskModal}
           onClose={() => {
             setShowTaskModal(false);

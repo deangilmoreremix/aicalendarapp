@@ -180,12 +180,8 @@ const linkedEvents = () => ({
   // task modal with related record
   await open();
   await page.locator('.rbc-event:has-text("Send proposal")').first().click(); await wait(500);
-  await shot('18-task-details-activity-and-linked-event');
-  await page.evaluate(() => document.querySelectorAll('[role=dialog]').forEach((d) => d.scrollTo(0, 1e5))); await wait(300);
-  await page.keyboard.press('Escape'); await wait(400);
-  await page.getByRole('button', { name: /new task/i }).first().click(); await wait(800);
-  await page.locator('#task-related-record').selectOption({ index: 1 }).catch(() => {});
-  await page.locator('#task-related-record').scrollIntoViewIfNeeded({ timeout: 8000 }); await wait(400);
+  await page.getByRole('dialog').getByRole('button', { name: 'Edit Task' }).click(); await wait(900); // event details -> task modal
+  await page.locator('#task-related-record').scrollIntoViewIfNeeded({ timeout: 8000 }); await wait(400); // opens directly in edit mode
   await shot('19-task-related-record-picker');
   await page.keyboard.press('Escape'); await wait(300);
 
