@@ -1,6 +1,6 @@
 import { initialsAvatar } from '../utils/avatars';
 import { AIEnrichmentService } from '../services/aiEnrichmentService';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { AIAutoFillButton } from './ui/AIAutoFillButton';
 import { AIResearchButton } from './ui/AIResearchButton';
@@ -375,6 +375,14 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
     setFormData(prev => ({ ...prev, ...updates }));
     setShowAIAssistant(false);
   };
+
+  // Escape closes the modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

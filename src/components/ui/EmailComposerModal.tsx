@@ -23,6 +23,10 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+// Module-level default: a fresh `[]` default prop is a new array on every render, and effects that depend on it
+// (to reset the form while the modal is open) would run on every render and wipe the form in a loop.
+const NO_IDS: string[] = [];
+
 interface EmailComposerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,7 +51,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
   isOpen,
   onClose,
   onEmailSent,
-  preselectedContacts = [],
+  preselectedContacts = NO_IDS,
   prefilledSubject = '',
   prefilledBody = ''
 }) => {

@@ -48,6 +48,14 @@ const App: React.FC = () => {
   const [showCalendarSettings, setShowCalendarSettings] = useState(false);
 
   // Load initial data on mount
+  // Escape closes the Calendar Settings modal
+  React.useEffect(() => {
+    if (!showCalendarSettings) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setShowCalendarSettings(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showCalendarSettings]);
+
   React.useEffect(() => {
     const loadData = async () => {
       try {
@@ -496,7 +504,7 @@ const App: React.FC = () => {
 
       {/* Calendar Settings Modal */}
       {showCalendarSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div role="dialog" aria-modal="true" aria-label="Calendar Settings" className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
             isDark ? 'text-white' : 'text-gray-900'
           }`}>
@@ -505,6 +513,7 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-bold">Calendar Settings</h2>
                 <button
                   onClick={() => setShowCalendarSettings(false)}
+                  aria-label="Close settings"
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 >
                   ×

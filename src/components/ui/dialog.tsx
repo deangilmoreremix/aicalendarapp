@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface DialogProps {
   open: boolean;
@@ -19,11 +19,33 @@ interface DialogTitleProps {
   children: React.ReactNode;
 }
 
+// Open dialogs, oldest first: Escape closes only the top-most one.
+const openDialogs: symbol[] = [];
+
 export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
+  const id = useRef(Symbol('dialog'));
+  const onChangeRef = useRef(onOpenChange);
+  onChangeRef.current = onOpenChange;
+
+  useEffect(() => {
+    if (!open) return;
+    const dialogId = id.current;
+    openDialogs.push(dialogId);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openDialogs[openDialogs.length - 1] === dialogId) onChangeRef.current(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      const i = openDialogs.indexOf(dialogId);
+      if (i >= 0) openDialogs.splice(i, 1);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => onOpenChange(false)} />
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>

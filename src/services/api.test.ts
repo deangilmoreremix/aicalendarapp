@@ -234,3 +234,11 @@ describe('Unified calendar mappers', () => {
     expect(view).toEqual({ id: 'v', name: 'W', layout: 'WEEK', fieldByType: { contact: 'createdAt' }, filters: {}, visibleTypes: ['task'], position: 2, isDefault: true });
   });
 });
+
+describe('Deal title', () => {
+  it('is stored and read back (the New Deal form requires it)', () => {
+    const db = mapDealToDB({ title: 'Big renewal', company: 'Acme', value: '1', probability: '50', dueDate: '2030-01-01', contactId: 'c', stage: 'prospecting', priority: 'low', status: 'online' });
+    expect(db.title).toBe('Big renewal');
+    expect(mapDealFromDB({ id: 'd', title: 'Big renewal', company: 'Acme', value: '1', probability: '50', due_date: '', contact_id: 'c', status: 'online', stage: 'prospecting', priority: 'low', created_at: '2030-01-01T00:00:00Z', updated_at: '2030-01-01T00:00:00Z' }).title).toBe('Big renewal');
+  });
+});

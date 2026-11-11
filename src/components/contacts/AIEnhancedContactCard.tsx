@@ -37,7 +37,7 @@ export const AIEnhancedContactCard: React.FC<AIEnhancedContactCardProps> = ({
         try {
           const [score, nextAction, interactionData] = await Promise.all([
             scoreContact(contact),
-            predictNextBestAction(contact.id),
+            predictNextBestAction(contact.id, contact),
             analyzeInteractionHistory(contact.id)
           ]);
 

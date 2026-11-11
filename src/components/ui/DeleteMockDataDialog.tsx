@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ModernButton } from './ModernButton';
 import { MockDataService, MockDataStats } from '../../services/mockDataService';
 import {
@@ -23,6 +23,14 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [deletedStats, setDeletedStats] = useState<MockDataStats | null>(null);
+
+  // Escape closes the dialog
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -92,8 +100,8 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Delete All Mock Data</h2>
-              <p className="text-sm text-gray-600">This action cannot be undone</p>
+              <h2 className="text-xl font-semibold text-gray-900">Clear Displayed Data</h2>
+              <p className="text-sm text-gray-600">Clears this screen only; saved data is not deleted</p>
             </div>
           </div>
           <button
@@ -119,7 +127,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
             <>
               <div className="mb-6">
                 <p className="text-gray-700 mb-4">
-                  This will permanently delete all demo/mock data from your application. This includes:
+                  This clears the data currently loaded in the app. Data saved in your database is not deleted and will load again after a refresh. This includes:
                 </p>
 
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -174,7 +182,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
                   <div>
                     <h4 className="text-sm font-medium text-red-900 mb-1">Warning</h4>
                     <p className="text-sm text-red-700">
-                      This action cannot be undone. All demo data will be permanently removed from your application.
+                      This only clears what is loaded on screen. Reload the app to see your saved data again.
                     </p>
                   </div>
                 </div>

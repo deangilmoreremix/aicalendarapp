@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Plus,
@@ -233,7 +233,7 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
 export const TaskKanbanBoard: React.FC = () => {
   const {
     getFilteredTasks,
-    updateTask,
+    rescheduleTask,
     filters,
     setFilters,
     setSelectedTask,
@@ -251,7 +251,10 @@ export const TaskKanbanBoard: React.FC = () => {
   const [aiTaskInsights, setAiTaskInsights] = useState<Record<string, string>>({});
   const [smartSuggestions, setSmartSuggestions] = useState<any[]>([]);
 
-  const tasks = getFilteredTasks();
+  // Memoised: getFilteredTasks() returns a new array every call, and `tasks` drives the AI-insights effect below.
+  // A fresh array each render re-ran that effect (an AI call + a state update) on every render, forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getFilteredTasks reads tasks/filters from the store, so they must retrigger it
+  const tasks = useMemo(() => getFilteredTasks(), [getFilteredTasks, allTasks, filters]);
 
   // Update search filter when search term changes
   useEffect(() => {
@@ -260,7 +263,11 @@ export const TaskKanbanBoard: React.FC = () => {
 
   // Generate AI insights for tasks
   useEffect(() => {
-    generateTaskInsights();
+    if (tasks.length === 0) return;
+    // short debounce so a burst of changes (drag, typing in search) triggers one request, not one per change
+    const timer = setTimeout(() => void generateTaskInsights(), 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
   const generateTaskInsights = async () => {
@@ -271,7 +278,7 @@ export const TaskKanbanBoard: React.FC = () => {
         name: task.assignedUserName || 'Unassigned',
         firstName: task.assignedUserName?.split(' ')[0] || 'User',
         lastName: task.assignedUserName?.split(' ').slice(1).join(' ') || '',
-        email: `${task.assignedUserName?.toLowerCase().replace(' ', '.')}@company.com` || 'user@company.com',
+        email: task.assignedUserName ? `${task.assignedUserName.toLowerCase().replace(/\s+/g, '.')}@company.com` : 'user@company.com',
         title: 'Team Member',
         company: 'Internal',
         industry: 'Technology',
@@ -310,7 +317,16 @@ export const TaskKanbanBoard: React.FC = () => {
     }
 
     const newStatus = destination.droppableId as Task['status'];
-    await updateTask(draggableId, { status: newStatus });
+    // Keep the `completed` flag in step with the status (stats and other views read the flag).
+    const updates: Partial<Task> = { status: newStatus };
+    if (newStatus === 'completed') {
+      updates.completed = true;
+      updates.completedAt = new Date();
+    } else if (source.droppableId === 'completed') {
+      updates.completed = false;
+    }
+    // Optimistic update: no global loading state, so the board does not blank out while a card moves.
+    await rescheduleTask(draggableId, updates);
   };
 
   const handleTaskClick = (task: Task) => {

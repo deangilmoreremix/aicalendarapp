@@ -13,8 +13,9 @@ export interface InitialDataSync {
   user?: any;
 }
 
+// Host data is untrusted: records without an id would otherwise be stored under the key "undefined".
 const toRecord = <T extends { id: string }>(items: T[]): Record<string, T> =>
-  Object.fromEntries(items.map((item) => [item.id, item]));
+  Object.fromEntries((Array.isArray(items) ? items : []).filter((item) => item && item.id != null).map((item) => [item.id, item]));
 
 // Stores keep entities as Record<id, entity>; these helpers write to them directly.
 const setContacts = (items: any[]) => useContactStore.setState({ contacts: toRecord(items) });
@@ -55,8 +56,8 @@ export function useHostDataSync() {
   const handleDataUpdate = useCallback((data: any) => {
     console.log('[CRM Embed] Received data update:', data);
 
-    const { entityType, operation, payload } = data;
-    if (!payload) return;
+    const { entityType, operation, payload } = data ?? {};
+    if (!payload || payload.id == null) return;
 
     switch (entityType) {
       case 'contact':

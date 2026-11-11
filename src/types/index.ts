@@ -162,6 +162,8 @@ export interface Contact {
 
 export interface Deal {
   id: string;
+  /** Optional deal name entered in the New Deal form */
+  title?: string;
   company: string;
   value: string;
   probability: string;

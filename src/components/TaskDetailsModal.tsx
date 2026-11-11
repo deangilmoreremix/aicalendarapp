@@ -430,10 +430,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
               {/* Related record (contact or deal) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="task-related-record" className="block text-sm font-medium text-gray-700 mb-2">
                   Related record
                 </label>
                 <select
+                  id="task-related-record"
                   value={formData.relatedTo ? `${formData.relatedTo.type}:${formData.relatedTo.id}` : ''}
                   onChange={(e) => {
                     const [type, id] = e.target.value.split(':');

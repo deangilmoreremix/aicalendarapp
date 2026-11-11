@@ -80,6 +80,7 @@ interface TaskDB {
 
 interface DealDB {
   id: string;
+  title?: string | null;
   company: string;
   value: string;
   probability: string;
@@ -195,6 +196,7 @@ export const mapTaskToDB = (task: Omit<Task, 'id' | 'createdAt'>) => ({
 
 export const mapDealFromDB = (deal: DealDB): Deal => ({
   id: deal.id,
+  title: deal.title ?? undefined,
   company: deal.company,
   value: deal.value,
   probability: deal.probability,
@@ -211,6 +213,7 @@ export const mapDealFromDB = (deal: DealDB): Deal => ({
 });
 
 export const mapDealToDB = (deal: any) => ({
+  title: deal.title,
   company: deal.company,
   value: deal.value,
   probability: deal.probability,
@@ -473,6 +476,23 @@ export const activityApi = {
   }
 };
 
+export interface ContactScoreResult {
+  score: number;
+  reasoning: string;
+  nextBestAction: string;
+  fitScore: number;
+  engagementScore: number;
+  conversionProbability: number;
+  urgencyScore: number;
+}
+
+const CONTACT_SCORE_TTL_MS = 10 * 60 * 1000;
+const contactScoreCache = new Map<string, { at: number; promise: Promise<ContactScoreResult> }>();
+const contactScoreKey = (c: Partial<Contact>) =>
+  JSON.stringify([c.id, c.firstName, c.lastName, c.name, c.email, c.title, c.company, c.industry, c.interestLevel, c.status, c.sources, c.tags, c.socialProfiles, c.notes]);
+/** Test helper: forget cached scores. */
+export const clearContactScoreCache = () => contactScoreCache.clear();
+
 // AI API (Edge Functions)
 export const aiApi = {
   async enrichContact(contact: Partial<Contact>): Promise<ContactEnrichmentData> {
@@ -515,10 +535,25 @@ export const aiApi = {
     return data.text;
   },
 
-  async scoreContact(contact: Partial<Contact>): Promise<{ score: number; reasoning: string; nextBestAction: string; fitScore: number; engagementScore: number; conversionProbability: number; urgencyScore: number }> {
-    const { data, error } = await supabase.functions.invoke('contacts_score', { body: { contact } });
-    if (error) throw error;
-    return data;
+  /**
+   * Scores a contact with the OpenAI-backed `contacts_score` function. Results are cached per contact content for
+   * 10 minutes and concurrent callers share one request: several components ask for a score, a next best action
+   * and sub-scores for the same contact, and each used to cost a separate OpenAI call (one per contact card, on every open).
+   */
+  scoreContact(contact: Partial<Contact>): Promise<ContactScoreResult> {
+    const key = contactScoreKey(contact);
+    const cached = contactScoreCache.get(key);
+    if (cached && Date.now() - cached.at < CONTACT_SCORE_TTL_MS) return cached.promise;
+
+    const promise = (async () => {
+      const { data, error } = await supabase.functions.invoke('contacts_score', { body: { contact } });
+      if (error) throw error;
+      return data as ContactScoreResult;
+    })();
+    contactScoreCache.set(key, { at: Date.now(), promise });
+    // failures are not cached
+    promise.catch(() => contactScoreCache.delete(key));
+    return promise;
   },
 
   async generateInsights(contacts: Contact[], extra: { deals?: Deal[]; tasks?: Task[] } = {}): Promise<AIInsight[]> {

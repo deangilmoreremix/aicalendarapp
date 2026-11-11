@@ -12,6 +12,10 @@ import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant'
 import { Calendar, Brain } from 'lucide-react';
 import { X, Clock, Users, MapPin, Video, Phone, Mail, Sparkles, Loader2, Plus, CheckCircle, Target } from 'lucide-react';
 
+// Module-level default: a fresh `[]` default prop is a new array on every render, and effects that depend on it
+// (to reset the form while the modal is open) would run on every render and wipe the form in a loop.
+const NO_IDS: string[] = [];
+
 interface MeetingSchedulerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,7 +50,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
   isOpen,
   onClose,
   onMeetingScheduled,
-  preselectedContacts = []
+  preselectedContacts = NO_IDS
 }) => {
   const { contacts } = useContactStore();
   const { createTask } = useTaskStore();

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
@@ -148,6 +148,14 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
     setSelectedContact(null);
     onClose();
   };
+
+  // Escape closes the modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

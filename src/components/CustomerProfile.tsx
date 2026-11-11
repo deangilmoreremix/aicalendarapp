@@ -37,7 +37,7 @@ export const CustomerProfile: React.FC = () => {
     setIsLoadingInsights(true);
     try {
       const [nextAction, interactionHistory] = await Promise.all([
-        predictNextBestAction(selectedContact.id),
+        predictNextBestAction(selectedContact.id, selectedContact),
         analyzeInteractionHistory(selectedContact.id)
       ]);
       
