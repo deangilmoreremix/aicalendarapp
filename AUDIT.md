@@ -11,7 +11,7 @@ Everything here ran in a sandbox: **nothing was run against a live OpenAI key or
 | Line coverage | 28% | **42%** (17 files still at 0%, mostly modals covered only by the browser sweep) |
 | `tsc` | 0 errors | 0 errors |
 | Browser sweep (`scripts/e2e-audit.cjs`) | crashed/looped in 3 places | **all 24 steps pass, 0 console errors/warnings** |
-| Migrations on a fresh DB | **failed** at the 2nd migration | all 19 apply (Postgres 16) |
+| Migrations on a fresh DB | **failed** at the 2nd migration | all 20 apply (Postgres 16) |
 | `npm audit` (prod) | 9 (6 high) | 2 moderate (react-router, needs a breaking major) |
 
 ## Bugs found and fixed
@@ -32,18 +32,15 @@ Everything here ran in a sandbox: **nothing was run against a live OpenAI key or
 | 13 | Low | Unlabelled "Related record" field, toolbar prev/next buttons | labelled |
 | 14 | Low | 7 vulnerable dependencies | `npm audit fix` |
 
-## OPEN: decision needed - calendar tables are blocked for the real app
-The app has no sign-in flow and uses the Supabase **anon** key, so contacts/tasks/deals/activities use open policies
-(documented in the core migration). The calendar tables added later (`calendar_events`, `calendar_event_participants`,
-`calendar_event_targets`, `calendar_settings`, `calendar_views`) only allow signed-in (`authenticated`) users.
-Verified on Postgres as the `anon` role: inserts into the first four succeed; **inserts into `calendar_events` and
-`calendar_settings` are rejected by row-level security, and the timeline function returns nothing.** So creating events,
-the contact Calendar tab, saved views, and the visibility setting will not work in the deployed app until one of:
-1. add real sign-in (then the owner-only policies work and data is per-user - recommended for production), or
-2. give these tables the same open policies as the core tables (works now; anyone with the anon key can read/write them, exactly like contacts today), or
-3. leave as is.
-I did not apply option 2 because it loosens security and needs your call.
-Also note: with open core policies **anyone holding the anon key can read and modify every contact, task, deal and activity.**
+## RESOLVED (option 2): calendar tables now use the same open access as the core tables
+The app has no sign-in and uses the Supabase **anon** key, so contacts/tasks/deals/activities use open policies. The calendar tables
+(`calendar_events`, `calendar_event_participants`, `calendar_event_targets`, `calendar_settings`, `calendar_views`) had owner-only
+policies for signed-in users, which blocked every write from the real app (verified on Postgres as the `anon` role).
+Migration `20251231000000_calendar_access_matches_app.sql` gives them the same open policies and makes `calendar_settings` a single
+`default` row. Re-verified on Postgres 16 as both `anon` and `authenticated`: insert, read, update, delete, settings upsert and the
+timeline function all work.
+**Security note:** this is not multi-tenant safe. Anyone holding the anon key can read and modify every contact, task, deal, activity,
+calendar event, saved view and setting. Add sign-in and per-user policies before storing sensitive data.
 
 ## Feature matrix
 | Area | How tested | Result |
@@ -63,7 +60,7 @@ Also note: with open core policies **anyone holding the anon key can read and mo
 | Calendar Settings (prefs, default visibility) | tests + browser | pass |
 | Embed/module federation (`CalendarApp`, `CalendarModule`, `ContactsModal` exposed; host sync, theme) | build output + 11 tests | pass |
 | 14 edge functions (validation, fallbacks, OpenAI request shape, errors, streaming, image upload) | 44 handler tests | pass; live API untested |
-| Database: full migration chain + RLS | Postgres 16 | pass; see OPEN item |
+| Database: full migration chain + access as anon/authenticated | Postgres 16 | pass |
 | Home screen "Recent Activity" panel and stat trend chips ("+5%", "24 completed") | browser | **hardcoded sample data, not real** |
 | Accessibility (axe) | browser | backlog below |
 
@@ -81,3 +78,10 @@ stat chips (`text-green-500` on white), no `<main>` landmark / heading order. Co
 
 ## Re-running
 `npx vitest run --coverage`, `npx tsc -p tsconfig.app.json --noEmit`, `npm run build`, and `scripts/e2e-audit.cjs` (see its header).
+
+## Screenshots
+
+`docs/screenshots/*.png` (24 images) are produced by `node scripts/screenshots.cjs` against a mocked Supabase REST API (no live OpenAI key), so the UI and flows are real but AI results are canned.
+
+### Open observation (not reproduced outside the scripted browser)
+Opening an existing task from the calendar and pressing **Edit Task** did not switch the modal to edit mode under Playwright (the click reached the button; React's `onClick` did not run, although calling the handler directly worked and the jsdom tests for the edit flow pass). Creating a task and every other modal button exercised in the sweep worked. Worth a manual check in a real browser. Related fix made on the way: the modal's reset effect now depends on `task?.id` / `defaultRelatedTo` ids instead of object identity, so a parent re-render can no longer wipe a form in progress.

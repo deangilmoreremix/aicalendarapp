@@ -776,7 +776,7 @@ export const calendarEventApi = {
   },
 
   async getSettings(): Promise<{ defaultVisibility: CalendarChannelVisibility }> {
-    const { data, error } = await supabase.from('calendar_settings').select('default_visibility').maybeSingle();
+    const { data, error } = await supabase.from('calendar_settings').select('default_visibility').eq('id', 'default').maybeSingle();
     if (error) throw error;
     return {
       defaultVisibility: (data?.default_visibility as CalendarChannelVisibility) ?? CalendarChannelVisibility.SHARE_EVERYTHING
@@ -786,7 +786,7 @@ export const calendarEventApi = {
   async setDefaultVisibility(visibility: CalendarChannelVisibility): Promise<void> {
     const { error } = await supabase
       .from('calendar_settings')
-      .upsert({ default_visibility: visibility, updated_at: new Date().toISOString() });
+      .upsert({ id: 'default', default_visibility: visibility, updated_at: new Date().toISOString() });
     if (error) throw error;
   }
 };

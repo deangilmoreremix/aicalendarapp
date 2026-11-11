@@ -45,3 +45,8 @@ settings and the `get_timeline_calendar_events` RPC. There is no Google/Microsof
 ## Unified calendar
 Migration `20251230000000_unified_calendar.sql` adds `tasks.start_time/end_time`, `contacts.next_follow_up` and `calendar_views`.
 Deals appear on the calendar when `due_date` is a `YYYY-MM-DD` date; free-text values (e.g. "Next Week") are skipped.
+
+## Access model
+There is no sign-in: the app uses the Supabase anon key and every table (contacts, tasks, deals, activities, calendar_*) has an open
+`anon, authenticated` policy. Anyone with the anon key can read and change this data. Add sign-in and per-user policies before
+storing sensitive data.

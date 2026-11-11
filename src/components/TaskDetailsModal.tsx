@@ -100,7 +100,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       });
       setIsEditing(true);
     }
-  }, [task, defaultStatus, defaultRelatedTo]);
+    // Keyed on stable ids, not object identity: callers build `task` / `defaultRelatedTo` fresh on each render, and
+    // depending on the objects reset the form (and left edit mode) on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id]);
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {
