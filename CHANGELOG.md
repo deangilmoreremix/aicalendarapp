@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced mocked AI screens with real data (insights, deals, scoring, interaction timeline, email composer saves to activity log).
 - Fixed: `useHostDataSync` store writes, CSV import header mapping and error display, contact interest level `warm`, kanban selected task, activity feed/contact profile record handling, missing `calendar_events` migration.
 - Calendar: ported Twenty's calendar timeline (utils/tests verbatim, UI logic in our design), event composer, per-event visibility, Calendar tab on contacts, Supabase timeline RPC.
+- Unified CRM calendar: tasks, deals, contacts (new follow-up date) and events on `BigTaskCalendar`; drag-and-drop date changes persisted through the existing services; filters, saved views (`calendar_views`), right-click menu (edit / duplicate / reschedule / delete), record selection, embedded task widgets in contacts and deals, task-to-record linking. Upstream Twenty `record-calendar` / `record-drag` utilities are used for ranges, week titles and date shifting.
+- Fixed: `tasks.start_time/end_time` had no columns (time-blocked tasks were dropped / updates failed), calendar events had no read API, calendar toolbar navigation (Today, per-view Prev/Next), linked-event lookup in `TaskDetailsModal`.
 - See `DEPLOY.md` for deployment.
 
 ## [Earlier] - 2026-04-27

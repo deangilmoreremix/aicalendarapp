@@ -1,7 +1,7 @@
 import { initialsAvatar } from '../utils/avatars';
 import { create } from 'zustand';
 import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
-import { taskApi } from '../services/api';
+import { taskApi, calendarEventApi } from '../services/api';
 import { generateId } from '../utils';
 
 interface TaskState {
@@ -27,6 +27,11 @@ interface TaskActions {
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => void;
   setSelectedTask: (task: Task | null) => void;
   loadInitialData: () => Promise<void>;
+  /** Optimistic update used by calendar drag/reschedule (no global loading flag, rolls back on failure). */
+  rescheduleTask: (id: string, taskData: Partial<Task>) => Promise<boolean>;
+  loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
+  rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date }) => Promise<boolean>;
+  removeCalendarEvent: (id: string) => Promise<boolean>;
 }
 
 type TaskStore = TaskState & TaskActions;
@@ -165,6 +170,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       );
     }
 
+    if (filters.assigneeIds?.length) {
+      filteredTasks = filteredTasks.filter(task =>
+        task.assignedUserId !== undefined && filters.assigneeIds!.includes(task.assignedUserId)
+      );
+    }
+
+    if (filters.dueDateRange?.start || filters.dueDateRange?.end) {
+      const { start, end } = filters.dueDateRange;
+      filteredTasks = filteredTasks.filter(task => {
+        const when = task.dueDate ?? task.startTime;
+        if (!when) return false;
+        return (!start || when >= start) && (!end || when <= end);
+      });
+    }
+
     if (filters.isOverdue) {
       filteredTasks = filteredTasks.filter(task =>
         task.dueDate && task.dueDate < new Date() && task.status !== 'completed'
@@ -205,6 +225,57 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   setSelectedTask: (task) => {
     set({ selectedTask: task?.id || null });
+  },
+
+  rescheduleTask: async (id, taskData) => {
+    const previous = get().tasks[id];
+    if (!previous) return false;
+    set((state) => ({ tasks: { ...state.tasks, [id]: { ...previous, ...taskData } } }));
+    try {
+      const saved = await taskApi.update(id, taskData);
+      set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
+      return true;
+    } catch (error) {
+      console.error('Failed to reschedule task:', error);
+      set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
+      return false;
+    }
+  },
+
+  loadCalendarEvents: async (from, to) => {
+    try {
+      const events = await calendarEventApi.getRange(from, to);
+      set({ calendarEvents: events });
+    } catch (error) {
+      console.error('Failed to load calendar events:', error);
+      set({ error: 'Failed to load calendar events' });
+    }
+  },
+
+  rescheduleCalendarEvent: async (id, updates) => {
+    const previous = get().calendarEvents;
+    set({ calendarEvents: previous.map(e => (e.id === id ? { ...e, ...updates } : e)) });
+    try {
+      await calendarEventApi.update(id, updates);
+      return true;
+    } catch (error) {
+      console.error('Failed to reschedule event:', error);
+      set({ calendarEvents: previous, error: 'Failed to reschedule event' });
+      return false;
+    }
+  },
+
+  removeCalendarEvent: async (id) => {
+    const previous = get().calendarEvents;
+    set({ calendarEvents: previous.filter(e => e.id !== id) });
+    try {
+      await calendarEventApi.delete(id);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      set({ calendarEvents: previous, error: 'Failed to delete event' });
+      return false;
+    }
   },
 
   loadInitialData: async () => {

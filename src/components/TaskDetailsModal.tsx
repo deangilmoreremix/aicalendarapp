@@ -5,6 +5,10 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Task, Subtask } from '../types';
 import { useTaskStore } from '../store/taskStore';
+import { useContactStore } from '../store/contactStore';
+import { useDealStore } from '../store/dealStore';
+import { calendarEventApi } from '../services/api';
+import { RecordActivityTimeline } from './contacts/ContactJourneyTimeline';
 import { AITaskAssistant } from './ui/AITaskAssistant';
 import {
   X,
@@ -26,13 +30,16 @@ interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultStatus?: Task['status'];
+  /** Pre-links a new task to a record (used by the embedded record tasks widget). */
+  defaultRelatedTo?: Task['relatedTo'];
 }
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ 
   task, 
   isOpen, 
   onClose, 
-  defaultStatus 
+  defaultStatus,
+  defaultRelatedTo
 }) => {
   const { createTask, updateTask, deleteTask } = useTaskStore();
   const [isEditing, setIsEditing] = useState(!task);
@@ -89,10 +96,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         completed: false,
         tags: [],
         subtasks: [],
+        relatedTo: defaultRelatedTo,
       });
       setIsEditing(true);
     }
-  }, [task, defaultStatus]);
+  }, [task, defaultStatus, defaultRelatedTo]);
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {
@@ -183,8 +191,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const { calendarEvents } = useTaskStore();
-
   const getConferenceIcon = (provider?: string) => {
     switch (provider?.toLowerCase()) {
       case 'zoom': return '📺';
@@ -194,9 +200,53 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const relatedCalendarEvent = task?.relatedTo?.type === 'contact' || task?.relatedTo?.type === 'deal' 
-    ? calendarEvents.find(e => e.id === task.relatedTo?.id)
-    : undefined;
+  // Linked calendar event: the most recent event linked to the task's contact/deal (calendar_event_targets).
+  // (This used to look an event up by the contact/deal id itself, which never matched.)
+  const [relatedCalendarEvent, setRelatedCalendarEvent] = useState<
+    | {
+        title: string;
+        conferenceSolution?: string;
+        conferenceLink?: string;
+        participants?: { displayName: string; handle?: string; avatarUrl?: string }[];
+      }
+    | undefined
+  >(undefined);
+
+  useEffect(() => {
+    const relatedTo = task?.relatedTo;
+    if (!relatedTo || (relatedTo.type !== 'contact' && relatedTo.type !== 'deal')) {
+      setRelatedCalendarEvent(undefined);
+      return;
+    }
+    let cancelled = false;
+    calendarEventApi
+      .getTimeline(relatedTo.type, relatedTo.id, 1, 0)
+      .then(({ timelineCalendarEvents }) => {
+        const event = timelineCalendarEvents[0];
+        if (cancelled) return;
+        setRelatedCalendarEvent(
+          event
+            ? {
+                title: event.title ?? 'Calendar event',
+                conferenceSolution: event.conferenceLink?.primaryLinkLabel,
+                conferenceLink: event.conferenceLink?.primaryLinkUrl,
+                participants: event.participants?.map(p => ({ displayName: p.displayName, handle: p.handle, avatarUrl: p.avatarUrl }))
+              }
+            : undefined
+        );
+      })
+      .catch(() => !cancelled && setRelatedCalendarEvent(undefined));
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.relatedTo?.type, task?.relatedTo?.id]);
+
+  const contacts = useContactStore(state => state.contacts);
+  const deals = useDealStore(state => state.deals);
+  const loadDeals = useDealStore(state => state.loadDeals);
+  useEffect(() => {
+    if (isOpen && Object.keys(useDealStore.getState().deals).length === 0) void loadDeals();
+  }, [isOpen, loadDeals]);
 
   if (!isOpen) return null;
 
@@ -378,6 +428,38 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </div>
               </div>
 
+              {/* Related record (contact or deal) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Related record
+                </label>
+                <select
+                  value={formData.relatedTo ? `${formData.relatedTo.type}:${formData.relatedTo.id}` : ''}
+                  onChange={(e) => {
+                    const [type, id] = e.target.value.split(':');
+                    if (!type || !id) {
+                      setFormData(prev => ({ ...prev, relatedTo: undefined }));
+                      return;
+                    }
+                    const name = type === 'contact' ? contacts[id]?.name : deals[id]?.company;
+                    setFormData(prev => ({ ...prev, relatedTo: { type: type as 'contact' | 'deal', id, name: name ?? '' } }));
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="">None</option>
+                  <optgroup label="Contacts">
+                    {Object.values(contacts).map(c => (
+                      <option key={c.id} value={`contact:${c.id}`}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Deals">
+                    {Object.values(deals).map(d => (
+                      <option key={d.id} value={`deal:${d.id}`}>{d.company}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
               {/* Tags */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -521,6 +603,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                      </div>
                    </div>
                  </div>
+
+                 {task && (
+                   <div className="border-t pt-4 mt-4">
+                     <RecordActivityTimeline entityId={task.id} title="Task activity" />
+                   </div>
+                 )}
 
                  {/* Calendar Event Integration - Twenty Enhanced */}
                  {relatedCalendarEvent && (

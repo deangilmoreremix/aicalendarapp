@@ -41,3 +41,7 @@ supabase secrets set OPENAI_API_KEY=... OPENAI_MODEL=gpt-6-astra OPENAI_IMAGE_MO
 The contact view has a **Calendar** tab (timeline grouped by month/day, "New event" composer) and Calendar Settings has a default
 event visibility (Everything / Metadata). The migration `20251229000000_calendar_timeline.sql` adds participants, event targets,
 settings and the `get_timeline_calendar_events` RPC. There is no Google/Microsoft sync. See `src/vendor/twenty/README.md`.
+
+## Unified calendar
+Migration `20251230000000_unified_calendar.sql` adds `tasks.start_time/end_time`, `contacts.next_follow_up` and `calendar_views`.
+Deals appear on the calendar when `due_date` is a `YYYY-MM-DD` date; free-text values (e.g. "Next Week") are skipped.

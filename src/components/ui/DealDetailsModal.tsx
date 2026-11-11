@@ -5,6 +5,8 @@ import { Button } from './button';
 import { Badge } from './badge';
 import { useDealViews, DealView } from '../../hooks/useDealViews';
 import { activityApi } from '../../services/api';
+import { RecordTasksWidget } from '../calendar/RecordTasksWidget';
+import { CalendarEventsCard } from '../calendar/CalendarEventsCard';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
 import { X, DollarSign, Calendar, User, AlertTriangle, CheckCircle, Clock, Target, Brain, Loader2, Edit, Archive, Mail, FileText } from 'lucide-react';
@@ -290,6 +292,15 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Tasks and calendar events linked to this deal */}
+            <RecordTasksWidget targetType="deal" targetId={deal.id} targetName={deal.company} />
+            <CalendarEventsCard
+              targetType="deal"
+              targetId={deal.id}
+              objectName="deal"
+              composerContext={{ targets: [{ type: 'deal', id: deal.id }] }}
+            />
 
             {/* Recent Activities */}
             <div>

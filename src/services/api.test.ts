@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapContactFromDB, mapContactToDB, mapTaskFromDB, mapTaskToDB, mapDealFromDB, mapDealToDB } from './api';
+import { mapContactFromDB, mapContactToDB, mapTaskFromDB, mapTaskToDB, mapDealFromDB, mapDealToDB, mapCalendarEventFromDB, mapCalendarViewFromDB } from './api';
 
 describe('API Mapping Functions', () => {
   describe('Contact Mapping', () => {
@@ -191,5 +191,46 @@ describe('API Mapping Functions', () => {
       expect(result.value).toBe('50000');
       expect(result.contact_id).toBe('contact1');
     });
+  });
+});
+describe('Unified calendar mappers', () => {
+  it('round-trips task start/end times (previously dropped: no columns, no mapping)', () => {
+    const task = mapTaskFromDB({
+      id: 't', title: 'Block', priority: 'low', status: 'pending', category: 'other', type: 'other', completed: false,
+      created_at: '2030-01-01T00:00:00Z', tags: [],
+      start_time: '2030-03-10T09:00:00Z', end_time: '2030-03-10T10:00:00Z'
+    });
+    expect(task.startTime).toEqual(new Date('2030-03-10T09:00:00Z'));
+    expect(task.endTime).toEqual(new Date('2030-03-10T10:00:00Z'));
+    const db = mapTaskToDB(task);
+    expect(db.start_time).toBe('2030-03-10T09:00:00.000Z');
+    expect(db.end_time).toBe('2030-03-10T10:00:00.000Z');
+  });
+
+  it('maps the contact follow-up date both ways', () => {
+    const contact = mapContactFromDB({
+      id: 'c', first_name: 'A', last_name: 'B', name: 'A B', email: 'a@b.co', title: '', company: '', sources: [],
+      interest_level: 'hot', status: 'lead', tags: [], is_favorite: false, created_at: '2030-01-01T00:00:00Z',
+      updated_at: '2030-01-01T00:00:00Z', next_follow_up: '2030-03-14'
+    });
+    expect(contact.nextFollowUp).toBe('2030-03-14');
+    expect(mapContactToDB(contact).next_follow_up).toBe('2030-03-14');
+    expect(mapContactToDB({ ...contact, nextFollowUp: undefined }).next_follow_up).toBeNull();
+  });
+
+  it('maps a stored calendar event and defaults a missing end to the end of its day', () => {
+    const event = mapCalendarEventFromDB({ id: 'e', title: 'T', start_date: '2030-03-10T09:00:00Z', end_date: null, is_all_day: false, is_canceled: true });
+    expect(event.calendarId).toBe('default');
+    expect(event.status).toBe('cancelled');
+    expect(event.endDate.getTime()).toBeGreaterThan(event.startDate.getTime());
+    expect(event.visibility).toBe('SHARE_EVERYTHING');
+  });
+
+  it('maps saved views with defaults', () => {
+    const view = mapCalendarViewFromDB({
+      id: 'v', name: 'W', calendar_layout: 'WEEK', field_by_type: { contact: 'createdAt' }, filters: {},
+      visible_types: ['task'], position: 2, is_default: true
+    });
+    expect(view).toEqual({ id: 'v', name: 'W', layout: 'WEEK', fieldByType: { contact: 'createdAt' }, filters: {}, visibleTypes: ['task'], position: 2, isDefault: true });
   });
 });

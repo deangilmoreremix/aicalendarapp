@@ -13,8 +13,8 @@ const iconFor = (type: string) => {
   return <Clock className="w-4 h-4" />;
 };
 
-/** Real contact timeline from the Supabase `activities` table. */
-export const ContactJourneyTimeline: React.FC<{ contact: Contact }> = ({ contact }) => {
+/** Real activity timeline for any record (contact, deal, task) from the Supabase `activities` table. */
+export const RecordActivityTimeline: React.FC<{ entityId: string; title?: string }> = ({ entityId, title = 'Activity' }) => {
   const [items, setItems] = useState<Activity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +28,7 @@ export const ContactJourneyTimeline: React.FC<{ contact: Contact }> = ({ contact
         if (cancelled) return;
         setItems(
           all
-            .filter(a => a.entityId === contact.id)
+            .filter(a => a.entityId === entityId)
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         );
       })
@@ -39,14 +39,14 @@ export const ContactJourneyTimeline: React.FC<{ contact: Contact }> = ({ contact
     return () => {
       cancelled = true;
     };
-  }, [contact.id]);
+  }, [entityId]);
 
   return (
     <div className="p-4 bg-gray-50 rounded-lg">
-      <h3 className="text-lg font-semibold mb-3">Contact Journey Timeline</h3>
+      <h3 className="text-lg font-semibold mb-3">{title}</h3>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!error && items === null && <p className="text-sm text-gray-500">Loading...</p>}
-      {items && items.length === 0 && <p className="text-sm text-gray-600">No activity recorded for this contact yet.</p>}
+      {items && items.length === 0 && <p className="text-sm text-gray-600">No activity recorded yet.</p>}
       {items && items.length > 0 && (
         <ol className="space-y-3">
           {items.map(item => (
@@ -66,3 +66,7 @@ export const ContactJourneyTimeline: React.FC<{ contact: Contact }> = ({ contact
     </div>
   );
 };
+
+export const ContactJourneyTimeline: React.FC<{ contact: Contact }> = ({ contact }) => (
+  <RecordActivityTimeline entityId={contact.id} title="Contact Journey Timeline" />
+);

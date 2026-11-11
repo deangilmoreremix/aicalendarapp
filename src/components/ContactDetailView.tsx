@@ -3,6 +3,7 @@ import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { AIResearchButton } from './ui/AIResearchButton';
 import { CalendarEventsCard } from './calendar/CalendarEventsCard';
+import { RecordTasksWidget } from './calendar/RecordTasksWidget';
 import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
 import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
 import { aiEnrichmentService, ContactEnrichmentData } from '../services/aiEnrichmentService';
@@ -109,6 +110,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'journey', label: 'Journey', icon: TrendingUp },
     { id: 'calendar', label: 'Calendar', icon: Calendar },
+    { id: 'tasks', label: 'Tasks', icon: Target },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'automation', label: 'Automation', icon: Zap },
@@ -924,6 +926,40 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   </div>
                 )}
 
+                {/* Next follow-up: places the contact on the calendar */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-6 h-6 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Next Follow-up</p>
+                      {editingField === 'nextFollowUp' ? (
+                        <input
+                          type="date"
+                          aria-label="Next follow-up date"
+                          value={editedContact.nextFollowUp || ''}
+                          onChange={(e) => handleEditField('nextFollowUp', e.target.value || null)}
+                          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                          onBlur={handleSaveField}
+                          autoFocus
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-gray-900 leading-tight">
+                          {editedContact.nextFollowUp || 'Not scheduled'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleStartEditingField('nextFollowUp')}
+                    aria-label="Edit next follow-up"
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  >
+                    <Edit className="w-3 h-3" />
+                  </button>
+                </div>
+
                 {/* Last Connected - Full Text Visible */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
@@ -1436,6 +1472,12 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
             {activeTab === 'journey' && (
               <div className="p-6">
                 <ContactJourneyTimeline contact={editedContact} />
+              </div>
+            )}
+
+            {activeTab === 'tasks' && (
+              <div className="p-6">
+                <RecordTasksWidget targetType="contact" targetId={editedContact.id} targetName={editedContact.name} />
               </div>
             )}
 

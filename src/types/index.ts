@@ -156,6 +156,8 @@ export interface Contact {
   createdAt: Date;
   updatedAt: Date;
   aiScore?: number;
+  /** YYYY-MM-DD; places the contact on the calendar */
+  nextFollowUp?: string | null;
 }
 
 export interface Deal {

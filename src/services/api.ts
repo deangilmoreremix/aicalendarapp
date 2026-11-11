@@ -4,7 +4,7 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
-import { Contact, Task, Deal, Activity, AIInsight } from '../types';
+import { Contact, Task, Deal, Activity, AIInsight, CalendarEvent } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
 // TaskSuggestion interface for AI API
@@ -48,6 +48,7 @@ interface ContactDB {
   custom_fields?: Record<string, string>;
   is_favorite: boolean;
   ai_score?: number;
+  next_follow_up?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +58,8 @@ interface TaskDB {
   title: string;
   description?: string;
   due_date?: string;
+  start_time?: string | null;
+  end_time?: string | null;
   priority: string;
   status: string;
   category: string;
@@ -114,6 +117,7 @@ export const mapContactFromDB = (contact: ContactDB): Contact => ({
   customFields: contact.custom_fields || {},
   isFavorite: contact.is_favorite,
   aiScore: contact.ai_score,
+  nextFollowUp: contact.next_follow_up ?? undefined,
   createdAt: new Date(contact.created_at),
   updatedAt: new Date(contact.updated_at)
 });
@@ -137,7 +141,8 @@ export const mapContactToDB = (contact: Omit<Contact, 'id' | 'createdAt' | 'upda
   social_profiles: contact.socialProfiles,
   custom_fields: contact.customFields,
   is_favorite: contact.isFavorite,
-  ai_score: contact.aiScore
+  ai_score: contact.aiScore,
+  next_follow_up: contact.nextFollowUp ?? null
 });
 
 export const mapTaskFromDB = (task: TaskDB): Task => ({
@@ -145,6 +150,8 @@ export const mapTaskFromDB = (task: TaskDB): Task => ({
   title: task.title,
   description: task.description,
   dueDate: task.due_date ? new Date(task.due_date) : undefined,
+  startTime: task.start_time ? new Date(task.start_time) : undefined,
+  endTime: task.end_time ? new Date(task.end_time) : undefined,
   priority: task.priority as Task['priority'],
   status: task.status as Task['status'],
   category: task.category as Task['category'],
@@ -167,6 +174,8 @@ export const mapTaskToDB = (task: Omit<Task, 'id' | 'createdAt'>) => ({
   title: task.title,
   description: task.description,
   due_date: task.dueDate?.toISOString(),
+  start_time: task.startTime?.toISOString(),
+  end_time: task.endTime?.toISOString(),
   priority: task.priority,
   status: task.status,
   category: task.category,
@@ -593,6 +602,42 @@ export interface CreateCalendarEventInput {
 const toStorageInstant = (value: string, isFullDay: boolean): string =>
   isFullDay ? new Date(`${value}T00:00:00`).toISOString() : new Date(value).toISOString();
 
+interface CalendarEventDB {
+  id: string;
+  title: string;
+  description?: string | null;
+  start_date: string;
+  end_date?: string | null;
+  is_all_day: boolean;
+  location?: string | null;
+  is_canceled?: boolean | null;
+  conference_solution?: string | null;
+  conference_link?: string | null;
+  visibility?: string | null;
+}
+
+export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent => {
+  const startDate = new Date(event.start_date);
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description ?? undefined,
+    startDate,
+    // events saved without an end last until the end of their start day (same rule as upstream's getCalendarEventEndDate)
+    endDate: event.end_date ? new Date(event.end_date) : new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 23, 59, 59),
+    isAllDay: event.is_all_day,
+    location: event.location ?? undefined,
+    // calendar_events has no calendar_id column; every stored event belongs to the default calendar
+    calendarId: 'default',
+    type: 'event',
+    status: event.is_canceled ? 'cancelled' : 'scheduled',
+    isCanceled: event.is_canceled ?? false,
+    conferenceSolution: event.conference_solution ?? undefined,
+    conferenceLink: event.conference_link ?? undefined,
+    visibility: (event.visibility as CalendarEvent['visibility']) ?? 'SHARE_EVERYTHING'
+  };
+};
+
 export const calendarEventApi = {
   async getTimeline(
     targetType: CalendarTargetType,
@@ -665,6 +710,36 @@ export const calendarEventApi = {
     return eventId;
   },
 
+  /** Events overlapping [from, to] (RLS limits rows to the owner). */
+  async getRange(from: Date, to: Date): Promise<CalendarEvent[]> {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .lte('start_date', to.toISOString())
+      .or(`end_date.gte.${from.toISOString()},end_date.is.null`)
+      .order('start_date');
+    if (error) throw error;
+    return (data ?? []).map(mapCalendarEventFromDB);
+  },
+
+  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean }): Promise<CalendarEvent> {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (updates.startDate) patch.start_date = updates.startDate.toISOString();
+    if (updates.endDate) patch.end_date = updates.endDate.toISOString();
+    if (updates.title !== undefined) patch.title = updates.title;
+    if (updates.location !== undefined) patch.location = updates.location;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.isAllDay !== undefined) patch.is_all_day = updates.isAllDay;
+    const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return mapCalendarEventFromDB(data);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async getSettings(): Promise<{ defaultVisibility: CalendarChannelVisibility }> {
     const { data, error } = await supabase.from('calendar_settings').select('default_visibility').maybeSingle();
     if (error) throw error;
@@ -677,6 +752,91 @@ export const calendarEventApi = {
     const { error } = await supabase
       .from('calendar_settings')
       .upsert({ default_visibility: visibility, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Saved calendar views (shape follows twentyhq/twenty's View: layout, date field, filters, visibility, position)
+// ---------------------------------------------------------------------------
+export type CalendarRecordType = 'task' | 'deal' | 'contact' | 'event';
+
+export interface CalendarViewFilters {
+  statuses?: string[];
+  assigneeIds?: string[];
+  dueDateRange?: { from?: string; to?: string };
+  searchTerm?: string;
+}
+
+export interface CalendarView {
+  id: string;
+  name: string;
+  layout: 'DAY' | 'WEEK' | 'MONTH' | 'AGENDA';
+  fieldByType: Partial<Record<CalendarRecordType, string>>;
+  filters: CalendarViewFilters;
+  visibleTypes: CalendarRecordType[];
+  position: number;
+  isDefault: boolean;
+}
+
+interface CalendarViewDB {
+  id: string;
+  name: string;
+  calendar_layout: CalendarView['layout'];
+  field_by_type: CalendarView['fieldByType'];
+  filters: CalendarViewFilters;
+  visible_types: CalendarRecordType[];
+  position: number;
+  is_default: boolean;
+}
+
+export const mapCalendarViewFromDB = (view: CalendarViewDB): CalendarView => ({
+  id: view.id,
+  name: view.name,
+  layout: view.calendar_layout,
+  fieldByType: view.field_by_type ?? {},
+  filters: view.filters ?? {},
+  visibleTypes: view.visible_types ?? ['task', 'deal', 'contact', 'event'],
+  position: view.position,
+  isDefault: view.is_default
+});
+
+const mapCalendarViewToDB = (view: Partial<Omit<CalendarView, 'id'>>) => ({
+  ...(view.name !== undefined && { name: view.name }),
+  ...(view.layout !== undefined && { calendar_layout: view.layout }),
+  ...(view.fieldByType !== undefined && { field_by_type: view.fieldByType }),
+  ...(view.filters !== undefined && { filters: view.filters }),
+  ...(view.visibleTypes !== undefined && { visible_types: view.visibleTypes }),
+  ...(view.position !== undefined && { position: view.position }),
+  ...(view.isDefault !== undefined && { is_default: view.isDefault }),
+  updated_at: new Date().toISOString()
+});
+
+export const calendarViewApi = {
+  async getAll(): Promise<CalendarView[]> {
+    const { data, error } = await supabase.from('calendar_views').select('*').order('position').order('created_at');
+    if (error) throw error;
+    return (data ?? []).map(mapCalendarViewFromDB);
+  },
+
+  async create(view: Omit<CalendarView, 'id' | 'position' | 'isDefault'>): Promise<CalendarView> {
+    const { data, error } = await supabase
+      .from('calendar_views')
+      .insert(mapCalendarViewToDB({ ...view, position: 0, isDefault: false }))
+      .select()
+      .single();
+    if (error) throw error;
+    return mapCalendarViewFromDB(data);
+  },
+
+  async update(id: string, updates: Partial<Omit<CalendarView, 'id'>>): Promise<CalendarView> {
+    const { data, error } = await supabase.from('calendar_views').update(mapCalendarViewToDB(updates)).eq('id', id).select().single();
+    if (error) throw error;
+    return mapCalendarViewFromDB(data);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('calendar_views').delete().eq('id', id);
     if (error) throw error;
   }
 };
