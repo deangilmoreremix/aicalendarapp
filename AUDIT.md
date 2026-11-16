@@ -61,7 +61,7 @@ calendar event, saved view and setting. Add sign-in and per-user policies before
 | Embed/module federation (`CalendarApp`, `CalendarModule`, `ContactsModal` exposed; host sync, theme) | build output + 11 tests | pass |
 | 14 edge functions (validation, fallbacks, OpenAI request shape, errors, streaming, image upload) | 44 handler tests | pass; live API untested |
 | Database: full migration chain + access as anon/authenticated | Postgres 16 | pass |
-| Home screen "Recent Activity" panel and stat trend chips ("+5%", "24 completed") | browser | **hardcoded sample data, not real** |
+| Home screen: stat trends, Recent Activity, Tasks Schedule, Stage Funnel, Interaction History | tests + browser | **real data** (was hardcoded); empty states when there is none |
 | Accessibility (axe) | browser | backlog below |
 
 ## Accessibility backlog (not fixed; existing components)
@@ -120,3 +120,6 @@ Ctrl/Cmd+K (or the search button in the header) opens a palette: type to find ta
 ## Group E: attachments
 Files can be attached to contacts (Journey tab), deals, tasks and calendar events: choose or drop files (up to 25 MB each, several at a time), see name, size and date, download through a one-minute signed link (opened without opener access), and delete after a confirmation. Metadata lives in the new `attachments` table and the bytes in a new private `attachments` Storage bucket (migration `20260105000000_attachments.sql`, verified on Postgres 16 as `anon`, including the storage policies). Uploads appear in the record timeline as "File added: ..."; if the timeline entry cannot be written the upload still counts. A failed metadata write removes the stored file again, so nothing is orphaned. Deleting sample data also deletes the files of the deleted records. Storage keys use a sanitised name while the readable name is kept in the table.
 **Needs your project**: Supabase Storage must be enabled (it already is for avatars); after `supabase db push`, upload one real file to confirm the bucket and policies on your project.
+
+## Real data on the home screen
+The home blocks used invented numbers; they now read your records. **Stat chips**: week-over-week change in tasks created and tasks completed, shown only when last week gives a real baseline (hover shows "N this week, M last week"). **Recent Activity**: the latest rows of the activities table (plain-text snippets, relative times) and real completed/pending task counts, with an empty state. **Upcoming Deals** now opens the deal and "View All" opens the deals list (they only logged to the console). **Tasks Schedule**: this week by day and this month's assignees come from task due dates and assignees; the month name is the current month. **Stage Funnel**: open pipeline by stage with weighted and total value from deals. **Interaction History**: your latest deals as cards, opening the deal. "Pipeline Insights" now calls the real insights function. Still placeholder: a few option handlers in the Tasks Schedule menu (export, share link, etc.) show browser alerts, as before.

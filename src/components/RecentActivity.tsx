@@ -3,7 +3,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAI } from '../contexts/AIContext';
 import { useDealViews } from '../hooks/useDealViews';
 import { useContactStore } from '../store/contactStore';
-import { Calendar, CheckCircle, AlertCircle, TrendingUp, ArrowRight, Brain, Sparkles, Loader2, Zap } from 'lucide-react';
+import { Calendar, CheckCircle, AlertCircle, TrendingUp, ArrowRight, Brain, Sparkles, Loader2, Zap, Mail, Phone, FileText, Clock } from 'lucide-react';
+import { activityApi } from '../services/api';
+import { useActivityVersionStore } from '../store/activityVersionStore';
+import { useTaskStore } from '../store/taskStore';
+import { completedAndPending, recentFromActivities, type RecentItem } from '../lib/home/homeData';
 import Avatar from './ui/Avatar';
 import { DealDetailsModal } from './ui/DealDetailsModal';
 import { DealsManagementModal } from './ui/DealsManagementModal';
@@ -23,7 +27,7 @@ const RecentActivity: React.FC = () => {
   const [showAIInsightsModal, setShowAIInsightsModal] = useState(false);
   const [selectedDealId, setSelectedDealId] = useState<string | undefined>();
 
-  const _handleViewAllDeals = () => {
+  const handleViewAllDeals = () => {
     setShowDealsManagementModal(true);
   };
 
@@ -72,33 +76,32 @@ const RecentActivity: React.FC = () => {
   const { deals: allDeals } = useDealViews();
   const upcomingDeals = allDeals.filter(d => !d.stage.startsWith('closed')).slice(0, 5);
 
-  // Combine regular activities with AI-generated alerts
-  const baseActivities = [
-    {
-      type: 'deal',
-      icon: TrendingUp,
-      title: 'Deal moved to negotiation',
-      description: 'TechCorp Solutions - $85,000',
-      time: '2 hours ago',
-      color: 'text-blue-600'
-    },
-    {
-      type: 'task',
-      icon: CheckCircle,
-      title: 'Task completed',
-      description: 'Follow-up call with Innovation Labs',
-      time: '4 hours ago',
-      color: 'text-green-600'
-    },
-    {
-      type: 'meeting',
-      icon: Calendar,
-      title: 'Meeting scheduled',
-      description: 'Product demo with Global Dynamics',
-      time: '6 hours ago',
-      color: 'text-purple-600'
-    }
-  ];
+  // Latest real activity (emails, calls, meetings, notes, deal moves, task events) from the activities table
+  const version = useActivityVersionStore((st) => st.version);
+  const [realActivities, setRealActivities] = useState<RecentItem[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    activityApi
+      .getAll()
+      .then((all) => !cancelled && setRealActivities(recentFromActivities(all, 5)))
+      .catch(() => !cancelled && setRealActivities([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [version]);
+  const tasks = useTaskStore((st) => st.tasks);
+  const { completed: completedCount, pending: pendingCount } = completedAndPending(Object.values(tasks));
+
+  const KIND_ICON = { deal: TrendingUp, task: CheckCircle, meeting: Calendar, email: Mail, call: Phone, note: FileText, other: Clock } as const;
+  const KIND_COLOR = { deal: 'text-blue-600', task: 'text-green-600', meeting: 'text-purple-600', email: 'text-blue-600', call: 'text-green-600', note: 'text-gray-600', other: 'text-gray-600' } as const;
+  const baseActivities = (realActivities ?? []).map((a) => ({
+    type: a.kind,
+    icon: KIND_ICON[a.kind],
+    title: a.title,
+    description: a.description,
+    time: a.time,
+    color: KIND_COLOR[a.kind]
+  }));
 
   // Merge AI alerts with regular activities
   const recentActivities = [
@@ -126,7 +129,7 @@ const RecentActivity: React.FC = () => {
           </h3>
           <button 
             className={`flex items-center space-x-1 text-sm ${isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} transition-colors`}
-            onClick={() => console.log('Navigate to deals')}
+            onClick={handleViewAllDeals}
           >
             <span>View All</span>
             <ArrowRight size={14} />
@@ -142,7 +145,7 @@ const RecentActivity: React.FC = () => {
               <div 
                 key={deal.id} 
                 className={`flex items-center justify-between p-4 ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50/80 hover:bg-gray-100/80'} rounded-xl transition-colors cursor-pointer`}
-                onClick={() => console.log(`Navigate to deal ${deal.id}`)}
+                onClick={() => handleDealClick(String(deal.id))}
               >
                 <div className="flex items-center space-x-3">
                   {contact && (
@@ -196,13 +199,16 @@ const RecentActivity: React.FC = () => {
             )}
           </h3>
           <div className="flex items-center space-x-2">
-            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>24 completed</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{completedCount} completed</span>
             <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>•</span>
-            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>8 pending</span>
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{pendingCount} pending</span>
             {isLoadingAI && <Loader2 className="w-4 h-4 animate-spin text-purple-500" />}
           </div>
         </div>
         
+        {realActivities !== null && recentActivities.length === 0 && (
+          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No activity yet. Emails, calls, meetings, notes and deal changes will show up here.</p>
+        )}
         <div className="space-y-4">
           {recentActivities.map((activity, index) => {
             const Icon = activity.icon;

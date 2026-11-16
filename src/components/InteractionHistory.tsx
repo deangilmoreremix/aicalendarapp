@@ -1,94 +1,32 @@
 import { initialsAvatar } from '../utils/avatars';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useDealStore } from '../store/dealStore';
+import { useContactStore } from '../store/contactStore';
+import { useOpenRecordStore } from '../store/openRecordStore';
+import { interactionsFromDeals } from '../lib/home/homeData';
 import { MoreHorizontal, ArrowRight } from 'lucide-react';
 
-const interactions = [
-  {
-    id: 1,
-    type: 'Royal Package Opportunity',
-    value: '11,250$',
-    date: 'Oct 12',
-    status: 'active',
-    bgColor: 'bg-blue-500',
-    textColor: 'text-white',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  },
-  {
-    id: 2,
-    type: 'Third Deal Most Useful',
-    value: '21,300$',
-    date: 'Oct 9',
-    status: 'success',
-    bgColor: 'bg-teal-500',
-    textColor: 'text-white',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  },
-  {
-    id: 3,
-    type: 'Absolute Success Deal',
-    value: '2,100$',
-    date: 'Oct 12',
-    status: 'pending',
-    bgColor: 'bg-black',
-    textColor: 'text-white',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  },
-  {
-    id: 4,
-    type: 'Royal Package Opportunity',
-    value: '4,160$',
-    date: 'Oct 11',
-    status: 'warning',
-    bgColor: 'bg-yellow-400',
-    textColor: 'text-black',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  },
-  {
-    id: 5,
-    type: 'Adaptive Business Services',
-    value: '3,140$',
-    date: 'Oct 7',
-    status: 'success',
-    bgColor: 'bg-gray-300',
-    textColor: 'text-black',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  },
-  {
-    id: 6,
-    type: 'Second deal Common Service',
-    value: '12,350$',
-    date: 'Oct 5',
-    status: 'active',
-    bgColor: 'bg-gray-300',
-    textColor: 'text-black',
-    participants: [
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member'),
-      initialsAvatar('Team Member')
-    ]
-  }
-];
+const STATUS_STYLE = {
+  active: { bgColor: 'bg-blue-500', textColor: 'text-white' },
+  success: { bgColor: 'bg-teal-500', textColor: 'text-white' },
+  pending: { bgColor: 'bg-amber-600', textColor: 'text-white' }
+} as const;
 
 export const InteractionHistory: React.FC = () => {
+  const deals = useDealStore((st) => st.deals);
+  const contacts = useContactStore((st) => st.contacts);
+  const openRecord = useOpenRecordStore((st) => st.open);
+  useEffect(() => {
+    if (Object.keys(useDealStore.getState().deals).length === 0) void useDealStore.getState().loadDeals();
+  }, []);
+  // the latest deals, with the deal's contact as participant
+  const interactions = interactionsFromDeals(Object.values(deals), contacts).map((c) => ({
+    ...c,
+    ...STATUS_STYLE[c.status],
+    type: c.title,
+    participants: c.people.map((name) => initialsAvatar(name))
+  }));
+
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-6">
@@ -103,10 +41,15 @@ export const InteractionHistory: React.FC = () => {
         </div>
       </div>
       
+      {interactions.length === 0 && <p className="text-sm text-gray-500">No deals yet. Your latest deals will show up here.</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {interactions.map((interaction) => (
           <div 
             key={interaction.id} 
+            role="button"
+            tabIndex={0}
+            onClick={() => openRecord('deal', interaction.id)}
+            onKeyDown={(e) => e.key === 'Enter' && openRecord('deal', interaction.id)}
             className={`
               ${interaction.bgColor} ${interaction.textColor} 
               rounded-2xl p-5 hover:scale-105 transition-all duration-300 cursor-pointer

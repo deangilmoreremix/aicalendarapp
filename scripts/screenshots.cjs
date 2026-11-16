@@ -338,6 +338,17 @@ const linkedEvents = () => ({
   await page.getByRole('tab', { name: 'Deals' }).click(); await wait(600);
   await shot('47-table-view-deals');
 
+  // ---------------- 4i. Real data on the home screen ----------------
+  await open();
+  await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);
+  await shot('49-home-stats-real-trends');
+  await page.locator('h3:has-text("Recent Activity")').scrollIntoViewIfNeeded(); await wait(500);
+  await shot('50-home-recent-activity-and-deals');
+  await page.locator('h3:has-text("Tasks Schedule")').scrollIntoViewIfNeeded(); await wait(500);
+  await shot('51-home-tasks-schedule-and-funnel');
+  await page.locator('h2:has-text("Interaction History")').scrollIntoViewIfNeeded(); await wait(500);
+  await shot('52-home-interaction-history');
+
   // ---------------- 5. Delete mock data ----------------
   await open();
   await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);
