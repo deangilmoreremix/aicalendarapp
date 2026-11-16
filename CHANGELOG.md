@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calendar: ported Twenty's calendar timeline (utils/tests verbatim, UI logic in our design), event composer, per-event visibility, Calendar tab on contacts, Supabase timeline RPC.
 - Unified CRM calendar: tasks, deals, contacts (new follow-up date) and events on `BigTaskCalendar`; drag-and-drop date changes persisted through the existing services; filters, saved views (`calendar_views`), right-click menu (edit / duplicate / reschedule / delete), record selection, embedded task widgets in contacts and deals, task-to-record linking. Upstream Twenty `record-calendar` / `record-drag` utilities are used for ranges, week titles and date shifting.
 - Fixed: `tasks.start_time/end_time` had no columns (time-blocked tasks were dropped / updates failed), calendar events had no read API, calendar toolbar navigation (Today, per-view Prev/Next), linked-event lookup in `TaskDetailsModal`.
+- Twenty-style CRM features (no design change): task rows with due chips, favorites, calendar polish (empty-day chooser, preview, week numbers), notes, typed timeline, command menu (Ctrl/Cmd+K), advanced filter rules, table view with saved views and bulk actions, file attachments, compact/full detail layouts, within-day position reordering, calendar event editing, "Delete mock data" for sample-flagged rows.
+- Home screen now uses real data (trends, recent activity, schedule, funnel, latest deals); leftover fake AI paths replaced by real calls.
+- Accessibility: every select/checkbox/icon button named, nested interactives removed, `<main>` landmark; axe sweep in `scripts/axe-audit.cjs`.
+- Lint: 0 errors (`no-explicit-any` is a warning, off in tests). Removed unused `react-router-dom` (prod `npm audit`: 0).
+- Migrations added: `20251231` calendar access, `20260101` is_sample, `20260102` record position, `20260103` favorites, `20260104` record_views, `20260105` attachments (+ private `attachments` bucket).
 - See `DEPLOY.md` for deployment.
 
 ## [Earlier] - 2026-04-27
