@@ -33,6 +33,8 @@ const db = {
   ],
   contacts: [
     { id: 'c1', first_name: 'Ada', last_name: 'Lovelace', name: 'Ada Lovelace', email: 'ada@techcorp.io', phone: '+1 555 0100', title: 'CTO', company: 'TechCorp Solutions', industry: 'Technology', sources: ['Website'], interest_level: 'hot', status: 'prospect', tags: ['vip', 'enterprise'], is_favorite: true, ai_score: 82, created_at: iso(now), updated_at: iso(now), next_follow_up: ymd(at(D + 3)), social_profiles: { linkedin: 'https://linkedin.com/in/ada' }, custom_fields: {} },
+    { id: 'c3', first_name: 'Alan', last_name: 'Turing', name: 'Alan Turing', email: 'alan@bletchley.uk', phone: '', title: 'Researcher', company: 'Bletchley', industry: 'Research', sources: [], interest_level: 'warm', status: 'customer', tags: ['vip'], is_favorite: false, ai_score: 91, created_at: iso(now), updated_at: iso(now), next_follow_up: ymd(at(D + 8)), social_profiles: {}, custom_fields: {} },
+    { id: 'c4', first_name: 'Katherine', last_name: 'Johnson', name: 'Katherine Johnson', email: 'kj@nasa.gov', phone: '', title: 'Mathematician', company: 'NASA', industry: 'Aerospace', sources: [], interest_level: 'cold', status: 'lead', tags: [], is_favorite: false, ai_score: 38, created_at: iso(now), updated_at: iso(now), social_profiles: {}, custom_fields: {} },
     { id: 'c2', first_name: 'Grace', last_name: 'Hopper', name: 'Grace Hopper', email: 'grace@globex.com', phone: '+1 555 0111', title: 'VP Engineering', company: 'Globex', industry: 'Software', sources: ['Referral'], interest_level: 'medium', status: 'lead', tags: [], is_favorite: false, ai_score: 64, created_at: iso(now), updated_at: iso(now), next_follow_up: ymd(at(D + 6)), social_profiles: {}, custom_fields: {} }
   ],
   calendar_events: [
@@ -46,6 +48,7 @@ const db = {
     { id: 'n2', type: 'note_added', title: 'Met at the conference', description: 'Met at the *SaaS summit*. Interested in the enterprise plan.', user_id: 'u1', user_name: 'You', entity_type: 'contact', entity_id: 'c1', created_at: iso(new Date(now.getFullYear(), now.getMonth() - 1, 20, 14)), metadata: {} },
     { id: 'a3', type: 'deal_moved', title: 'Moved to Negotiation', description: '', user_id: 'u1', user_name: 'Sam Lee', entity_type: 'deal', entity_id: 'd1', created_at: iso(at(Math.max(1, D - 1), 11)) }
   ],
+  record_views: [],
   calendar_views: [{ id: 'v1', name: 'Sales pipeline', calendar_layout: 'MONTH', field_by_type: {}, filters: {}, visible_types: ['deal', 'contact', 'event'], position: 0, is_default: false }],
   calendar_settings: [], calendar_event_participants: [], calendar_event_targets: []
 };
@@ -300,6 +303,34 @@ const linkedEvents = () => ({
   await page.getByRole('combobox', { name: 'Search records and commands' }).fill('tech'); await wait(500);
   await shot('42-command-menu-search');
   await page.keyboard.press('Escape'); await wait(300);
+
+  // ---------------- 4h. Group D: advanced filters + table view ----------------
+  await open();
+  await page.getByRole('button', { name: /filter calendar/i }).click(); await wait(400);
+  await page.getByRole('button', { name: /Add rule/ }).click(); await wait(200);
+  await page.getByLabel('Rule 1 field').selectOption('title');
+  await page.getByLabel('Rule 1 operator').selectOption('contains');
+  await page.getByLabel('Rule 1 value').fill('tech'); await wait(400);
+  await calendarBlock('43-calendar-advanced-rules');
+  await page.keyboard.press('Escape'); await page.mouse.click(5, 5); await wait(200);
+
+  await open();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByTitle('Table View').click(); await wait(1000);
+  await page.getByRole('tab', { name: 'Contacts' }).scrollIntoViewIfNeeded(); await wait(300);
+  await shot('44-table-view-contacts');
+  await page.getByRole('button', { name: /AI score/ }).click(); await page.getByRole('button', { name: /AI score/ }).click(); await wait(300);
+  await page.getByRole('button', { name: 'Filter table' }).click(); await wait(300);
+  await page.getByRole('button', { name: /Add rule/ }).click(); await wait(200);
+  await page.getByLabel('Rule 1 field').selectOption('aiScore');
+  await page.getByLabel('Rule 1 operator').selectOption('gt');
+  await page.getByLabel('Rule 1 value').fill('50'); await wait(400);
+  await shot('45-table-filter-rules-and-sort');
+  await page.mouse.click(5, 5); await wait(200);
+  await page.getByLabel('Select Ada Lovelace').check(); await page.getByLabel('Select Alan Turing').check(); await wait(300);
+  await shot('46-table-bulk-actions');
+  await page.getByRole('tab', { name: 'Deals' }).click(); await wait(600);
+  await shot('47-table-view-deals');
 
   // ---------------- 5. Delete mock data ----------------
   await open();

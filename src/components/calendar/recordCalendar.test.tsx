@@ -245,6 +245,16 @@ describe('RecordContextMenu', () => {
   });
 });
 
+describe('calendar advanced rules', () => {
+  const recs = () => buildUnifiedRecords({ tasks: [task({ id: 'a', title: 'Alpha plan' }), task({ id: 'b', title: 'Beta plan' })], deals: [], contacts: [], events: [] });
+  it('applies rules with operators on top of the simple filters, and old saved filters still work', () => {
+    const advanced = { op: 'and' as const, rules: [{ id: '1', field: 'title', operand: 'starts_with' as const, value: 'beta' }] };
+    expect(recs().length).toBeGreaterThan(1);
+    expect(buildUnifiedRecords({ tasks: [task({ id: 'a', title: 'Alpha plan' }), task({ id: 'b', title: 'Beta plan' })], deals: [], contacts: [], events: [], filters: { advanced } }).map((r) => r.id)).toEqual(['b']);
+    expect(buildUnifiedRecords({ tasks: [task({ id: 'a', title: 'Alpha plan' })], deals: [], contacts: [], events: [], filters: { statuses: ['pending'] } })).toHaveLength(1);
+  });
+});
+
 describe('CalendarFiltersMenu', () => {
   it('toggles record types, statuses and the date field', () => {
     const onFiltersChange = vi.fn();

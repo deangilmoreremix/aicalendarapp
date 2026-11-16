@@ -838,6 +838,8 @@ export interface CalendarViewFilters {
   dueDateRange?: { from?: string; to?: string };
   searchTerm?: string;
   favoritesOnly?: boolean;
+  /** advanced rules with operators (optional, so older saved views keep working) */
+  advanced?: import('../lib/recordFilters/types').FilterGroup;
 }
 
 export interface CalendarView {
@@ -946,5 +948,60 @@ export const sampleDataApi = {
       ids[key] = (data ?? []).map((r: { id: string }) => r.id);
     }
     return ids;
+  }
+};
+
+// Saved table views (Contacts / Deals / Tasks), same pattern as calendar views.
+export type RecordObjectType = 'contact' | 'deal' | 'task';
+export interface RecordView {
+  id: string;
+  name: string;
+  objectType: RecordObjectType;
+  filters: import('../lib/recordFilters/types').FilterGroup;
+  sort: { key?: string; dir?: 'asc' | 'desc' };
+  columns: string[];
+  position: number;
+}
+
+interface RecordViewDB {
+  id: string;
+  name: string;
+  object_type: RecordObjectType;
+  filters: RecordView['filters'] | null;
+  sort: RecordView['sort'] | null;
+  columns: string[] | null;
+  position: number;
+}
+
+export const mapRecordViewFromDB = (v: RecordViewDB): RecordView => ({
+  id: v.id,
+  name: v.name,
+  objectType: v.object_type,
+  filters: v.filters ?? { op: 'and', rules: [] },
+  sort: v.sort ?? {},
+  columns: v.columns ?? [],
+  position: v.position
+});
+
+export const recordViewApi = {
+  async getAll(objectType: RecordObjectType): Promise<RecordView[]> {
+    const { data, error } = await supabase.from('record_views').select('*').eq('object_type', objectType).order('position').order('created_at');
+    if (error) throw error;
+    return (data ?? []).map(mapRecordViewFromDB);
+  },
+
+  async create(view: Omit<RecordView, 'id' | 'position'>): Promise<RecordView> {
+    const { data, error } = await supabase
+      .from('record_views')
+      .insert({ name: view.name, object_type: view.objectType, filters: view.filters, sort: view.sort, columns: view.columns, position: 0 })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapRecordViewFromDB(data);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('record_views').delete().eq('id', id);
+    if (error) throw error;
   }
 };

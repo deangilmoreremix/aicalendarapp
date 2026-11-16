@@ -11,6 +11,8 @@ import { Temporal } from 'temporal-polyfill';
 
 import type { CalendarEvent, Contact, Deal, Task } from '../../types';
 import type { CalendarRecordType, CalendarViewFilters } from '../../services/api';
+import { filterRecords } from '../../lib/recordFilters/match';
+import { FIELD_MAPS } from '../../lib/recordFilters/fields';
 import type { ObjectRecord } from '../../vendor/twenty/record-calendar/shared/ObjectRecord';
 import { getShiftedRecordCalendarDateUpdateInput } from '../../vendor/twenty/record-calendar/drag/getShiftedRecordCalendarDateUpdateInput';
 import { getShiftedRecordCalendarDateTimeUpdateInput } from '../../vendor/twenty/record-calendar/drag/getShiftedRecordCalendarDateTimeUpdateInput';
@@ -221,6 +223,7 @@ export const applyRecordFilters = (records: UnifiedCalendarRecord[], filters: Ca
     const to = filters.dueDateRange.to ? new Date(`${filters.dueDateRange.to}T23:59:59`) : undefined;
     result = result.filter((r) => (!from || r.start >= from) && (!to || r.start <= to));
   }
+  if (filters.advanced?.rules.length) result = filterRecords(result, filters.advanced, FIELD_MAPS.calendar);
   if (filters.favoritesOnly) result = result.filter((r) => r.isFavorite);
   if (filters.searchTerm) {
     const term = filters.searchTerm.toLowerCase();

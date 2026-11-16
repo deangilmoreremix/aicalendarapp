@@ -10,6 +10,9 @@ import { MenuPanel } from './MenuPanel';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import type { CalendarViewFilters } from '../../services/api';
 import { ALL_RECORD_TYPES, DATE_FIELD_OPTIONS, DEFAULT_FIELD_BY_TYPE, type UnifiedRecordType } from './unifiedCalendarRecords';
+import { FilterBuilder } from '../filters/FilterBuilder';
+import { CALENDAR_FIELDS } from '../../lib/recordFilters/fields';
+import { emptyGroup } from '../../lib/recordFilters/types';
 
 const TYPE_LABELS: Record<UnifiedRecordType, string> = { task: 'Tasks', deal: 'Deals', contact: 'Contacts', event: 'Events' };
 
@@ -45,6 +48,7 @@ export const CalendarFiltersMenu = ({
     (filters.assigneeIds?.length ?? 0) +
     (filters.dueDateRange?.from || filters.dueDateRange?.to ? 1 : 0) +
     (filters.favoritesOnly ? 1 : 0) +
+    (filters.advanced?.rules.length ?? 0) +
     (ALL_RECORD_TYPES.length - visibleTypes.length);
 
   return (
@@ -113,6 +117,15 @@ export const CalendarFiltersMenu = ({
             />
             Favorites only
           </label>
+
+          <fieldset>
+            <legend className="mb-1 font-medium text-gray-900 dark:text-gray-100">Advanced rules</legend>
+            <FilterBuilder
+              fields={CALENDAR_FIELDS}
+              value={filters.advanced ?? emptyGroup()}
+              onChange={(next) => onFiltersChange({ ...filters, advanced: next.rules.length ? next : undefined })}
+            />
+          </fieldset>
 
           <fieldset>
             <legend className="mb-1 font-medium text-gray-900 dark:text-gray-100">Date range</legend>

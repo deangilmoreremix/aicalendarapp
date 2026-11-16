@@ -24,7 +24,7 @@ import {
   type SearchableType
 } from '../lib/commandMenu/searchRecords';
 
-export type AppView = 'calendar' | 'kanban' | 'list' | 'activity';
+export type AppView = 'calendar' | 'kanban' | 'list' | 'activity' | 'table';
 
 const ICON: Record<SearchableType, React.ComponentType<{ className?: string }>> = {
   task: ListChecks,
@@ -113,6 +113,7 @@ export const CommandMenu = ({
       { id: 'go-calendar', label: 'Go to Calendar', keywords: 'view month week', run: go(() => onNavigate('calendar')) },
       { id: 'go-kanban', label: 'Go to Kanban board', keywords: 'view columns', run: go(() => onNavigate('kanban')) },
       { id: 'go-list', label: 'Go to Task list', keywords: 'view all tasks', run: go(() => onNavigate('list')) },
+      { id: 'go-table', label: 'Go to Table view', keywords: 'view contacts deals tasks grid records', run: go(() => onNavigate('table')) },
       { id: 'go-activity', label: 'Go to Activity feed', keywords: 'view history', run: go(() => onNavigate('activity')) },
       { id: 'theme', label: 'Toggle dark mode', keywords: 'theme light dark', run: go(toggleTheme) },
       { id: 'settings', label: 'Open calendar settings', keywords: 'preferences visibility', run: go(onOpenSettings) },

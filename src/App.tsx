@@ -1,5 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
-import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings } from 'lucide-react';
+import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings, Table2 } from 'lucide-react';
 
 // Lazy load heavy components
 const BigTaskCalendar = lazy(() => import('./components/BigTaskCalendar').then(module => ({ default: module.BigTaskCalendar })));
@@ -23,6 +23,7 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { RecordTable } from './components/table/RecordTable';
 import { CommandMenu, CommandMenuButton } from './components/CommandMenu';
 import { FavoritesPanel } from './components/FavoritesPanel';
 import { OpenRecordHost } from './components/OpenRecordHost';
@@ -35,9 +36,9 @@ const App: React.FC = () => {
   const { insights, generateInsights } = useAI();
   const { tasks, markTaskComplete, loadInitialData } = useTaskStore();
   const { contacts, loadContacts } = useContactStore();
-  const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity'>('calendar');
+  const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity' | 'table'>('calendar');
 
-  const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity') => {
+  const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity' | 'table') => {
     setView(newView);
   };
   const [showAIInsights, setShowAIInsights] = useState(false);
@@ -232,6 +233,8 @@ const App: React.FC = () => {
               return <ActivityFeed />;
             case 'list':
               return <TaskListView />;
+            case 'table':
+              return <RecordTable />;
             default:
               return <BigTaskCalendar />;
           }
@@ -364,6 +367,20 @@ const App: React.FC = () => {
                 title="Activity Feed"
               >
                 <Activity size={18} />
+              </button>
+              <button
+                onClick={() => handleViewChange('table')}
+                className={`p-2 rounded-lg transition-colors ${
+                  view === 'table'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
+                      : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                title="Table View"
+                aria-label="Table view"
+              >
+                <Table2 size={18} />
               </button>
             </div>
           </div>
