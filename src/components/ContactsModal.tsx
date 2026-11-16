@@ -9,6 +9,7 @@ import { Contact } from '../types';
 import { AIEnhancedContactCard } from './contacts/AIEnhancedContactCard';
 import { DarkModeToggle } from './ui/DarkModeToggle';
 import Fuse from 'fuse.js';
+import { aiApi } from '../services/api';
 import { X, Search, Filter, Plus, Users, ChevronDown, Brain, Download, Upload, Zap, CheckCheck, Grid3X3, List, Target, Sparkles, AlertCircle, CheckCircle, Loader2, TrendingUp, Award } from 'lucide-react';
 
 interface ContactsModalProps {
@@ -201,11 +202,9 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const handleAnalyzeContact = async (contact: Contact) => {
     setAnalyzingContactIds(prev => [...prev, contact.id]);
     try {
-      // This will be handled by the contact card's internal AI logic now
-      // We'll keep this for compatibility but the real work happens in AIEnhancedContactCard
-      await updateContact(contact.id, { 
-        aiScore: contact.aiScore || Math.floor(Math.random() * 40) + 60 // Placeholder - real scoring happens in card
-      });
+      // Real AI score from the contacts_score function (cached per contact for a few minutes)
+      const { score } = await aiApi.scoreContact(contact);
+      await updateContact(contact.id, { aiScore: score });
       return true;
     } catch (error) {
       console.error('Analysis failed:', error);

@@ -36,6 +36,7 @@ const ContactEmailPanel = (_props: { contact: Contact }) => (
   </div>
 );
 import { Contact } from '../types';
+import { aiApi } from '../services/api';
 import { LayoutToggle } from './ui/LayoutToggle';
 import { RecordNotes } from './contacts/RecordNotes';
 import { RecordAttachments } from './contacts/RecordAttachments';
@@ -350,9 +351,8 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   const handleAnalyzeContact = async () => {
     setIsAnalyzing(true);
     try {
-      // Simulate AI analysis
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const newScore = Math.floor(Math.random() * 40) + 60; // Random score between 60-100
+      // Real AI score from the contacts_score function
+      const { score: newScore } = await aiApi.scoreContact(editedContact);
       const updatedContact = { ...editedContact, aiScore: newScore };
       setEditedContact(updatedContact);
       

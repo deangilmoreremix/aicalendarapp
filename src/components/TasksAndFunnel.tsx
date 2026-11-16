@@ -288,7 +288,7 @@ export const TasksAndFunnel: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${funnelData.map((stage, index) => {
+                        ${funnelData.map((stage) => {
                           const percentage = stage.width;
                           return `
                             <tr>

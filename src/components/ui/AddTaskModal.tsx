@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './badge';
 import { useContactStore } from '../../store/contactStore';
 import { useTaskStore } from '../../store/taskStore';
+import { aiApi } from '../../services/api';
 import { UniversalAIAssistant } from './UniversalAIAssistant';
 import { X, Plus, Tag, Loader2, Sparkles } from 'lucide-react';
 
@@ -132,30 +133,14 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     setAiWritingLoading(field);
 
     try {
-      // Simulate AI writing assistance
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      let aiSuggestion = '';
-
-      if (field === 'title') {
-        const titlePrompts = [
-          'Schedule client discovery call for Q4 planning',
-          'Prepare project proposal presentation',
-          'Follow up on outstanding invoice payment',
-          'Review and update team performance metrics',
-          'Organize quarterly business review meeting'
-        ];
-        aiSuggestion = titlePrompts[Math.floor(Math.random() * titlePrompts.length)];
-      } else {
-        const descPrompts = [
-          'Conduct a comprehensive discovery call to understand client needs, pain points, and goals for Q4. Prepare agenda covering current challenges, future objectives, and potential solutions.',
-          'Create a compelling project proposal presentation highlighting our unique value proposition, implementation timeline, and expected ROI. Include case studies and testimonials.',
-          'Follow up on the outstanding invoice from the recent project delivery. Review payment terms, send friendly reminder, and explore any potential issues preventing payment.',
-          'Review team performance metrics for the current quarter, identify areas for improvement, and develop action plans for enhancing productivity and achieving targets.',
-          'Organize a comprehensive quarterly business review meeting with key stakeholders to discuss progress, challenges, and strategic direction for the next quarter.'
-        ];
-        aiSuggestion = descPrompts[Math.floor(Math.random() * descPrompts.length)];
-      }
+      // Real suggestion from the generate_task_suggestions function, based on what is already typed
+      const seed = (field === 'description' ? formData.title : formData.title || formData.description).trim();
+      const prompt = seed
+        ? `Suggest a ${field} for this task: ${seed}`
+        : 'Suggest a useful follow-up task for a sales team';
+      const [suggestion] = await aiApi.generateTaskSuggestions(prompt);
+      const aiSuggestion = field === 'title' ? suggestion?.title : suggestion?.description;
+      if (!aiSuggestion) throw new Error('The AI returned no suggestion');
 
       setFormData(prev => ({
         ...prev,
