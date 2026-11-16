@@ -6,19 +6,15 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AIProvider } from './contexts/AIContext';
 
 // Mock the stores
+// Stores are read both as `useStore()` and with selectors (`useStore(s => s.x)`), so the mocks support both.
+const taskState = { tasks: {}, calendarEvents: [], markTaskComplete: vi.fn(), loadInitialData: vi.fn(), rescheduleTask: vi.fn() };
 vi.mock('./store/taskStore', () => ({
-  useTaskStore: () => ({
-    tasks: {},
-    markTaskComplete: vi.fn(),
-    loadInitialData: vi.fn(),
-  }),
+  useTaskStore: Object.assign((selector?: (s: any) => any) => (selector ? selector(taskState) : taskState), { getState: () => taskState }),
 }));
 
+const contactState = { contacts: {}, loadContacts: vi.fn(), updateContact: vi.fn() };
 vi.mock('./store/contactStore', () => ({
-  useContactStore: () => ({
-    contacts: {},
-    loadContacts: vi.fn(),
-  }),
+  useContactStore: Object.assign((selector?: (s: any) => any) => (selector ? selector(contactState) : contactState), { getState: () => contactState }),
 }));
 
 // Mock the components to avoid complex dependencies
