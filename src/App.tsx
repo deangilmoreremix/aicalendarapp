@@ -268,14 +268,16 @@ const App: React.FC = () => {
             {/* Delete Mock Data Button */}
             <button
               onClick={() => setShowDeleteMockDataDialog(true)}
-              className={`p-2 rounded-xl transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 isDark
                   ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30 border border-red-500/20'
                   : 'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm border border-red-200'
               }`}
-              title="Delete All Mock Data"
+              title="Delete sample data (your own records are kept)"
+              aria-label="Delete mock data"
             >
               <Trash2 size={18} />
+              <span className="hidden sm:inline">Delete mock data</span>
             </button>
 
             {/* Settings Button */}

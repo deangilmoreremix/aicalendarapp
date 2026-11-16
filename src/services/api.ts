@@ -875,3 +875,39 @@ export const calendarViewApi = {
     if (error) throw error;
   }
 };
+
+// Sample ("mock") data: rows flagged is_sample = true (migration 20260101000000). The delete button removes exactly those.
+export type SampleDataCounts = { tasks: number; calendarEvents: number; activities: number; contacts: number; deals: number };
+export type SampleDataIds = { [K in keyof SampleDataCounts]: string[] };
+
+// children before parents, so foreign keys never block a delete
+const SAMPLE_TABLES: [keyof SampleDataCounts, string][] = [
+  ['tasks', 'tasks'],
+  ['calendarEvents', 'calendar_events'],
+  ['activities', 'activities'],
+  ['deals', 'deals'],
+  ['contacts', 'contacts']
+];
+
+export const sampleDataApi = {
+  async count(): Promise<SampleDataCounts> {
+    const counts: SampleDataCounts = { tasks: 0, calendarEvents: 0, activities: 0, contacts: 0, deals: 0 };
+    for (const [key, table] of SAMPLE_TABLES) {
+      const { count, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq('is_sample', true);
+      if (error) throw error;
+      counts[key] = count ?? 0;
+    }
+    return counts;
+  },
+
+  /** Deletes every row flagged is_sample and returns the ids removed per table. Unflagged rows are never touched. */
+  async deleteAll(): Promise<SampleDataIds> {
+    const ids: SampleDataIds = { tasks: [], calendarEvents: [], activities: [], contacts: [], deals: [] };
+    for (const [key, table] of SAMPLE_TABLES) {
+      const { data, error } = await supabase.from(table).delete().eq('is_sample', true).select('id');
+      if (error) throw error;
+      ids[key] = (data ?? []).map((r: { id: string }) => r.id);
+    }
+    return ids;
+  }
+};

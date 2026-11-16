@@ -62,7 +62,7 @@ const linkedEvents = () => ({
   const page = await ctx.newPage();
   await page.route('http://127.0.0.1:54321/**', async (route) => {
     const req = route.request(); const url = new URL(req.url()); const table = url.pathname.split('/').pop(); const method = req.method();
-    const headers = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    const headers = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-expose-headers': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (url.pathname.includes('/functions/v1/')) {
       const out = {
@@ -80,6 +80,10 @@ const linkedEvents = () => ({
     const rows = db[table]; const single = (req.headers()['accept'] || '').includes('vnd.pgrst.object');
     if (!rows) return route.fulfill({ status: 404, headers, body: '{}' });
     const idq = (url.searchParams.get('id') || '').replace('eq.', '');
+    if ((method === 'GET' || method === 'HEAD') && url.searchParams.get('is_sample')) { // sample-data counts for the delete dialog
+      const n = { tasks: 2, contacts: 1, deals: 1 }[table] ?? 0;
+      return route.fulfill({ status: 200, headers: { ...headers, 'content-range': n ? `0-${n - 1}/${n}` : '*/0' }, body: method === 'HEAD' ? '' : '[]' });
+    }
     if (method === 'GET') return route.fulfill({ status: 200, headers, body: JSON.stringify(idq ? rows.filter((r) => r.id === idq) : rows) });
     if (method === 'POST') { const b = JSON.parse(req.postData() || '[]'); const list = (Array.isArray(b) ? b : [b]).map((x) => ({ id: `n${++seq}`, created_at: iso(new Date()), updated_at: iso(new Date()), ...x })); rows.push(...list); return route.fulfill({ status: 201, headers, body: JSON.stringify(single ? list[0] : list) }); }
     if (method === 'PATCH') { const row = rows.find((r) => r.id === idq); if (row) Object.assign(row, JSON.parse(req.postData() || '{}')); return route.fulfill({ status: 200, headers, body: JSON.stringify(single ? row : [row]) }); }
@@ -210,6 +214,14 @@ const linkedEvents = () => ({
   await page.getByText('New Contact').first().click(); await wait(700);
   await page.getByPlaceholder('Enter first name').fill('Katherine'); await page.getByPlaceholder('Enter last name').fill('Johnson'); await page.getByPlaceholder('Enter email address').fill('katherine@nasa.gov'); await wait(300);
   await shot('24-new-contact-ai-autofill-and-avatar');
+  await page.keyboard.press('Escape'); await wait(300);
+
+  // ---------------- 5. Delete mock data ----------------
+  await open();
+  await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);
+  await page.screenshot({ path: path.join(OUT, '25-delete-mock-data-button.png'), clip: { x: 0, y: 0, width: 1440, height: 200 } }); console.log('saved 25-delete-mock-data-button');
+  await page.getByRole('button', { name: 'Delete mock data' }).click(); await wait(900);
+  await shot('26-delete-mock-data-dialog');
   await page.keyboard.press('Escape'); await wait(300);
 
   await browser.close();

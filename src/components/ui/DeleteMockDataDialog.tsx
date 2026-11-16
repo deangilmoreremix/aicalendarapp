@@ -23,6 +23,24 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [deletedStats, setDeletedStats] = useState<MockDataStats | null>(null);
+  const [stats, setStats] = useState<MockDataStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Count the flagged sample rows each time the dialog opens
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoadingStats(true);
+    setError(null);
+    MockDataService.fetchMockDataStats()
+      .then((s) => !cancelled && setStats(s))
+      .catch(() => !cancelled && setError('Could not check for sample data. Please try again.'))
+      .finally(() => !cancelled && setLoadingStats(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   // Escape closes the dialog
   useEffect(() => {
@@ -34,9 +52,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
 
   if (!isOpen) return null;
 
-  const stats = MockDataService.getMockDataStats();
-  const hasData = MockDataService.hasMockData();
-  const deletionSummary = MockDataService.getDeletionSummary();
+  const hasData = MockDataService.hasMockData(stats);
 
   const handleDeleteAll = async () => {
     if (!hasData) return;
@@ -52,8 +68,9 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
       setTimeout(() => {
         handleClose();
       }, 3000);
-    } catch (error) {
-      console.error('Failed to delete mock data:', error);
+    } catch (err) {
+      console.error('Failed to delete mock data:', err);
+      setError('Could not delete the sample data. Nothing was removed. Please try again.');
       setIsDeleting(false);
     }
   };
@@ -61,6 +78,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
   const handleClose = () => {
     setIsDeleting(false);
     setIsSuccess(false);
+    setError(null);
     setDeletedStats(null);
     onClose();
   };
@@ -70,7 +88,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl p-8 max-w-md w-full text-center shadow-2xl">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-green-900 mb-2">Mock Data Cleared!</h3>
+          <h3 className="text-2xl font-bold text-green-900 mb-2">Sample Data Deleted!</h3>
           <p className="text-green-700 mb-4">
             Successfully deleted {deletedStats.total} items from your app.
           </p>
@@ -100,8 +118,8 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Clear Displayed Data</h2>
-              <p className="text-sm text-gray-600">Clears this screen only; saved data is not deleted</p>
+              <h2 className="text-xl font-semibold text-gray-900">Delete Sample Data</h2>
+              <p className="text-sm text-gray-600">Deletes sample data only; your own records are kept</p>
             </div>
           </div>
           <button
@@ -115,19 +133,25 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
 
         {/* Content */}
         <div className="p-6">
-          {!hasData ? (
+          {loadingStats ? (
+            <div className="flex items-center justify-center py-8 text-gray-600" role="status">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Checking for sample data…
+            </div>
+          ) : error && !stats ? (
+            <p className="text-sm text-red-700 py-4" role="alert">{error}</p>
+          ) : !hasData || !stats ? (
             <div className="text-center py-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Mock Data Found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Sample Data Found</h3>
               <p className="text-gray-600">
-                Your app is already clean! No mock data to delete.
+                No records are flagged as sample data, so there is nothing to delete. Your own data is never touched.
               </p>
             </div>
           ) : (
             <>
               <div className="mb-6">
                 <p className="text-gray-700 mb-4">
-                  This clears the data currently loaded in the app. Data saved in your database is not deleted and will load again after a refresh. This includes:
+                  This permanently deletes the records flagged as sample data, from your database and from this screen. Your own (unflagged) records are not touched. This includes:
                 </p>
 
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -176,13 +200,16 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
                 </div>
               </div>
 
+              {error && (
+                <p className="text-sm text-red-700 mb-4" role="alert">{error}</p>
+              )}
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                 <div className="flex items-start space-x-3">
                   <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                   <div>
                     <h4 className="text-sm font-medium text-red-900 mb-1">Warning</h4>
                     <p className="text-sm text-red-700">
-                      This only clears what is loaded on screen. Reload the app to see your saved data again.
+                      This cannot be undone. Only records flagged as sample data are deleted.
                     </p>
                   </div>
                 </div>
@@ -222,7 +249,7 @@ export const DeleteMockDataDialog: React.FC<DeleteMockDataDialogProps> = ({
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4" />
-                    <span>Delete All Data</span>
+                    <span>Delete Sample Data</span>
                   </>
                 )}
               </ModernButton>

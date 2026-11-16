@@ -93,10 +93,10 @@ describe('App Component - Button Functionality', () => {
   test('delete mock data button exists and has onClick handler', () => {
     renderApp();
 
-    const deleteButton = screen.getByTitle('Delete All Mock Data');
+    const deleteButton = screen.getByRole('button', { name: 'Delete mock data' });
     expect(deleteButton).toBeInTheDocument();
     expect(deleteButton.tagName).toBe('BUTTON');
-    expect(deleteButton).toHaveAttribute('title', 'Delete All Mock Data');
+    expect(deleteButton).toHaveTextContent('Delete mock data'); // visible text label, not just an icon
   });
 
   test('theme toggle button exists and has onClick handler', () => {
@@ -195,7 +195,7 @@ describe('App Component - Button Functionality', () => {
   test('buttons are keyboard accessible', () => {
     renderApp();
 
-    const deleteButton = screen.getByTitle('Delete All Mock Data');
+    const deleteButton = screen.getByRole('button', { name: 'Delete mock data' });
 
     // Focus the button
     deleteButton.focus();

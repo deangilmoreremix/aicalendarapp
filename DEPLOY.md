@@ -50,3 +50,10 @@ Deals appear on the calendar when `due_date` is a `YYYY-MM-DD` date; free-text v
 There is no sign-in: the app uses the Supabase anon key and every table (contacts, tasks, deals, activities, calendar_*) has an open
 `anon, authenticated` policy. Anyone with the anon key can read and change this data. Add sign-in and per-user policies before
 storing sensitive data.
+
+## Delete mock data button
+The **Delete mock data** button (top right) deletes only records flagged `is_sample = true` (contacts, tasks, deals, activities, calendar events) from the database and the screen, plus the in-memory demo appointments. Unflagged (your own) records are never touched.
+
+- Migration `20260101000000_is_sample_flag.sql` adds the flag (default `false`, so existing rows are treated as real).
+- Flag your existing demo rows once with `scripts/mark-sample-data.sql`: read each statement, run its `select` first, adjust the condition to your demo data, then run the `update`.
+- Until rows are flagged the dialog shows "No Sample Data Found".
