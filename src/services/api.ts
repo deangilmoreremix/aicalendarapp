@@ -947,6 +947,8 @@ export const sampleDataApi = {
       if (error) throw error;
       ids[key] = (data ?? []).map((r: { id: string }) => r.id);
     }
+    // files attached to the deleted records go with them
+    await attachmentApi.removeForEntities([...ids.tasks, ...ids.calendarEvents, ...ids.deals, ...ids.contacts]);
     return ids;
   }
 };
@@ -1003,5 +1005,99 @@ export const recordViewApi = {
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('record_views').delete().eq('id', id);
     if (error) throw error;
+  }
+};
+
+// Attachments (files on records): metadata in `attachments`, bytes in the private `attachments` Storage bucket.
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+export interface Attachment {
+  id: string;
+  entityType: 'task' | 'deal' | 'contact' | 'calendar';
+  entityId: string;
+  name: string;
+  size: number;
+  mimeType?: string;
+  storagePath: string;
+  createdAt: Date;
+}
+
+interface AttachmentDB {
+  id: string;
+  entity_type: Attachment['entityType'];
+  entity_id: string;
+  name: string;
+  size: number;
+  mime_type?: string | null;
+  storage_path: string;
+  created_at: string;
+}
+
+export const mapAttachmentFromDB = (a: AttachmentDB): Attachment => ({
+  id: a.id,
+  entityType: a.entity_type,
+  entityId: a.entity_id,
+  name: a.name,
+  size: Number(a.size),
+  mimeType: a.mime_type ?? undefined,
+  storagePath: a.storage_path,
+  createdAt: new Date(a.created_at)
+});
+
+/** Storage keys allow only a limited character set; keep the readable name in the table. */
+export const safeStorageName = (name: string) =>
+  name.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^\.+/, '').slice(-100) || 'file';
+
+export const attachmentApi = {
+  async list(entityId: string): Promise<Attachment[]> {
+    const { data, error } = await supabase.from('attachments').select('*').eq('entity_id', entityId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapAttachmentFromDB);
+  },
+
+  async upload(entityType: Attachment['entityType'], entityId: string, file: File): Promise<Attachment> {
+    if (file.size > MAX_ATTACHMENT_BYTES) throw new Error(`"${file.name}" is larger than 25 MB.`);
+    if (file.size === 0) throw new Error(`"${file.name}" is empty.`);
+    const path = `${entityType}/${entityId}/${crypto.randomUUID()}-${safeStorageName(file.name)}`;
+    const { error: uploadError } = await supabase.storage.from('attachments').upload(path, file, { contentType: file.type || undefined });
+    if (uploadError) throw uploadError;
+    const { data, error } = await supabase
+      .from('attachments')
+      .insert({ entity_type: entityType, entity_id: entityId, name: file.name, size: file.size, mime_type: file.type || null, storage_path: path })
+      .select()
+      .single();
+    if (error) {
+      // do not leave an orphaned file behind
+      await supabase.storage.from('attachments').remove([path]);
+      throw error;
+    }
+    return mapAttachmentFromDB(data);
+  },
+
+  /** A link that works for one minute. */
+  async getDownloadUrl(storagePath: string, fileName?: string): Promise<string> {
+    const { data, error } = await supabase.storage.from('attachments').createSignedUrl(storagePath, 60, fileName ? { download: fileName } : undefined);
+    if (error || !data?.signedUrl) throw error ?? new Error('No download link');
+    return data.signedUrl;
+  },
+
+  async remove(attachment: Pick<Attachment, 'id' | 'storagePath'>): Promise<void> {
+    const { error: storageError } = await supabase.storage.from('attachments').remove([attachment.storagePath]);
+    if (storageError) throw storageError;
+    const { error } = await supabase.from('attachments').delete().eq('id', attachment.id);
+    if (error) throw error;
+  },
+
+  /** Used when records are deleted in bulk (sample data): their files go too. */
+  async removeForEntities(entityIds: string[]): Promise<void> {
+    if (entityIds.length === 0) return;
+    const { data, error } = await supabase.from('attachments').select('id, storage_path').in('entity_id', entityIds);
+    if (error) throw error;
+    const rows = data ?? [];
+    if (rows.length === 0) return;
+    const { error: storageError } = await supabase.storage.from('attachments').remove(rows.map((r: { storage_path: string }) => r.storage_path));
+    if (storageError) throw storageError;
+    const { error: delError } = await supabase.from('attachments').delete().in('id', rows.map((r: { id: string }) => r.id));
+    if (delError) throw delError;
   }
 };

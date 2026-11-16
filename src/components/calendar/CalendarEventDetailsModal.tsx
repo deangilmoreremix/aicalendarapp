@@ -4,6 +4,7 @@ import { MapPin, Video, X } from 'lucide-react';
 import { Dialog, DialogContent } from '../ui/dialog';
 import { LayoutToggle } from '../ui/LayoutToggle';
 import { RecordNotes } from '../contacts/RecordNotes';
+import { RecordAttachments } from '../contacts/RecordAttachments';
 import { useDetailLayout } from '../../store/detailLayoutStore';
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { getCalendarEventStartDate } from '../../vendor/twenty/calendar/utils/getCalendarEventStartDate';
@@ -54,6 +55,7 @@ export const CalendarEventDetailsModal = ({ event, onClose }: { event: TimelineC
           )}
           {!isCompact && event.description && <p className="whitespace-pre-line text-sm text-gray-700">{event.description}</p>}
           {!isCompact && <RecordNotes entityType="calendar" entityId={event.id} />}
+          {!isCompact && <RecordAttachments entityType="calendar" entityId={event.id} />}
           {!isCompact && !!event.participants?.length && (
             <div>
               <p className="mb-1 text-xs font-semibold uppercase text-gray-500">Guests</p>

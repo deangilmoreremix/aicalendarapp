@@ -12,6 +12,7 @@ import { useDealStore } from '../store/dealStore';
 import { calendarEventApi } from '../services/api';
 import { RecordActivityTimeline } from './contacts/ContactJourneyTimeline';
 import { RecordNotes } from './contacts/RecordNotes';
+import { RecordAttachments } from './contacts/RecordAttachments';
 import { AITaskAssistant } from './ui/AITaskAssistant';
 import {
   X,
@@ -635,6 +636,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                  {task && !isCompact && (
                    <div className="border-t pt-4 mt-4">
                      <RecordNotes entityType="task" entityId={task.id} />
+                     <div className="mt-4"><RecordAttachments entityType="task" entityId={task.id} /></div>
                      <div className="mt-4"><RecordActivityTimeline entityId={task.id} entityType="task" title="Task activity" /></div>
                    </div>
                  )}

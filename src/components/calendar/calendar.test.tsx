@@ -10,7 +10,9 @@ const { getTimeline, create, getSettings } = vi.hoisted(() => ({
 
 vi.mock('../../services/api', () => ({
   calendarEventApi: { getTimeline, create, getSettings },
-  activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() }
+  activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  attachmentApi: { list: () => Promise.resolve([]), upload: vi.fn(), remove: vi.fn(), getDownloadUrl: vi.fn() },
+  MAX_ATTACHMENT_BYTES: 25 * 1024 * 1024
 }));
 
 import { CalendarEventsCard } from './CalendarEventsCard';

@@ -13,6 +13,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
       select: (_cols: string, opts?: { head?: boolean }) => ({
+        in: async () => ({ data: [], error: null }), // attachments of deleted records (none in these tests)
         eq: async (col: string, val: boolean) => {
           db.log.push(`count ${table} ${col}=${val}`);
           return { count: (db.tables[table] ?? []).filter((r) => r.is_sample === val).length, error: null, data: opts?.head ? null : [] };

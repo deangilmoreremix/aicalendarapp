@@ -49,6 +49,10 @@ const db = {
     { id: 'a3', type: 'deal_moved', title: 'Moved to Negotiation', description: '', user_id: 'u1', user_name: 'Sam Lee', entity_type: 'deal', entity_id: 'd1', created_at: iso(at(Math.max(1, D - 1), 11)) }
   ],
   record_views: [],
+  attachments: [
+    { id: 'f1', entity_type: 'contact', entity_id: 'c1', name: 'TechCorp-proposal-v3.pdf', size: 482113, mime_type: 'application/pdf', storage_path: 'contact/c1/x-proposal.pdf', created_at: iso(at(Math.max(1, D - 2), 9)) },
+    { id: 'f2', entity_type: 'contact', entity_id: 'c1', name: 'org-chart.png', size: 91234, mime_type: 'image/png', storage_path: 'contact/c1/x-org.png', created_at: iso(at(Math.max(1, D - 4), 11)) }
+  ],
   calendar_views: [{ id: 'v1', name: 'Sales pipeline', calendar_layout: 'MONTH', field_by_type: {}, filters: {}, visible_types: ['deal', 'contact', 'event'], position: 0, is_default: false }],
   calendar_settings: [], calendar_event_participants: [], calendar_event_targets: []
 };
@@ -293,6 +297,8 @@ const linkedEvents = () => ({
   await shot('39-contact-notes-and-timeline');
   await page.getByRole('button', { name: 'Emails', exact: true }).first().click().catch(() => {}); await wait(400);
   await shot('40-timeline-filtered-by-type');
+  await page.locator('h3:has-text("Files")').scrollIntoViewIfNeeded(); await wait(400);
+  await shot('48-contact-files');
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await wait(300);
 
   // ---------------- 4g. Group C: command menu ----------------

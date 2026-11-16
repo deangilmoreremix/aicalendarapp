@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { LayoutToggle } from './LayoutToggle';
 import { RecordNotes } from '../contacts/RecordNotes';
+import { RecordAttachments } from '../contacts/RecordAttachments';
 import { RecordActivityTimeline } from '../contacts/ContactJourneyTimeline';
 import { useDetailLayout } from '../../store/detailLayoutStore';
 import { Button } from './button';
@@ -333,6 +334,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
             )}
 
             {!isCompact && <RecordNotes entityType="deal" entityId={deal.id} />}
+            {!isCompact && <RecordAttachments entityType="deal" entityId={deal.id} />}
             {!isCompact && <RecordActivityTimeline entityId={deal.id} entityType="deal" title="Deal activity" />}
 
             {/* Recent Activities */}

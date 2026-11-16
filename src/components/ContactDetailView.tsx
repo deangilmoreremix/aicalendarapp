@@ -38,6 +38,7 @@ const ContactEmailPanel = ({ contact }: { contact: Contact }) => (
 import { Contact } from '../types';
 import { LayoutToggle } from './ui/LayoutToggle';
 import { RecordNotes } from './contacts/RecordNotes';
+import { RecordAttachments } from './contacts/RecordAttachments';
 import { useDetailLayout } from '../store/detailLayoutStore';
 import { X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, User, Globe, Clock, Building, Tag, Brain, TrendingUp, BarChart3, Zap, Activity, Database, Target, Linkedin, Twitter, Facebook, Instagram, Save, Ambulance as Cancel, Heart, HeartOff, Search, Sparkles, Camera, Wand2 } from 'lucide-react';
 
@@ -1480,6 +1481,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
             {activeTab === 'journey' && (
               <div className="p-6 space-y-6">
                 <RecordNotes entityType="contact" entityId={editedContact.id} />
+                <RecordAttachments entityType="contact" entityId={editedContact.id} />
                 <ContactJourneyTimeline contact={editedContact} />
               </div>
             )}
