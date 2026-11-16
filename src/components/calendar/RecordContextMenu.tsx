@@ -4,11 +4,11 @@
  * reschedule, delete) are ours.
  */
 import { useEffect, useRef } from 'react';
-import { CalendarClock, CalendarPlus, Copy, Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Copy, ListOrdered, Pencil, Trash2 } from 'lucide-react';
 
 import type { UnifiedCalendarRecord } from './unifiedCalendarRecords';
 
-export type RecordMenuAction = 'edit' | 'duplicate' | 'tomorrow' | 'nextWeek' | 'delete';
+export type RecordMenuAction = 'edit' | 'day' | 'duplicate' | 'tomorrow' | 'nextWeek' | 'delete';
 
 type RecordContextMenuProps = {
   record: UnifiedCalendarRecord;
@@ -68,6 +68,7 @@ export const RecordContextMenu = ({ record, position, onAction, onClose }: Recor
       style={{ position: 'fixed', top, left }}
       className="z-50 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
     >
+      <Item action="day" icon={<ListOrdered className="h-4 w-4" />} label="Reorder this day" />
       {canEdit && <Item action="edit" icon={<Pencil className="h-4 w-4" />} label="Edit" />}
       {canDuplicate && <Item action="duplicate" icon={<Copy className="h-4 w-4" />} label="Duplicate" />}
       <Item action="tomorrow" icon={<CalendarClock className="h-4 w-4" />} label="Reschedule to tomorrow" />

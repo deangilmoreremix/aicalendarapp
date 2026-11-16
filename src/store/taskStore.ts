@@ -30,7 +30,7 @@ interface TaskActions {
   /** Optimistic update used by calendar drag/reschedule (no global loading flag, rolls back on failure). */
   rescheduleTask: (id: string, taskData: Partial<Task>) => Promise<boolean>;
   loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
-  rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date }) => Promise<boolean>;
+  rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date; position?: number }) => Promise<boolean>;
   removeCalendarEvent: (id: string) => Promise<boolean>;
 }
 

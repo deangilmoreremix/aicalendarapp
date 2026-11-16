@@ -27,7 +27,8 @@ const db = {
     { id: 't5', title: 'Follow up with Grace', description: '', due_date: iso(at(D + 4)), priority: 'medium', status: 'pending', category: 'call', type: 'follow-up', completed: false, created_at: iso(now), tags: [], attachments: [], subtasks: [], assigned_user_id: 'u2', assigned_user_name: 'Priya Rao' }
   ],
   deals: [
-    { id: 'd1', title: 'TechCorp renewal', company: 'TechCorp Solutions', value: '$85,000', probability: '85', due_date: ymd(at(D + 1)), contact_id: 'c1', status: 'online', stage: 'negotiation', priority: 'high', ai_prediction: 87, created_at: iso(now), updated_at: iso(now) },
+    { id: 'd1', title: 'TechCorp renewal', company: 'TechCorp Solutions', value: '$85,000', probability: '85', due_date: ymd(at(D + 1)), contact_id: 'c1', status: 'online', stage: 'negotiation', priority: 'high', ai_prediction: 87, created_at: iso(now), updated_at: iso(now), position: 1 },
+    { id: 'd3', title: 'Initech pilot', company: 'Initech', value: '$30,000', probability: '40', due_date: ymd(at(D + 5)), contact_id: 'c2', status: 'online', stage: 'proposal', priority: 'low', ai_prediction: 55, created_at: iso(now), updated_at: iso(now), position: 2 },
     { id: 'd2', title: 'Globex expansion', company: 'Globex', value: '$120,000', probability: '60', due_date: ymd(at(D + 5)), contact_id: 'c2', status: 'offline', stage: 'proposal', priority: 'medium', ai_prediction: 72, created_at: iso(now), updated_at: iso(now) }
   ],
   contacts: [
@@ -226,6 +227,39 @@ const linkedEvents = () => ({
   await page.getByRole('button', { name: 'Save changes' }).click();
   const req = await patch; console.log('PATCH calendar_events body:', req ? req.postData() : 'NOT SENT');
   await wait(800);
+
+  // ---------------- 4c. Reorder within a day ----------------
+  await open();
+  await page.locator('.rbc-event:has-text("TechCorp")').first().click({ button: 'right' }); await wait(400);
+  await page.getByRole('menuitem', { name: 'Reorder this day' }).click(); await wait(700);
+  const listNames = async () => (await page.getByRole('list', { name: 'Records on this day' }).getByRole('listitem').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  console.log('day list before:', JSON.stringify(await listNames()));
+  await shot('28-day-list-before');
+  const handle = page.getByLabel(/^Reorder TechCorp/); const dropAt = page.getByLabel(/^Reorder Renewal call/);
+  const hb = await handle.boundingBox(); const tb = await dropAt.boundingBox();
+  const patches = []; page.on('request', (r) => { if (r.method() === 'PATCH' && /deals|tasks|contacts|calendar_events/.test(r.url())) patches.push(r.url().split('/').pop().split('?')[0] + ' ' + r.postData()); });
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 + 10, { steps: 4 });
+  await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height + 12, { steps: 10 }); await wait(300); await page.mouse.up(); await wait(900);
+  console.log('day list after:', JSON.stringify(await listNames()));
+  console.log('PATCH bodies:', JSON.stringify(patches));
+  await shot('29-day-list-after-reorder');
+  await page.keyboard.press('Escape'); await wait(500);
+  await calendarBlock('30-month-grid-follows-order');
+
+  // ---------------- 4d. Compact / Full layouts ----------------
+  await open();
+  await page.locator('.rbc-event:has-text("Renewal call")').first().click(); await wait(600);
+  await shot('31-event-details-full');
+  await page.getByRole('dialog').getByRole('button', { name: 'Compact' }).click(); await wait(400);
+  await shot('32-event-details-compact');
+  await page.getByRole('dialog').getByRole('button', { name: 'Full' }).click(); await page.keyboard.press('Escape'); await wait(300);
+
+  await open();
+  await page.locator('.rbc-event:has-text("TechCorp")').first().click({ button: 'right' }); await wait(300);
+  await page.getByRole('menuitem', { name: 'Edit' }).click(); await wait(1200);
+  await page.getByRole('dialog').getByRole('button', { name: 'Compact' }).click(); await wait(500);
+  await shot('33-deal-details-compact');
+  await page.getByRole('dialog').getByRole('button', { name: 'Full' }).click(); await page.keyboard.press('Escape'); await wait(300);
 
   // ---------------- 5. Delete mock data ----------------
   await open();

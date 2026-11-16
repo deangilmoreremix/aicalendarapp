@@ -1,5 +1,7 @@
 // Consolidated type definitions to resolve conflicts
 export interface Task {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   title: string;
   description?: string;
@@ -57,6 +59,8 @@ export interface CalendarEventParticipant {
 }
 
 export interface CalendarEvent {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   title: string;
   description?: string;
@@ -127,6 +131,8 @@ export interface Appointment {
 }
 
 export interface Contact {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   firstName: string;
   lastName: string;
@@ -161,6 +167,8 @@ export interface Contact {
 }
 
 export interface Deal {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   /** Optional deal name entered in the New Deal form */
   title?: string;

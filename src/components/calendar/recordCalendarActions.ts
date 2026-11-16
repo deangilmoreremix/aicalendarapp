@@ -94,3 +94,25 @@ export const deleteRecord = async (record: UnifiedCalendarRecord): Promise<boole
       return !useContactStore.getState().error;
   }
 };
+
+/** Persist a within-day order change (optimistic, rolled back by the stores when saving fails). */
+export const applyPositionUpdate = async (record: UnifiedCalendarRecord, position: number): Promise<boolean> => {
+  switch (record.type) {
+    case 'task':
+      return useTaskStore.getState().rescheduleTask(record.id, { position });
+    case 'event':
+      return useTaskStore.getState().rescheduleCalendarEvent(record.id, { position });
+    case 'deal':
+      await useDealStore.getState().updateDeal(record.id, { position });
+      return !useDealStore.getState().error;
+    case 'contact':
+      await useContactStore.getState().updateContact(record.id, { position });
+      return !useContactStore.getState().error;
+  }
+};
+
+/** Persist several position updates; false if any failed. */
+export const applyPositionUpdates = async (updates: { record: UnifiedCalendarRecord; position: number }[]): Promise<boolean> => {
+  const results = await Promise.all(updates.map((u) => applyPositionUpdate(u.record, u.position)));
+  return results.every(Boolean);
+};

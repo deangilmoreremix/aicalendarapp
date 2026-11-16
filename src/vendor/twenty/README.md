@@ -30,3 +30,9 @@ Twenty's drag layer (@dnd-kit) cannot run inside react-big-calendar, so react-bi
 `unifiedCalendarRecords.ts` (records -> calendar entries, filters), `recordCalendarActions.ts` (persistence through our stores),
 `calendarSelectionStore.ts`, `RecordContextMenu.tsx` (upstream has no calendar menu actions), `CalendarFiltersMenu.tsx`,
 `CalendarViewsMenu.tsx` (+ `calendar_views` table), `RecordTasksWidget.tsx`, `groupTasksByStatus.ts` (upstream rule, vendored `groupArrayItemsBy`).
+
+## `record-calendar/position/` - within-day ordering (copied unchanged except for import paths)
+`computeNewPositionOfDraggedRecord`, `computeNewPositionsOfDraggedRecords`, `computeNewEvenlySpacedPositions`, `sortByProperty`,
+`isDefined`, `ArraySortDirection` and their upstream tests (from `object-record/utils` and `twenty-shared`).
+Glue that is ours: `src/components/calendar/dayOrder.ts` (feeds the upstream function from this app's records and applies the
+drop-index rules of upstream `useProcessCalendarCardDrop`) and the `DayRecordsDialog` list.

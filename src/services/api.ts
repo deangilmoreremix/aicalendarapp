@@ -49,12 +49,14 @@ interface ContactDB {
   is_favorite: boolean;
   ai_score?: number;
   next_follow_up?: string | null;
+  position?: number | null;
   created_at: string;
   updated_at: string;
 }
 
 interface TaskDB {
   id: string;
+  position?: number | null;
   title: string;
   description?: string;
   due_date?: string;
@@ -80,6 +82,7 @@ interface TaskDB {
 
 interface DealDB {
   id: string;
+  position?: number | null;
   title?: string | null;
   company: string;
   value: string;
@@ -119,6 +122,7 @@ export const mapContactFromDB = (contact: ContactDB): Contact => ({
   isFavorite: contact.is_favorite,
   aiScore: contact.ai_score,
   nextFollowUp: contact.next_follow_up ?? undefined,
+  position: contact.position ?? undefined,
   createdAt: new Date(contact.created_at),
   updatedAt: new Date(contact.updated_at)
 });
@@ -208,6 +212,7 @@ export const mapDealFromDB = (deal: DealDB): Deal => ({
   aiPrediction: deal.ai_prediction,
   description: deal.description,
   notes: deal.notes,
+  position: deal.position ?? undefined,
   createdAt: new Date(deal.created_at),
   updatedAt: new Date(deal.updated_at)
 });
@@ -639,6 +644,7 @@ const toStorageInstant = (value: string, isFullDay: boolean): string =>
 
 interface CalendarEventDB {
   id: string;
+  position?: number | null;
   title: string;
   description?: string | null;
   start_date: string;
@@ -669,7 +675,8 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
     isCanceled: event.is_canceled ?? false,
     conferenceSolution: event.conference_solution ?? undefined,
     conferenceLink: event.conference_link ?? undefined,
-    visibility: (event.visibility as CalendarEvent['visibility']) ?? 'SHARE_EVERYTHING'
+    visibility: (event.visibility as CalendarEvent['visibility']) ?? 'SHARE_EVERYTHING',
+    position: event.position ?? undefined
   };
 };
 
@@ -757,7 +764,7 @@ export const calendarEventApi = {
     return (data ?? []).map(mapCalendarEventFromDB);
   },
 
-  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string }): Promise<CalendarEvent> {
+  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (updates.startDate) patch.start_date = updates.startDate.toISOString();
     if (updates.endDate) patch.end_date = updates.endDate.toISOString();
@@ -767,6 +774,7 @@ export const calendarEventApi = {
     if (updates.isAllDay !== undefined) patch.is_all_day = updates.isAllDay;
     if (updates.timeZone !== undefined) patch.time_zone = updates.timeZone;
     if (updates.visibility !== undefined) patch.visibility = updates.visibility;
+    if (updates.position !== undefined) patch.position = updates.position;
     if (updates.conferenceLink !== undefined) patch.conference_link = updates.conferenceLink || null;
     const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', id).select().single();
     if (error) throw error;

@@ -2,12 +2,16 @@ import { format } from 'date-fns';
 import { MapPin, Video, X } from 'lucide-react';
 
 import { Dialog, DialogContent } from '../ui/dialog';
+import { LayoutToggle } from '../ui/LayoutToggle';
+import { useDetailLayout } from '../../store/detailLayoutStore';
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { getCalendarEventStartDate } from '../../vendor/twenty/calendar/utils/getCalendarEventStartDate';
 import { getCalendarEventEndDate } from '../../vendor/twenty/calendar/utils/getCalendarEventEndDate';
 import { getTimelineCalendarEventLabel } from '../../vendor/twenty/calendar/utils/getTimelineCalendarEventLabel';
 
 export const CalendarEventDetailsModal = ({ event, onClose }: { event: TimelineCalendarEvent | null; onClose: () => void }) => {
+  const [detailLayout] = useDetailLayout('event');
+  const isCompact = detailLayout === 'compact';
   if (!event) return null;
 
   const startsAt = getCalendarEventStartDate(event);
@@ -24,9 +28,12 @@ export const CalendarEventDetailsModal = ({ event, onClose }: { event: TimelineC
             <h2 className={`text-lg font-semibold text-gray-900 ${event.isCanceled ? 'line-through' : ''}`}>
               {getTimelineCalendarEventLabel(event)}
             </h2>
-            <button type="button" aria-label="Close" onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-3">
+              <LayoutToggle kind="event" />
+              <button type="button" aria-label="Close" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           <p className="text-sm text-gray-600">{when}</p>
           {event.location && (
@@ -44,8 +51,8 @@ export const CalendarEventDetailsModal = ({ event, onClose }: { event: TimelineC
               <Video className="h-4 w-4" /> {event.conferenceLink.primaryLinkLabel}
             </a>
           )}
-          {event.description && <p className="whitespace-pre-line text-sm text-gray-700">{event.description}</p>}
-          {!!event.participants?.length && (
+          {!isCompact && event.description && <p className="whitespace-pre-line text-sm text-gray-700">{event.description}</p>}
+          {!isCompact && !!event.participants?.length && (
             <div>
               <p className="mb-1 text-xs font-semibold uppercase text-gray-500">Guests</p>
               <ul className="space-y-1 text-sm text-gray-700">

@@ -36,6 +36,8 @@ const ContactEmailPanel = ({ contact }: { contact: Contact }) => (
   </div>
 );
 import { Contact } from '../types';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { useDetailLayout } from '../store/detailLayoutStore';
 import { X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, User, Globe, Clock, Building, Tag, Brain, TrendingUp, BarChart3, Zap, Activity, Database, Target, Linkedin, Twitter, Facebook, Instagram, Save, Ambulance as Cancel, Heart, HeartOff, Search, Sparkles, Camera, Wand2 } from 'lucide-react';
 
 interface ContactDetailViewProps {
@@ -85,6 +87,8 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   onUpdate 
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [detailLayout] = useDetailLayout('contact');
+  const isCompact = detailLayout === 'compact';
   const [isEditing, setIsEditing] = useState(false);
   const [editedContact, setEditedContact] = useState<Contact>(contact);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1217,8 +1221,9 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
           <div className="flex-1 overflow-y-auto bg-gray-50 min-h-0">
             {activeTab === 'overview' && (
               <div className="p-6 space-y-6">
+                <div className="flex justify-end"><LayoutToggle kind="contact" /></div>
                 {/* AI Enhancement Notice */}
-                {lastEnrichment && (
+                {!isCompact && lastEnrichment && (
                   <div className="bg-gradient-to-r from-purple-50 via-blue-50 to-green-50 border border-purple-200 rounded-xl p-4">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-purple-500 rounded-lg">
@@ -1295,6 +1300,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   </div>
                 </div>
 
+                {!isCompact && (<>
                 {/* Social Profiles */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -1466,6 +1472,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
             )}
 

@@ -243,4 +243,22 @@ describe('TaskDetailsModal', () => {
     expect(await screen.findByText('Renewal call')).toBeInTheDocument();
     expect(api.timeline).toHaveBeenCalledWith('contact', 'c1', 1, 0);
   });
+
+  it('compact layout hides description, created date and activity; full shows them; the choice is kept', async () => {
+    const t = task({ id: 'tc', description: 'Draft it', tags: ['sales'] });
+    useTaskStore.setState({ tasks: { tc: t } });
+    const { unmount } = render(<TaskDetailsModal task={t} isOpen onClose={vi.fn()} />);
+    expect(screen.getByText('Draft it')).toBeInTheDocument();
+    expect(screen.getByText('Created')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Compact' }));
+    expect(screen.queryByText('Draft it')).toBeNull();
+    expect(screen.queryByText('Created')).toBeNull();
+    expect(screen.queryByText('sales')).toBeNull();
+    expect(screen.getByText('Due Date')).toBeInTheDocument(); // key facts stay
+    unmount();
+    render(<TaskDetailsModal task={t} isOpen onClose={vi.fn()} />); // reopened: still compact
+    expect(screen.queryByText('Draft it')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Full' }));
+    expect(screen.getByText('Draft it')).toBeInTheDocument();
+  });
 });

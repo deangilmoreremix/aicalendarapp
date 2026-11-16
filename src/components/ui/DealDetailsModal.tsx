@@ -1,6 +1,8 @@
 import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { LayoutToggle } from './LayoutToggle';
+import { useDetailLayout } from '../../store/detailLayoutStore';
 import { Button } from './button';
 import { Badge } from './badge';
 import { useDealViews, DealView } from '../../hooks/useDealViews';
@@ -133,6 +135,9 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
     }
   };
 
+  const [detailLayout] = useDetailLayout('deal');
+  const isCompact = detailLayout === 'compact';
+
   if (!isOpen) return null;
 
   const contact = deal ? contacts[deal.contactId] : null;
@@ -146,12 +151,15 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
               <DollarSign className="w-5 h-5 text-green-500" />
               <DialogTitle>Deal Details</DialogTitle>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center space-x-2">
+              <LayoutToggle kind="deal" onDark />
+              <button
+                onClick={onClose}
+                className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -254,7 +262,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
             )}
 
             {/* Deal Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {!isCompact && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Deal Information</h3>
                 <div className="space-y-3">
@@ -291,19 +299,21 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
 
             {/* Tasks and calendar events linked to this deal */}
-            <RecordTasksWidget targetType="deal" targetId={deal.id} targetName={deal.company} />
-            <CalendarEventsCard
-              targetType="deal"
-              targetId={deal.id}
-              objectName="deal"
-              composerContext={{ targets: [{ type: 'deal', id: deal.id }] }}
-            />
+            {!isCompact && <RecordTasksWidget targetType="deal" targetId={deal.id} targetName={deal.company} />}
+            {!isCompact && (
+              <CalendarEventsCard
+                targetType="deal"
+                targetId={deal.id}
+                objectName="deal"
+                composerContext={{ targets: [{ type: 'deal', id: deal.id }] }}
+              />
+            )}
 
             {/* Recent Activities */}
-            <div>
+            {!isCompact && <div>
               <h3 className="font-semibold text-gray-900 mb-3">Recent Activities</h3>
               <div className="space-y-3">
                 {deal.activities.map(activity => (
@@ -323,7 +333,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-3 pt-4 border-t">

@@ -6,6 +6,11 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { Temporal } from 'temporal-polyfill';
 import { enUS } from 'date-fns/locale';
+import { startOfDay } from 'date-fns';
+import { DayRecordsDialog } from './calendar/DayRecordsDialog';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { useDetailLayout } from '../store/detailLayoutStore';
+import { compareWithinDay, getDayRecords } from './calendar/dayOrder';
 import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
 import { toTimelineCalendarEvent, getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
 import {
@@ -106,6 +111,10 @@ interface EventModalProps {
 }
 
 const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit }) => {
+  // hook first: the early return below must not skip it
+  const layoutKind = event?.resource.type === 'calendar-event' ? 'event' : event?.resource.type ?? 'task';
+  const [detailLayout] = useDetailLayout(layoutKind);
+  const isCompact = detailLayout === 'compact';
   if (!event) return null;
 
   const { resource } = event;
@@ -137,7 +146,10 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{event.title}</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>{event.title}</DialogTitle>
+            <LayoutToggle kind={layoutKind} onDark />
+          </div>
         </DialogHeader>
 
         <div className="space-y-4 px-6 pb-6">
@@ -171,13 +183,13 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                   </div>
                 )}
 
-                {data.description && (
+                {!isCompact && data.description && (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
-                {data.estimatedDuration && (
+                {!isCompact && data.estimatedDuration && (
                   <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <Clock className="h-4 w-4" />
                     <span>{data.estimatedDuration} minutes</span>
@@ -191,7 +203,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                 {resource.record.subtitle && <p>{resource.record.subtitle}</p>}
                 {resource.type === 'contact' && data.email && <p>{data.email}</p>}
-                {resource.type === 'deal' && data.description && <p>{data.description}</p>}
+                {!isCompact && resource.type === 'deal' && data.description && <p>{data.description}</p>}
               </div>
             )}
 
@@ -205,13 +217,13 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                   </div>
                 )}
 
-                {data.description && (
+                {!isCompact && data.description && (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
-{data.attendees && data.attendees.length > 0 && (
+{!isCompact && data.attendees && data.attendees.length > 0 && (
                    <div className="text-sm text-gray-600 dark:text-gray-400">
                      <span className="font-medium text-gray-900 dark:text-gray-100">Attendees:</span>
                      <div className="mt-1 space-y-1">
@@ -226,7 +238,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                  )}
 
                  {/* Enhanced: Rich participants from Twenty model */}
-                 {resource.participants && resource.participants.length > 0 && (
+                 {!isCompact && resource.participants && resource.participants.length > 0 && (
                    <div className="text-sm text-gray-600 dark:text-gray-400">
                      <span className="font-medium text-gray-900 dark:text-gray-100">Participants:</span>
                      <div className="mt-1 flex flex-wrap gap-2">
@@ -275,7 +287,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                  )}
 
                  {/* Enhanced: Visibility badge from Twenty model */}
-                 {resource.visibility && (
+                 {!isCompact && resource.visibility && (
                    <div className="flex items-center space-x-2 text-sm">
                      <span className="text-gray-600 dark:text-gray-400">Visibility:</span>
                      <Badge variant={resource.visibility === 'METADATA' ? 'secondary' : 'default'}>
@@ -317,6 +329,7 @@ export const BigTaskCalendar: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('month');
   const [selectedEvent, setSelectedEvent] = useState<TaskEvent | null>(null);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [dayListDate, setDayListDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -390,13 +403,17 @@ export const BigTaskCalendar: React.FC = () => {
     [tasks, deals, contacts, calendarEvents, fieldByType, visibleTypes, filters, visibleCalendars]
   );
 
+  // react-big-calendar orders a day's cards by start/end and keeps input order for ties, and gives no hook to sort by
+  // anything else. So all-day cards (deals, contacts, untimed tasks/events) are placed at the start of their day, which
+  // makes them tie, and are handed over sorted by saved position. Timed cards stay in time order. (Drops compute day
+  // offsets from the record itself, so the time part of an all-day card's start is not needed.)
   const events: TaskEvent[] = useMemo(
     () =>
-      records.map((record) => ({
+      [...records].sort((a, b) => compareWithinDay(a, b)).map((record) => ({
         id: record.key,
         title: record.title,
-        start: record.start,
-        end: record.end,
+        start: record.allDay ? startOfDay(record.start) : record.start,
+        end: record.allDay ? startOfDay(record.end) : record.end,
         allDay: record.allDay,
         resource: {
           type: record.type === 'event' ? ('calendar-event' as const) : record.type,
@@ -518,6 +535,8 @@ export const BigTaskCalendar: React.FC = () => {
       } else if (record.type === 'deal') setEditDealId(record.id);
       else if (record.type === 'contact') setEditContactId(record.id);
       else if (record.type === 'event') setEditingCalendarEvent(record.raw as CalendarEvent);
+    } else if (action === 'day') {
+      setDayListDate(record.start);
     } else if (action === 'duplicate') ok = await duplicateRecord(record);
     else if (action === 'tomorrow') ok = await rescheduleRecordByDays(record, 1);
     else if (action === 'nextWeek') ok = await rescheduleRecordByDays(record, 7);
@@ -757,6 +776,7 @@ export const BigTaskCalendar: React.FC = () => {
           onNavigate={handleNavigate}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
+          onShowMore={(_events, date) => setDayListDate(date)}
           onEventDrop={handleEventDrop}
           onEventResize={handleEventResize}
           resizableAccessor={isTimed}
@@ -798,6 +818,19 @@ export const BigTaskCalendar: React.FC = () => {
           onUpdate={async (id, updates) => {
             await updateContact(id, updates);
             return useContactStore.getState().contacts[id] ?? contacts[id];
+          }}
+        />
+      )}
+
+      {/* One day's records, reorderable */}
+      {dayListDate && (
+        <DayRecordsDialog
+          day={dayListDate}
+          records={getDayRecords(records, dayListDate)}
+          onClose={() => setDayListDate(null)}
+          onOpenRecord={(record) => {
+            setDayListDate(null);
+            void handleMenuAction('edit', record);
           }}
         />
       )}

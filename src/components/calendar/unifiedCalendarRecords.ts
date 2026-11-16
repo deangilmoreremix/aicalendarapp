@@ -31,6 +31,8 @@ export interface UnifiedCalendarRecord {
   ownerName?: string;
   /** record-specific line shown on the calendar card */
   subtitle?: string;
+  /** manual order within a day (0 when never reordered) */
+  position: number;
   raw: Task | Deal | Contact | CalendarEvent;
 }
 
@@ -132,6 +134,7 @@ export const buildUnifiedRecords = ({
         ownerId: task.assignedUserId,
         ownerName: task.assignedUserName,
         subtitle: [task.priority, task.assignedUserName].filter(Boolean).join(' · '),
+        position: task.position ?? 0,
         raw: task
       });
     }
@@ -151,6 +154,7 @@ export const buildUnifiedRecords = ({
         allDay: true,
         status: deal.stage,
         subtitle: [deal.value, deal.stage].filter(Boolean).join(' · '),
+        position: deal.position ?? 0,
         raw: deal
       });
     }
@@ -170,6 +174,7 @@ export const buildUnifiedRecords = ({
         allDay: true,
         status: contact.status,
         subtitle: [contact.company, contact.title].filter(Boolean).join(' · '),
+        position: contact.position ?? 0,
         raw: contact
       });
     }
@@ -188,6 +193,7 @@ export const buildUnifiedRecords = ({
         allDay: event.isAllDay,
         status: event.status,
         subtitle: event.location,
+        position: event.position ?? 0,
         raw: event
       });
     }
@@ -221,7 +227,7 @@ export interface RescheduleUpdates {
   task?: Partial<Task>;
   deal?: Partial<Deal>;
   contact?: Partial<Contact>;
-  event?: { startDate?: Date; endDate?: Date };
+  event?: { startDate?: Date; endDate?: Date; position?: number };
 }
 
 const iso = (d?: Date) => (d ? d.toISOString() : undefined);

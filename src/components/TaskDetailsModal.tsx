@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { useDetailLayout } from '../store/detailLayoutStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -59,6 +61,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     subtasks: [],
   });
 
+  const [detailLayout] = useDetailLayout('task');
+  const isCompact = detailLayout === 'compact';
   const [newTag, setNewTag] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [showAIAssistant, setShowAIAssistant] = useState(false);
@@ -265,6 +269,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               {task ? (isEditing ? 'Edit Task' : 'Task Details') : 'Create New Task'}
             </DialogTitle>
             <div className="flex items-center space-x-2">
+              {task && !isEditing && <LayoutToggle kind="task" onDark />}
               {!task && (
                 <button
                   onClick={() => setShowAIAssistant(true)}
@@ -564,7 +569,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </div>
 
                 {/* Description */}
-                {task.description && (
+                {!isCompact && task.description && (
                   <div>
                     <p className="text-gray-600">{task.description}</p>
                   </div>
@@ -592,7 +597,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {task.estimatedDuration && (
+                  {!isCompact && task.estimatedDuration && (
                     <div className="flex items-center space-x-2">
                       <Clock size={16} className="text-gray-400" />
                       <div>
@@ -602,23 +607,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     </div>
                   )}
 
-<div className="flex items-center space-x-2">
+{!isCompact && <div className="flex items-center space-x-2">
                      <Calendar size={16} className="text-gray-400" />
                      <div>
                        <div className="font-medium text-gray-700">Created</div>
                        <div className="text-gray-600">{task.createdAt.toLocaleDateString()}</div>
                      </div>
-                   </div>
+                   </div>}
                  </div>
 
-                 {task && (
+                 {task && !isCompact && (
                    <div className="border-t pt-4 mt-4">
                      <RecordActivityTimeline entityId={task.id} title="Task activity" />
                    </div>
                  )}
 
                  {/* Calendar Event Integration - Twenty Enhanced */}
-                 {relatedCalendarEvent && (
+                 {!isCompact && relatedCalendarEvent && (
                    <div className="border-t pt-4 mt-4">
                      <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                        <Calendar size={16} className="mr-2" />
@@ -676,7 +681,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                  )}
 
                  {/* Tags */}
-                 {task.tags.length > 0 && (
+                 {!isCompact && task.tags.length > 0 && (
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2 flex items-center">
                       <Tag size={16} className="mr-1" />
