@@ -292,6 +292,15 @@ const linkedEvents = () => ({
   await shot('40-timeline-filtered-by-type');
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await wait(300);
 
+  // ---------------- 4g. Group C: command menu ----------------
+  await open();
+  await page.evaluate(() => window.scrollTo(0, 0)); await wait(200);
+  await page.keyboard.press('Control+k'); await wait(600);
+  await shot('41-command-menu-empty-recent-favorites');
+  await page.getByRole('combobox', { name: 'Search records and commands' }).fill('tech'); await wait(500);
+  await shot('42-command-menu-search');
+  await page.keyboard.press('Escape'); await wait(300);
+
   // ---------------- 5. Delete mock data ----------------
   await open();
   await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);

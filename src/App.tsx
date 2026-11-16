@@ -23,6 +23,7 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { CommandMenu, CommandMenuButton } from './components/CommandMenu';
 import { FavoritesPanel } from './components/FavoritesPanel';
 import { OpenRecordHost } from './components/OpenRecordHost';
 import { AssigneeAvatar, InlineDueDate, TaskFavoriteStar } from './components/calendar/TaskRowParts';
@@ -277,6 +278,8 @@ const App: React.FC = () => {
               <span className="hidden sm:inline">Delete mock data</span>
             </button>
 
+            <CommandMenuButton isDark={isDark} />
+
             {/* Settings Button */}
             <button
               onClick={() => setShowCalendarSettings(true)}
@@ -499,6 +502,13 @@ const App: React.FC = () => {
       )}
 
       <OpenRecordHost />
+      <CommandMenu
+        onNavigate={handleViewChange}
+        onNewContact={() => setShowNewContactModal(true)}
+        onNewDeal={() => setShowNewDealModal(true)}
+        onOpenSettings={() => setShowCalendarSettings(true)}
+        onDeleteMockData={() => setShowDeleteMockDataDialog(true)}
+      />
 
       {/* Delete Mock Data Dialog */}
       <DeleteMockDataDialog
