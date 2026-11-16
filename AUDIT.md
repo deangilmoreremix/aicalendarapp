@@ -12,7 +12,7 @@ Everything here ran in a sandbox: **nothing was run against a live OpenAI key or
 | `tsc` | 0 errors | 0 errors |
 | Browser sweep (`scripts/e2e-audit.cjs`) | crashed/looped in 3 places | **all 24 steps pass, 0 console errors/warnings** |
 | Migrations on a fresh DB | **failed** at the 2nd migration | all 20 apply (Postgres 16) |
-| `npm audit` (prod) | 9 (6 high) | 2 moderate (react-router, needs a breaking major) |
+| `npm audit` (prod) | 9 (6 high) | 0 (unused `react-router-dom` removed; the app has no router) |
 
 ## Bugs found and fixed
 | # | Severity | Bug | Fix |

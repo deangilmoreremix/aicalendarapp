@@ -54,7 +54,8 @@ import CustomerProfile from 'CalendarApp/CustomerProfile';
 The following packages are configured as singletons:
 - `react` (^18.0.0)
 - `react-dom` (^18.0.0)
-- `react-router-dom` (^6.26.0)
+
+The app has no router, so `react-router-dom` is no longer shared (it was removed along with its advisories).
 
 ## Host Application Setup
 
@@ -83,10 +84,6 @@ export default defineConfig({
         'react-dom': {
           singleton: true,
           requiredVersion: '^18.0.0'
-        },
-        'react-router-dom': {
-          singleton: true,
-          requiredVersion: '^6.26.0'
         }
       }
     })
