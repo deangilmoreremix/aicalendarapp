@@ -37,12 +37,15 @@ const toStoredDate = (value: string, isFullDay: boolean) =>
 export const useCalendarEventComposer = ({
   context,
   onCreated,
-  editing
+  editing,
+  initialDate
 }: {
   context: CalendarComposerContext;
   onCreated: () => void;
   /** When set, the composer edits this event instead of creating a new one. */
   editing?: CalendarEvent;
+  /** New events start at 9:00 on this day (e.g. the empty day that was clicked on the calendar). */
+  initialDate?: Date;
 }) => {
   const [timeZone, setTimeZone] = useState(browserTimeZone);
   const [title, setTitle] = useState(editing?.title ?? '');
@@ -59,7 +62,13 @@ export const useCalendarEventComposer = ({
       ? editing.isAllDay
         ? { startsAt: localDateString(editing.startDate), endsAt: localDateString(editing.endDate) }
         : { startsAt: editing.startDate.toISOString(), endsAt: editing.endDate.toISOString() }
-      : getCalendarEventComposerDefaultDates({ now: Temporal.Now.instant(), timeZone: browserTimeZone() })
+      : getCalendarEventComposerDefaultDates({
+          // 8:45 so the upstream 30-minute rounding lands on 9:00
+          now: initialDate
+            ? Temporal.Instant.fromEpochMilliseconds(new Date(initialDate.getFullYear(), initialDate.getMonth(), initialDate.getDate(), 8, 45).getTime())
+            : Temporal.Now.instant(),
+          timeZone: browserTimeZone()
+        })
   );
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);

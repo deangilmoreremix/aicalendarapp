@@ -56,6 +56,7 @@ interface ContactDB {
 
 interface TaskDB {
   id: string;
+  is_favorite?: boolean | null;
   position?: number | null;
   title: string;
   description?: string;
@@ -82,6 +83,7 @@ interface TaskDB {
 
 interface DealDB {
   id: string;
+  is_favorite?: boolean | null;
   position?: number | null;
   title?: string | null;
   company: string;
@@ -172,6 +174,8 @@ export const mapTaskFromDB = (task: TaskDB): Task => ({
   attachments: task.attachments || [],
   subtasks: task.subtasks || [],
   relatedTo: task.related_to,
+  position: task.position ?? undefined,
+  isFavorite: task.is_favorite ?? false,
   notes: task.notes
 });
 
@@ -195,6 +199,7 @@ export const mapTaskToDB = (task: Omit<Task, 'id' | 'createdAt'>) => ({
   attachments: task.attachments,
   subtasks: task.subtasks,
   related_to: task.relatedTo,
+  is_favorite: task.isFavorite ?? false,
   notes: task.notes
 });
 
@@ -213,6 +218,7 @@ export const mapDealFromDB = (deal: DealDB): Deal => ({
   description: deal.description,
   notes: deal.notes,
   position: deal.position ?? undefined,
+  isFavorite: deal.is_favorite ?? false,
   createdAt: new Date(deal.created_at),
   updatedAt: new Date(deal.updated_at)
 });
@@ -229,6 +235,7 @@ export const mapDealToDB = (deal: any) => ({
   priority: deal.priority,
   ai_prediction: deal.aiPrediction,
   description: deal.description,
+  is_favorite: deal.isFavorite ?? false,
   notes: deal.notes
 });
 
@@ -812,6 +819,7 @@ export interface CalendarViewFilters {
   assigneeIds?: string[];
   dueDateRange?: { from?: string; to?: string };
   searchTerm?: string;
+  favoritesOnly?: boolean;
 }
 
 export interface CalendarView {

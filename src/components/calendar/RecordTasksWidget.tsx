@@ -11,6 +11,7 @@ import { useTaskStore } from '../../store/taskStore';
 import type { Task } from '../../types';
 import { completionUpdate, groupTasksByStatus } from './groupTasksByStatus';
 import { TaskDetailsModal } from '../TaskDetailsModal';
+import { AssigneeAvatar, InlineDueDate, TaskFavoriteStar } from './TaskRowParts';
 
 type RecordTasksWidgetProps = {
   targetType: 'contact' | 'deal';
@@ -71,7 +72,6 @@ export const RecordTasksWidget = ({ targetType, targetId, targetName }: RecordTa
             </h4>
             <ul className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
               {groupTasks.map((task) => {
-                const isPast = !!task.dueDate && task.dueDate < new Date() && !task.completed;
                 return (
                   <li key={task.id} className="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 dark:border-gray-800">
                     <input
@@ -83,9 +83,9 @@ export const RecordTasksWidget = ({ targetType, targetId, targetName }: RecordTa
                     <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => setOpenTask(task)}>
                       <span className={`font-medium text-gray-900 dark:text-gray-100 ${task.completed ? 'line-through' : ''}`}>{task.title}</span>
                     </button>
-                    {task.dueDate && (
-                      <span className={`text-xs ${isPast ? 'text-red-600' : 'text-gray-500'}`}>{format(task.dueDate, 'MMM d')}</span>
-                    )}
+                    <AssigneeAvatar name={task.assignedUserName} />
+                    <InlineDueDate task={task} />
+                    <TaskFavoriteStar task={task} />
                   </li>
                 );
               })}

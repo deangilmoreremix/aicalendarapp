@@ -44,6 +44,7 @@ export const CalendarFiltersMenu = ({
     (filters.statuses?.length ?? 0) +
     (filters.assigneeIds?.length ?? 0) +
     (filters.dueDateRange?.from || filters.dueDateRange?.to ? 1 : 0) +
+    (filters.favoritesOnly ? 1 : 0) +
     (ALL_RECORD_TYPES.length - visibleTypes.length);
 
   return (
@@ -103,6 +104,15 @@ export const CalendarFiltersMenu = ({
               ))}
             </fieldset>
           )}
+
+          <label className="flex items-center gap-2 py-0.5">
+            <input
+              type="checkbox"
+              checked={filters.favoritesOnly ?? false}
+              onChange={(e) => onFiltersChange({ ...filters, favoritesOnly: e.target.checked || undefined })}
+            />
+            Favorites only
+          </label>
 
           <fieldset>
             <legend className="mb-1 font-medium text-gray-900 dark:text-gray-100">Date range</legend>

@@ -23,6 +23,9 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { FavoritesPanel } from './components/FavoritesPanel';
+import { OpenRecordHost } from './components/OpenRecordHost';
+import { AssigneeAvatar, InlineDueDate, TaskFavoriteStar } from './components/calendar/TaskRowParts';
 import { CalendarSettings } from './components/CalendarSettings';
 import { SkeletonCard } from './components/ui/Skeleton';
 
@@ -191,17 +194,11 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {task.dueDate && (
-                  <div className="text-right">
-                    <p className={`text-sm font-medium ${
-                      !task.completed && task.dueDate < new Date()
-                        ? 'text-red-600'
-                        : isDark ? 'text-gray-300' : 'text-gray-600'
-                    }`}>
-                      {formatDate(task.dueDate)}
-                    </p>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  <AssigneeAvatar name={task.assignedUserName} />
+                  <InlineDueDate task={task} />
+                  <TaskFavoriteStar task={task} />
+                </div>
               </div>
             </div>
           ))}
@@ -435,6 +432,9 @@ const App: React.FC = () => {
         onNewDeal={() => setShowNewDealModal(true)}
       />
 
+      {/* Favorites */}
+      <FavoritesPanel />
+
       {/* Recent Activity Dashboard */}
       <RecentActivity />
 
@@ -497,6 +497,8 @@ const App: React.FC = () => {
           }}
         />
       )}
+
+      <OpenRecordHost />
 
       {/* Delete Mock Data Dialog */}
       <DeleteMockDataDialog

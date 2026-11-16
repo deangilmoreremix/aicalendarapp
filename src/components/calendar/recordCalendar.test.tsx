@@ -224,7 +224,7 @@ describe('RecordContextMenu', () => {
     const onAction = vi.fn();
     const onClose = vi.fn();
     render(<RecordContextMenu record={record} position={{ x: 10, y: 20 }} onAction={onAction} onClose={onClose} />);
-    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Reorder this day', 'Edit', 'Duplicate', 'Reschedule to tomorrow', 'Reschedule +1 week', 'Delete']);
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Reorder this day', 'Add to favorites', 'Edit', 'Duplicate', 'Reschedule to tomorrow', 'Reschedule +1 week', 'Delete']);
     fireEvent.click(screen.getByRole('menuitem', { name: /reschedule \+1 week/i }));
     expect(onAction).toHaveBeenCalledWith('nextWeek', record);
     expect(onClose).toHaveBeenCalled();

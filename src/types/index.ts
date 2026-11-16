@@ -1,5 +1,6 @@
 // Consolidated type definitions to resolve conflicts
 export interface Task {
+  isFavorite?: boolean;
   /** Manual order among records on the same calendar day (Twenty record position). */
   position?: number;
   id: string;
@@ -167,6 +168,7 @@ export interface Contact {
 }
 
 export interface Deal {
+  isFavorite?: boolean;
   /** Manual order among records on the same calendar day (Twenty record position). */
   position?: number;
   id: string;

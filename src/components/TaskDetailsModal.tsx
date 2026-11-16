@@ -25,6 +25,7 @@ import {
   Check,
   Brain,
   Video,
+  Star
 } from 'lucide-react';
 
 interface TaskDetailsModalProps {
@@ -34,6 +35,8 @@ interface TaskDetailsModalProps {
   defaultStatus?: Task['status'];
   /** Pre-links a new task to a record (used by the embedded record tasks widget). */
   defaultRelatedTo?: Task['relatedTo'];
+  /** Due date for a new task (e.g. the empty day clicked on the calendar). */
+  defaultDueDate?: Date;
   /** Open an existing task straight in edit mode (used when the user already pressed "Edit"). */
   startInEditMode?: boolean;
 }
@@ -44,6 +47,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   onClose, 
   defaultStatus,
   defaultRelatedTo,
+  defaultDueDate,
   startInEditMode = false
 }) => {
   const { createTask, updateTask, deleteTask } = useTaskStore();
@@ -93,7 +97,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       setFormData({
         title: '',
         description: '',
-        dueDate: new Date(),
+        dueDate: defaultDueDate ?? new Date(),
         startTime: undefined,
         endTime: undefined,
         priority: 'medium',
@@ -110,7 +114,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     // Keyed on stable ids, not object identity: callers build `task` / `defaultRelatedTo` fresh on each render, and
     // depending on the objects reset the form (and left edit mode) on every parent re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id, startInEditMode]);
+  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id, startInEditMode, defaultDueDate?.getTime()]);
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {
@@ -269,6 +273,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               {task ? (isEditing ? 'Edit Task' : 'Task Details') : 'Create New Task'}
             </DialogTitle>
             <div className="flex items-center space-x-2">
+              {task && !isEditing && (
+                <button
+                  type="button"
+                  aria-label={task.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-pressed={!!task.isFavorite}
+                  onClick={() => void updateTask(task.id, { isFavorite: !task.isFavorite })}
+                  className={`rounded-lg p-2 hover:bg-white/10 ${task.isFavorite ? 'text-amber-300' : 'text-white/70 hover:text-white'}`}
+                >
+                  <Star size={18} className={task.isFavorite ? 'fill-current' : ''} />
+                </button>
+              )}
               {task && !isEditing && <LayoutToggle kind="task" onDark />}
               {!task && (
                 <button

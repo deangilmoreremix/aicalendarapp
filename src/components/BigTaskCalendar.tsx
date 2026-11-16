@@ -9,6 +9,9 @@ import { enUS } from 'date-fns/locale';
 import { startOfDay } from 'date-fns';
 import { DayRecordsDialog } from './calendar/DayRecordsDialog';
 import { LayoutToggle } from './ui/LayoutToggle';
+import { toggleFavorite } from './calendar/favorites';
+import { SlotChooser } from './calendar/SlotChooser';
+import { getISOWeek } from 'date-fns';
 import { useDetailLayout } from '../store/detailLayoutStore';
 import { compareWithinDay, getDayRecords } from './calendar/dayOrder';
 import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
@@ -330,6 +333,9 @@ export const BigTaskCalendar: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<TaskEvent | null>(null);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [dayListDate, setDayListDate] = useState<Date | null>(null);
+  const [slot, setSlot] = useState<{ day: Date; x: number; y: number } | null>(null);
+  const [newTaskDate, setNewTaskDate] = useState<Date | null>(null);
+  const [newEventDate, setNewEventDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -535,6 +541,8 @@ export const BigTaskCalendar: React.FC = () => {
       } else if (record.type === 'deal') setEditDealId(record.id);
       else if (record.type === 'contact') setEditContactId(record.id);
       else if (record.type === 'event') setEditingCalendarEvent(record.raw as CalendarEvent);
+    } else if (action === 'favorite') {
+      ok = await toggleFavorite(record);
     } else if (action === 'day') {
       setDayListDate(record.start);
     } else if (action === 'duplicate') ok = await duplicateRecord(record);
@@ -776,6 +784,13 @@ export const BigTaskCalendar: React.FC = () => {
           onNavigate={handleNavigate}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
+          selectable
+          onSelectSlot={(info) => {
+            // a click or double click on an empty day offers to create something there (drag-select is ignored)
+            if (info.action === 'select') return;
+            const box = (info as { box?: { x: number; y: number } }).box;
+            setSlot({ day: new Date(info.start), x: box?.x ?? window.innerWidth / 2, y: box?.y ?? window.innerHeight / 2 });
+          }}
           onShowMore={(_events, date) => setDayListDate(date)}
           onEventDrop={handleEventDrop}
           onEventResize={handleEventResize}
@@ -783,6 +798,21 @@ export const BigTaskCalendar: React.FC = () => {
           popup
           components={{
             toolbar: () => null, // We use custom toolbar
+            month: {
+              // ISO week number on each Monday (Twenty's record calendar shows week numbers)
+              dateHeader: ({ label, date, drilldownView, onDrillDown }: { label: string; date: Date; drilldownView?: string | null; onDrillDown?: (e: React.MouseEvent) => void }) => (
+                <>
+                  {date.getDay() === 1 && <span className="mr-1 text-[10px] text-gray-400" title="Week number">W{getISOWeek(date)}</span>}
+                  {drilldownView ? (
+                    <button type="button" className="rbc-button-link" onClick={onDrillDown}>
+                      {label}
+                    </button>
+                  ) : (
+                    <span>{label}</span>
+                  )}
+                </>
+              ),
+            },
             event: eventComponent,
           }}
           className="h-full bg-white dark:bg-gray-900"
@@ -819,6 +849,39 @@ export const BigTaskCalendar: React.FC = () => {
             await updateContact(id, updates);
             return useContactStore.getState().contacts[id] ?? contacts[id];
           }}
+        />
+      )}
+
+      {slot && (
+        <SlotChooser
+          day={slot.day}
+          position={{ x: slot.x, y: slot.y }}
+          contacts={Object.values(contacts)}
+          onClose={() => setSlot(null)}
+          onChoose={(choice) => {
+            if (choice === 'task') {
+              setSelectedTask(null);
+              setNewTaskDate(slot.day);
+            } else setNewEventDate(slot.day);
+            setSlot(null);
+          }}
+          onFollowUp={async (contactId) => {
+            const d = slot.day;
+            await updateContact(contactId, { nextFollowUp: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
+            setSlot(null);
+          }}
+        />
+      )}
+      {newTaskDate && (
+        <TaskDetailsModal task={null} isOpen defaultDueDate={new Date(newTaskDate.getFullYear(), newTaskDate.getMonth(), newTaskDate.getDate(), 9)} onClose={() => setNewTaskDate(null)} />
+      )}
+      {newEventDate && (
+        <CalendarEventComposerModal
+          isOpen
+          initialDate={newEventDate}
+          context={{ targets: [] }}
+          onClose={() => setNewEventDate(null)}
+          onCreated={() => void loadCalendarEvents(visibleRange.from, visibleRange.to)}
         />
       )}
 

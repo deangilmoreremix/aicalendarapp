@@ -35,6 +35,7 @@ const rec = (id: string, type: UnifiedCalendarRecord['type'], position: number, 
   end: new Date(2026, 10, 12, hour),
   allDay: hour === 0,
   position,
+  isFavorite: false,
   raw: { id } as any
 });
 

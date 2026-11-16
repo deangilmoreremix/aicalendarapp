@@ -1,3 +1,4 @@
+import { TaskFavoriteStar } from './calendar/TaskRowParts';
 import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
@@ -98,9 +99,12 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) 
                   {task.priority.toUpperCase()}
                 </Badge>
               </div>
-              {task.attachments.length > 0 && (
-                <Paperclip className="h-4 w-4 text-gray-400" />
-              )}
+              <div className="flex items-center space-x-2">
+                {task.attachments.length > 0 && (
+                  <Paperclip className="h-4 w-4 text-gray-400" />
+                )}
+                <TaskFavoriteStar task={task} />
+              </div>
             </div>
 
             {/* Title */}

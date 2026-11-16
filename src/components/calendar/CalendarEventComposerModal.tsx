@@ -20,6 +20,7 @@ type CalendarEventComposerModalProps = {
   context: CalendarComposerContext;
   /** Edit this event instead of creating a new one. */
   editing?: CalendarEvent;
+  initialDate?: Date;
 };
 
 const inputClass =
@@ -39,10 +40,11 @@ const instantToLocalInput = (instant: string, timeZone: string) =>
 const localInputToInstant = (value: string, timeZone: string) =>
   Temporal.PlainDateTime.from(value).toZonedDateTime(timeZone).toInstant().toString();
 
-export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context, editing }: CalendarEventComposerModalProps) => {
+export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context, editing, initialDate }: CalendarEventComposerModalProps) => {
   const composer = useCalendarEventComposer({
     context,
     editing,
+    initialDate,
     onCreated: () => {
       onCreated();
       onClose();

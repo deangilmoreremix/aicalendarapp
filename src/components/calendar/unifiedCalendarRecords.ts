@@ -33,6 +33,7 @@ export interface UnifiedCalendarRecord {
   subtitle?: string;
   /** manual order within a day (0 when never reordered) */
   position: number;
+  isFavorite: boolean;
   raw: Task | Deal | Contact | CalendarEvent;
 }
 
@@ -135,6 +136,7 @@ export const buildUnifiedRecords = ({
         ownerName: task.assignedUserName,
         subtitle: [task.priority, task.assignedUserName].filter(Boolean).join(' · '),
         position: task.position ?? 0,
+        isFavorite: !!task.isFavorite,
         raw: task
       });
     }
@@ -155,6 +157,7 @@ export const buildUnifiedRecords = ({
         status: deal.stage,
         subtitle: [deal.value, deal.stage].filter(Boolean).join(' · '),
         position: deal.position ?? 0,
+        isFavorite: !!deal.isFavorite,
         raw: deal
       });
     }
@@ -175,6 +178,7 @@ export const buildUnifiedRecords = ({
         status: contact.status,
         subtitle: [contact.company, contact.title].filter(Boolean).join(' · '),
         position: contact.position ?? 0,
+        isFavorite: !!contact.isFavorite,
         raw: contact
       });
     }
@@ -194,6 +198,7 @@ export const buildUnifiedRecords = ({
         status: event.status,
         subtitle: event.location,
         position: event.position ?? 0,
+        isFavorite: false,
         raw: event
       });
     }
@@ -216,6 +221,7 @@ export const applyRecordFilters = (records: UnifiedCalendarRecord[], filters: Ca
     const to = filters.dueDateRange.to ? new Date(`${filters.dueDateRange.to}T23:59:59`) : undefined;
     result = result.filter((r) => (!from || r.start >= from) && (!to || r.start <= to));
   }
+  if (filters.favoritesOnly) result = result.filter((r) => r.isFavorite);
   if (filters.searchTerm) {
     const term = filters.searchTerm.toLowerCase();
     result = result.filter((r) => r.title.toLowerCase().includes(term) || (r.subtitle ?? '').toLowerCase().includes(term));

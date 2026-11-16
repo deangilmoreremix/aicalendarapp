@@ -10,8 +10,25 @@ import { activityApi } from '../../services/api';
 import { RecordTasksWidget } from '../calendar/RecordTasksWidget';
 import { CalendarEventsCard } from '../calendar/CalendarEventsCard';
 import { useContactStore } from '../../store/contactStore';
+import { useDealStore } from '../../store/dealStore';
 import { useAI } from '../../contexts/AIContext';
-import { X, DollarSign, Calendar, User, AlertTriangle, CheckCircle, Clock, Target, Brain, Loader2, Edit, Archive, Mail, FileText } from 'lucide-react';
+import { Star, X, DollarSign, Calendar, User, AlertTriangle, CheckCircle, Clock, Target, Brain, Loader2, Edit, Archive, Mail, FileText } from 'lucide-react';
+
+const DealFavoriteStar = ({ dealId }: { dealId: string }) => {
+  const isFavorite = useDealStore((s) => !!s.deals[dealId]?.isFavorite);
+  const updateDeal = useDealStore((s) => s.updateDeal);
+  return (
+    <button
+      type="button"
+      aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      aria-pressed={isFavorite}
+      onClick={() => void updateDeal(dealId, { isFavorite: !isFavorite })}
+      className={`rounded-lg p-2 hover:bg-white/10 ${isFavorite ? 'text-amber-300' : 'text-white/70 hover:text-white'}`}
+    >
+      <Star size={18} className={isFavorite ? 'fill-current' : ''} />
+    </button>
+  );
+};
 
 interface DealDetailsModalProps {
   isOpen: boolean;
@@ -152,6 +169,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
               <DialogTitle>Deal Details</DialogTitle>
             </div>
             <div className="flex items-center space-x-2">
+              {deal && <DealFavoriteStar dealId={deal.id} />}
               <LayoutToggle kind="deal" onDark />
               <button
                 onClick={onClose}

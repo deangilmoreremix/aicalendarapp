@@ -20,14 +20,14 @@ let seq = 100;
 
 const db = {
   tasks: [
-    { id: 't1', title: 'Send proposal to TechCorp', description: 'Pricing + timeline', due_date: iso(at(D)), priority: 'high', status: 'pending', category: 'email', type: 'proposal', completed: false, created_at: iso(now), tags: ['sales'], attachments: [], subtasks: [{ id: 's1', title: 'Draft pricing', completed: true }, { id: 's2', title: 'Legal review', completed: false }], assigned_user_id: 'u1', assigned_user_name: 'Sam Lee', related_to: { type: 'deal', id: 'd1', name: 'TechCorp renewal' } },
+    { id: 't1', title: 'Send proposal to TechCorp', description: 'Pricing + timeline', due_date: iso(at(D)), priority: 'high', status: 'pending', category: 'email', type: 'proposal', completed: false, created_at: iso(now), tags: ['sales'], attachments: [], subtasks: [{ id: 's1', title: 'Draft pricing', completed: true }, { id: 's2', title: 'Legal review', completed: false }], assigned_user_id: 'u1', assigned_user_name: 'Sam Lee', is_favorite: true, related_to: { type: 'deal', id: 'd1', name: 'TechCorp renewal' } },
     { id: 't2', title: 'Prepare demo environment', description: '', due_date: iso(at(D + 2)), priority: 'urgent', status: 'in-progress', category: 'meeting', type: 'meeting', completed: false, created_at: iso(now), tags: [], attachments: [], subtasks: [], assigned_user_id: 'u2', assigned_user_name: 'Priya Rao', related_to: { type: 'contact', id: 'c1', name: 'Ada Lovelace' } },
     { id: 't3', title: 'Deep work: roadmap', description: '', due_date: iso(at(D)), start_time: iso(at(D, 9)), end_time: iso(at(D, 11)), priority: 'medium', status: 'in-progress', category: 'other', type: 'research', completed: false, created_at: iso(now), tags: [], attachments: [], subtasks: [], assigned_user_id: 'u1', assigned_user_name: 'Sam Lee' },
     { id: 't4', title: 'Send contract to Ada', description: '', due_date: iso(at(Math.max(1, D - 3))), priority: 'low', status: 'completed', category: 'email', type: 'email', completed: true, created_at: iso(now), tags: [], attachments: [], subtasks: [], related_to: { type: 'contact', id: 'c1', name: 'Ada Lovelace' } },
     { id: 't5', title: 'Follow up with Grace', description: '', due_date: iso(at(D + 4)), priority: 'medium', status: 'pending', category: 'call', type: 'follow-up', completed: false, created_at: iso(now), tags: [], attachments: [], subtasks: [], assigned_user_id: 'u2', assigned_user_name: 'Priya Rao' }
   ],
   deals: [
-    { id: 'd1', title: 'TechCorp renewal', company: 'TechCorp Solutions', value: '$85,000', probability: '85', due_date: ymd(at(D + 1)), contact_id: 'c1', status: 'online', stage: 'negotiation', priority: 'high', ai_prediction: 87, created_at: iso(now), updated_at: iso(now), position: 1 },
+    { id: 'd1', title: 'TechCorp renewal', company: 'TechCorp Solutions', value: '$85,000', probability: '85', due_date: ymd(at(D + 1)), contact_id: 'c1', status: 'online', stage: 'negotiation', priority: 'high', ai_prediction: 87, created_at: iso(now), updated_at: iso(now), position: 1, is_favorite: true },
     { id: 'd3', title: 'Initech pilot', company: 'Initech', value: '$30,000', probability: '40', due_date: ymd(at(D + 5)), contact_id: 'c2', status: 'online', stage: 'proposal', priority: 'low', ai_prediction: 55, created_at: iso(now), updated_at: iso(now), position: 2 },
     { id: 'd2', title: 'Globex expansion', company: 'Globex', value: '$120,000', probability: '60', due_date: ymd(at(D + 5)), contact_id: 'c2', status: 'offline', stage: 'proposal', priority: 'medium', ai_prediction: 72, created_at: iso(now), updated_at: iso(now) }
   ],
@@ -134,7 +134,7 @@ const linkedEvents = () => ({
     const rows = page.locator('.rbc-month-row');
     for (let r = 0; r < await rows.count(); r++) {
       const dates = rows.nth(r).locator('.rbc-date-cell:not(.rbc-off-range) button, .rbc-date-cell:not(.rbc-off-range) a');
-      for (let c = 0; c < await dates.count(); c++) if ((await dates.nth(c).innerText()).trim() === String(dayNumber)) return rows.nth(r).locator('.rbc-day-bg').nth(c);
+      for (let c = 0; c < await dates.count(); c++) if (((await dates.nth(c).innerText()).trim().match(/(\d+)$/) || [])[1] === String(dayNumber)) return rows.nth(r).locator('.rbc-day-bg').nth(c);
     }
   };
   const target = Math.min(D + 3, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate());
@@ -260,6 +260,25 @@ const linkedEvents = () => ({
   await page.getByRole('dialog').getByRole('button', { name: 'Compact' }).click(); await wait(500);
   await shot('33-deal-details-compact');
   await page.getByRole('dialog').getByRole('button', { name: 'Full' }).click(); await page.keyboard.press('Escape'); await wait(300);
+
+  // ---------------- 4e. Group A: favorites, task rows, click-a-day, preview ----------------
+  await open();
+  await page.locator('h2:has-text("Favorites")').scrollIntoViewIfNeeded(); await wait(400);
+  await shot('34-favorites-block');
+  await page.getByTitle('List View').click(); await wait(900);
+  await page.locator('h2:has-text("All Tasks")').scrollIntoViewIfNeeded(); await wait(300);
+  await shot('35-task-list-chips-avatar-star');
+  await page.getByTitle('Calendar View').click(); await wait(700);
+  await calendar().scrollIntoViewIfNeeded(); await wait(300);
+  await page.locator('.rbc-event:has-text("TechCorp Solutions")').first().hover(); await wait(500);
+  await calendarBlock('36-card-preview-popover');
+  await page.mouse.move(5, 5); await wait(200);
+  const emptyCell = page.locator('.rbc-month-row .rbc-day-bg:not(.rbc-off-range-bg)').nth(25); await emptyCell.scrollIntoViewIfNeeded(); // an empty day late in the month
+  await emptyCell.click({ force: true }); await wait(500);
+  await calendarBlock('37-click-empty-day-chooser');
+  await page.getByRole('menuitem', { name: /New event/ }).click(); await wait(700);
+  await shot('38-new-event-prefilled-for-that-day');
+  await page.keyboard.press('Escape'); await wait(300);
 
   // ---------------- 5. Delete mock data ----------------
   await open();

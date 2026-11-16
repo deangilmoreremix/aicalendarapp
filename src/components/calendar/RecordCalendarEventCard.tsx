@@ -3,8 +3,9 @@
  * Pattern from twentyhq/twenty record-calendar-card (RecordCalendarCard / Header / Body): a card shows the record's
  * visible fields. Rendered inside react-big-calendar's event slot, in this app's styling.
  */
-import { CalendarCheck, CalendarDays, Handshake, ListChecks, User } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Handshake, ListChecks, Star, User } from 'lucide-react';
 
+import { RecordPreview } from './RecordPreview';
 import type { UnifiedCalendarRecord, UnifiedRecordType } from './unifiedCalendarRecords';
 
 const ICONS: Record<UnifiedRecordType, React.ComponentType<{ className?: string }>> = {
@@ -27,6 +28,7 @@ export const RecordCalendarEventCard = ({ record, isSelected, compact, onContext
   const done = record.status === 'completed' || record.status === 'closed-won' || record.status === 'cancelled';
 
   return (
+    <RecordPreview record={record}>
     <div
       data-selected={isSelected}
       data-record-type={record.type}
@@ -36,9 +38,11 @@ export const RecordCalendarEventCard = ({ record, isSelected, compact, onContext
       <div className={`flex items-center gap-1 truncate text-xs font-medium ${done ? 'line-through opacity-80' : ''}`}>
         <Icon className="h-3 w-3 shrink-0" />
         <span className="truncate">{record.title}</span>
+        {record.isFavorite && <Star aria-label="Favorite" className="h-3 w-3 shrink-0 fill-current" />}
         {record.type === 'task' && record.status === 'completed' && <CalendarCheck className="h-3 w-3 shrink-0" />}
       </div>
       {!compact && record.subtitle && <div className="truncate text-[10px] opacity-90">{record.subtitle}</div>}
     </div>
+    </RecordPreview>
   );
 };
