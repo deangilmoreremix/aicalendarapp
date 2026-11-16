@@ -102,7 +102,7 @@ export const CalendarSettings: React.FC = () => {
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-gray-700 dark:text-gray-300">Week starts on</span>
-            <select
+            <select aria-label="Week starts on"
               className={inputClass}
               value={prefs.weekStartsOn}
               onChange={e => update('weekStartsOn', Number(e.target.value) as 0 | 1)}

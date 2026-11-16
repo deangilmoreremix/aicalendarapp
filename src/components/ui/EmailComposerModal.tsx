@@ -299,6 +299,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
               </Button>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -323,6 +324,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => removeRecipient('to', recipientId)}
+                      aria-label="Remove recipient"
                       className="ml-1 text-gray-500 hover:text-gray-700"
                     >
                       <X size={12} />
@@ -331,7 +333,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                 ))}
               </div>
               <div className="flex gap-2">
-                <select
+                <select aria-label="Recipient type"
                   value={recipientType}
                   onChange={(e) => setRecipientType(e.target.value as 'to' | 'cc' | 'bcc')}
                   className="px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -347,7 +349,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                   onKeyPress={(e) => e.key === 'Enter' && addRecipient()}
                   className="flex-1 rounded-l-none"
                 />
-                <Button type="button" onClick={addRecipient} size="sm">
+                <Button type="button" onClick={addRecipient} size="sm" aria-label="Add recipient">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -369,6 +371,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => removeRecipient('cc', recipientId)}
+                      aria-label="Remove recipient"
                         className="ml-1 text-gray-500 hover:text-gray-700"
                       >
                         <X size={12} />
@@ -392,6 +395,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => removeRecipient('bcc', recipientId)}
+                      aria-label="Remove recipient"
                         className="ml-1 text-gray-500 hover:text-gray-700"
                       >
                         <X size={12} />
@@ -515,6 +519,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => removeAttachment(index)}
+                    aria-label="Remove attachment"
                     className="text-red-500 hover:text-red-700"
                   >
                     <X size={16} />
@@ -545,7 +550,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Priority
             </label>
-            <select
+            <select aria-label="Priority"
               value={formData.priority}
               onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'low' | 'normal' | 'high' }))}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"

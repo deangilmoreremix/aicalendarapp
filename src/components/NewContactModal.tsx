@@ -444,6 +444,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
 
             <button
               onClick={handleClose}
+              aria-label="Close"
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-6 h-6" />
@@ -549,6 +550,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   </label>
                   <input
                     type="date"
+                    aria-label="Birthday"
                     value={formData.birthday}
                     onChange={(e) => handleInputChange('birthday', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -597,7 +599,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Preferred Contact Method
                   </label>
-                  <select
+                  <select aria-label="Preferred contact method"
                     value={formData.preferredContact}
                     onChange={(e) => handleInputChange('preferredContact', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -688,7 +690,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Industry
                   </label>
-                  <select
+                  <select aria-label="Industry"
                     value={formData.industry}
                     onChange={(e) => handleInputChange('industry', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -824,7 +826,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
-                  <select
+                  <select aria-label="Status"
                     value={formData.status}
                     onChange={(e) => handleInputChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -950,6 +952,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                       <button
                         type="button"
                         onClick={() => handleRemoveCustomField(fieldName)}
+                        aria-label={`Remove ${fieldName}`}
                         className="p-1 text-red-400 hover:text-red-600 transition-colors"
                       >
                         <X className="w-4 h-4" />

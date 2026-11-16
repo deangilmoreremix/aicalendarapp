@@ -274,7 +274,7 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Associated Contact *
                   </label>
-                  <select
+                  <select aria-label="Associated contact"
                     value={formData.contactId}
                     onChange={(e) => handleContactChange(e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
@@ -318,7 +318,7 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Probability
                   </label>
-                  <select
+                  <select aria-label="Probability"
                     value={formData.probability}
                     onChange={(e) => handleInputChange('probability', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"

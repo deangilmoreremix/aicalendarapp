@@ -298,6 +298,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               )}
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -386,7 +387,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Priority
                     </label>
-                    <select
+                    <select aria-label="Priority"
                       value={formData.priority}
                       onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as Task['priority'] }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -402,7 +403,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
-                  <select
+                  <select aria-label="Status"
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Task['status'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -422,7 +423,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category
                   </label>
-                  <select
+                  <select aria-label="Category"
                     value={formData.category}
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as Task['category'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -439,7 +440,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Type
                   </label>
-                  <select
+                  <select aria-label="Type"
                     value={formData.type}
                     onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as Task['type'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"

@@ -887,7 +887,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   <div className="p-3 bg-gray-50 rounded-lg">
                     <div className="mb-2">
                       <label className="block text-xs text-gray-500 mb-1">Platform</label>
-                      <select
+                      <select aria-label="Social platform"
                         value={selectedSocialPlatform}
                         onChange={(e) => setSelectedSocialPlatform(e.target.value)}
                         className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"

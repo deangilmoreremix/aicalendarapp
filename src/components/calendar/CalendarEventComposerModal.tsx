@@ -143,7 +143,7 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
 
           <label className="block text-sm">
             <span className="mb-1 block text-gray-700 dark:text-gray-300">Time zone</span>
-            <select className={inputClass} value={composer.timeZone} onChange={(e) => composer.handleTimeZoneChange(e.target.value)}>
+            <select aria-label="Time zone" className={inputClass} value={composer.timeZone} onChange={(e) => composer.handleTimeZoneChange(e.target.value)}>
               {timeZones.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}

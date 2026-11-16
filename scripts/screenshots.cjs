@@ -121,14 +121,14 @@ const linkedEvents = () => ({
   await calendarBlock('02-week-view-timed-task');
   await page.getByRole('button', { name: 'Month' }).click(); await wait(500);
 
-  await page.getByRole('button', { name: /filter calendar/i }).click(); await wait(400);
+  await page.getByRole('button', { name: /^filters/i }).click(); await wait(400);
   await calendarBlock('03-filters');
   await page.getByRole('checkbox', { name: 'Deals' }).uncheck(); await wait(500);
   await calendarBlock('04-filters-deals-hidden');
   await page.getByRole('checkbox', { name: 'Deals' }).check();
   await page.keyboard.press('Escape'); await page.mouse.click(5, 5); await wait(300);
 
-  await page.getByRole('button', { name: /saved views/i }).click(); await wait(400);
+  await page.getByRole('button', { name: /^views/i }).click(); await wait(400);
   await calendarBlock('05-saved-views');
   await page.mouse.click(5, 5); await wait(300);
 
@@ -312,7 +312,7 @@ const linkedEvents = () => ({
 
   // ---------------- 4h. Group D: advanced filters + table view ----------------
   await open();
-  await page.getByRole('button', { name: /filter calendar/i }).click(); await wait(400);
+  await page.getByRole('button', { name: /^filters/i }).click(); await wait(400);
   await page.getByRole('button', { name: /Add rule/ }).click(); await wait(200);
   await page.getByLabel('Rule 1 field').selectOption('title');
   await page.getByLabel('Rule 1 operator').selectOption('contains');

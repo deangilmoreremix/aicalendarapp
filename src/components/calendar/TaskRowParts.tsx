@@ -70,7 +70,7 @@ export const InlineDueDate = ({ task }: { task: Pick<Task, 'id' | 'title' | 'due
     <button
       type="button"
       title="Change due date"
-      aria-label={`Change due date for ${task.title}`}
+      aria-label={`${getDueChip(task)?.label ?? 'Set due date'}: change due date for ${task.title}`}
       onClick={(e) => {
         e.stopPropagation();
         setEditing(true);

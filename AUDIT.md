@@ -62,12 +62,19 @@ calendar event, saved view and setting. Add sign-in and per-user policies before
 | 14 edge functions (validation, fallbacks, OpenAI request shape, errors, streaming, image upload) | 44 handler tests | pass; live API untested |
 | Database: full migration chain + access as anon/authenticated | Postgres 16 | pass |
 | Home screen: stat trends, Recent Activity, Tasks Schedule, Stage Funnel, Interaction History | tests + browser | **real data** (was hardcoded); empty states when there is none |
-| Accessibility (axe) | browser | backlog below |
+| Accessibility (axe) | browser | critical issues fixed; contrast/heading-order remain (see Accessibility) |
 
-## Accessibility backlog (not fixed; existing components)
-axe found, per view: unlabelled `<select>`s (about 10 across New Contact/Deal, Email, filters), icon-only buttons without names
-(modal close buttons, contact detail edit pencils, kanban header), checkboxes/date inputs without labels, low-contrast green
-stat chips (`text-green-500` on white), no `<main>` landmark / heading order. Counts and elements are reproducible with the sweep.
+## Accessibility (axe-core, `node scripts/axe-audit.cjs`)
+Run on 5 views x desktop/mobile. Before -> after, per view (critical/serious/moderate rule types):
+- **Fixed**: `select-name` (every `<select>` now has an accessible name), `label` (list-view checkboxes, birthday date input),
+  `button-name` (modal close buttons, kanban add-task, email recipient/attachment remove, contact custom-field remove),
+  `nested-interactive` (kanban favorite star removed from draggable cards; Interaction History card no longer a `role=button`
+  containing a button), `label-content-name-mismatch` (command menu, due-date button, Filters/Views), `landmark-one-main`
+  (`<main>` added), `page-has-heading-one`, week-number and Delete-mock-data text contrast.
+- **Result**: no critical issues remain (was 4 rule types incl. `select-name` x2-5 and `button-name` x1-4 per view).
+- **Still open (design-dependent, left as is by the "do not change the design" rule)**: `color-contrast` on white text over
+  coloured calendar event bars / blue avatar chips / Interaction History cards (about 3-20 nodes per view), `heading-order`
+  (1-2 per view) and `region` on the New Contact modal (13 nodes, dialog content outside landmarks).
 
 ## Needs your keys (cannot run here)
 - Deploy: `supabase link`, `supabase db push` (chain now applies), `supabase functions deploy`, `supabase secrets set OPENAI_API_KEY ...`.

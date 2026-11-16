@@ -54,7 +54,7 @@ export const CalendarFiltersMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Filter calendar">
+        <Button variant="outline" size="sm">
           <Filter className="mr-2 h-4 w-4" />
           Filters{activeCount > 0 ? ` (${activeCount})` : ''}
         </Button>

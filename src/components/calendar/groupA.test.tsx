@@ -92,7 +92,7 @@ describe('task row parts', () => {
   it('changes the due date in place and keeps the time of day', async () => {
     const due = new Date(2026, 10, 12, 15, 30);
     render(<InlineDueDate task={{ id: 't1', title: 'Send proposal', dueDate: due, completed: false }} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Change due date for Send proposal' }));
+    fireEvent.click(screen.getByRole('button', { name: /change due date for Send proposal/ }));
     fireEvent.change(screen.getByLabelText('Due date for Send proposal'), { target: { value: '2026-11-20' } });
     await waitFor(() => expect(api.taskUpdate).toHaveBeenCalled());
     const sent = api.taskUpdate.mock.calls[0][1].dueDate as Date;
@@ -101,7 +101,7 @@ describe('task row parts', () => {
 
   it('Escape leaves the date unchanged', () => {
     render(<InlineDueDate task={{ id: 't1', title: 'Send proposal', dueDate: new Date(2026, 10, 12), completed: false }} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Change due date for Send proposal' }));
+    fireEvent.click(screen.getByRole('button', { name: /change due date for Send proposal/ }));
     fireEvent.keyDown(screen.getByLabelText('Due date for Send proposal'), { key: 'Escape' });
     expect(screen.queryByLabelText('Due date for Send proposal')).toBeNull();
     expect(api.taskUpdate).not.toHaveBeenCalled();

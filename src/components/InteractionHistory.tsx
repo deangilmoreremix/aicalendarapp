@@ -46,10 +46,7 @@ export const InteractionHistory: React.FC = () => {
         {interactions.map((interaction) => (
           <div 
             key={interaction.id} 
-            role="button"
-            tabIndex={0}
             onClick={() => openRecord('deal', interaction.id)}
-            onKeyDown={(e) => e.key === 'Enter' && openRecord('deal', interaction.id)}
             className={`
               ${interaction.bgColor} ${interaction.textColor} 
               rounded-2xl p-5 hover:scale-105 transition-all duration-300 cursor-pointer
@@ -66,7 +63,9 @@ export const InteractionHistory: React.FC = () => {
             </div>
             
             <div className="mb-6">
-              <h3 className="font-semibold text-sm mb-3 leading-tight">{interaction.type}</h3>
+              <h3 className="font-semibold text-sm mb-3 leading-tight">
+                <button type="button" className="text-left" onClick={(e) => { e.stopPropagation(); openRecord('deal', interaction.id); }}>{interaction.type}</button>
+              </h3>
               <p className="text-2xl font-bold">{interaction.value}</p>
             </div>
             

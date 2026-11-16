@@ -53,7 +53,7 @@ describe('CommandMenu', () => {
 
   it('the header button opens it', async () => {
     render(<><CommandMenuButton isDark={false} /><CommandMenu {...handlers()} /></>);
-    fireEvent.click(screen.getByRole('button', { name: 'Open command menu' }));
+    fireEvent.click(screen.getByRole('button', { name: /Open command menu/ }));
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
   });
 

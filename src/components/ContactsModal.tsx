@@ -721,7 +721,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-2">
               {/* Sort Dropdown */}
-              <select
+              <select aria-label="Sort contacts"
                 value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [field, order] = e.target.value.split('-');

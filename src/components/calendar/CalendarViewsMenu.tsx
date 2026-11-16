@@ -60,7 +60,7 @@ export const CalendarViewsMenu = ({ current, onApply }: CalendarViewsMenuProps) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Saved views">
+        <Button variant="outline" size="sm">
           <Bookmark className="mr-2 h-4 w-4" />
           Views
         </Button>

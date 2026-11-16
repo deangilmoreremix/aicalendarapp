@@ -114,7 +114,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Filters */}
-              <select
+              <select aria-label="Filter by status"
                 value={filters.statuses?.[0] || 'all'}
                 onChange={(e) => setFilters(prev => ({ ...prev, statuses: e.target.value === 'all' ? undefined : [e.target.value as Task['status']] }))}
                 className={`px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
@@ -131,7 +131,7 @@ const App: React.FC = () => {
                 <option value="cancelled">Cancelled</option>
               </select>
 
-              <select
+              <select aria-label="Filter by priority"
                 value={filters.priorities?.[0] || 'all'}
                 onChange={(e) => setFilters(prev => ({ ...prev, priorities: e.target.value === 'all' ? undefined : [e.target.value as Task['priority']] }))}
                 className={`px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
@@ -166,6 +166,7 @@ const App: React.FC = () => {
                 <div className="flex items-center space-x-4">
                   <input
                     type="checkbox"
+                    aria-label={`Mark ${task.title} complete`}
                     checked={task.completed}
                     onChange={(e) => {
                       e.stopPropagation();
@@ -272,7 +273,7 @@ const App: React.FC = () => {
               className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 isDark
                   ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30 border border-red-500/20'
-                  : 'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm border border-red-200'
+                  : 'bg-red-50 text-red-700 hover:bg-red-100 shadow-sm border border-red-200'
               }`}
               title="Delete sample data (your own records are kept)"
               aria-label="Delete mock data"
@@ -387,6 +388,8 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      <main>
+
       {/* Task Statistics */}
       <TaskStats />
 
@@ -489,6 +492,8 @@ const App: React.FC = () => {
       <div className="space-y-8">
         {renderView()}
       </div>
+
+      </main>
 
       {/* Contact Modals */}
       <ContactsModal

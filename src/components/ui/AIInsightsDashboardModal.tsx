@@ -153,6 +153,7 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <X size={20} />
@@ -209,7 +210,7 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
           {/* Filters */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
-              <select
+              <select aria-label="Filter by category"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as any)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -223,7 +224,7 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
             </div>
 
             <div className="flex-1">
-              <select
+              <select aria-label="Filter by impact"
                 value={selectedImpact}
                 onChange={(e) => setSelectedImpact(e.target.value as any)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

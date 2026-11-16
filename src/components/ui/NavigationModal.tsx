@@ -215,6 +215,7 @@ export const NavigationModal: React.FC<NavigationModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <X size={20} />

@@ -1,4 +1,3 @@
-import { TaskFavoriteStar } from './calendar/TaskRowParts';
 import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
@@ -103,7 +102,6 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) 
                 {task.attachments.length > 0 && (
                   <Paperclip className="h-4 w-4 text-gray-400" />
                 )}
-                <TaskFavoriteStar task={task} />
               </div>
             </div>
 
@@ -226,6 +224,7 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
         size="sm"
         variant="ghost"
         onClick={onAddTask}
+        aria-label="Add task to column"
         className="h-6 w-6 p-0 hover:bg-white/50 dark:hover:bg-gray-700/50"
       >
         <Plus className="h-4 w-4" />

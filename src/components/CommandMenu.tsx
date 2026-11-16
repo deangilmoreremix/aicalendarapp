@@ -251,13 +251,13 @@ export const CommandMenuButton = ({ isDark }: { isDark: boolean }) => (
   <button
     type="button"
     onClick={() => window.dispatchEvent(new Event('command-menu:open'))}
-    aria-label="Open command menu"
     title="Search and commands (Ctrl+K)"
     className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors ${
       isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm border border-gray-200'
     }`}
   >
     <Search size={18} />
-    <span className="hidden md:inline text-xs opacity-70">Ctrl K</span>
+    <span className="sr-only">Open command menu</span>
+    <span className="hidden md:inline text-xs">Ctrl K</span>
   </button>
 );

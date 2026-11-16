@@ -272,7 +272,7 @@ describe('CalendarFiltersMenu', () => {
         onFieldByTypeChange={onFieldByTypeChange}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /filter calendar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^filters/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Deals' }));
     expect(onVisibleTypesChange).toHaveBeenCalledWith(['task', 'contact', 'event']);
     fireEvent.click(screen.getByLabelText('completed'));
@@ -296,7 +296,7 @@ describe('CalendarFiltersMenu', () => {
         onFieldByTypeChange={vi.fn()}
       />
     );
-    expect(screen.getByRole('button', { name: /filter calendar/i })).toHaveTextContent('Filters (4)');
+    expect(screen.getByRole('button', { name: /^filters/i })).toHaveTextContent('Filters (4)');
   });
 });
 
@@ -307,7 +307,7 @@ describe('CalendarViewsMenu (saved views)', () => {
     const saved = { id: 'v1', name: 'My week', position: 0, isDefault: false, ...current };
     api.viewsCreate.mockResolvedValue(saved);
     render(<CalendarViewsMenu current={current} onApply={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /saved views/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^views/i }));
     fireEvent.change(screen.getByLabelText('View name'), { target: { value: 'My week' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.viewsCreate).toHaveBeenCalledWith({ ...current, name: 'My week' }));
@@ -320,7 +320,7 @@ describe('CalendarViewsMenu (saved views)', () => {
     api.viewsDelete.mockResolvedValue(undefined);
     const onApply = vi.fn();
     render(<CalendarViewsMenu current={current} onApply={onApply} />);
-    fireEvent.click(screen.getByRole('button', { name: /saved views/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^views/i }));
     fireEvent.click(await screen.findByText('Deals only'));
     expect(onApply).toHaveBeenCalledWith(view);
     fireEvent.click(screen.getByRole('button', { name: 'Delete view Deals only' }));
@@ -332,7 +332,7 @@ describe('CalendarViewsMenu (saved views)', () => {
     api.viewsCreate.mockRejectedValue(new Error('x'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<CalendarViewsMenu current={current} onApply={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /saved views/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^views/i }));
     fireEvent.change(screen.getByLabelText('View name'), { target: { value: 'Broken' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Could not save the view.')).toBeInTheDocument();
@@ -451,7 +451,7 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
   it('hides a record type from the filters menu', async () => {
     render(<BigTaskCalendar />);
     await screen.findByText('TechCorp');
-    fireEvent.click(screen.getByRole('button', { name: /filter calendar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^filters/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Deals' }));
     await waitFor(() => expect(screen.queryByText('TechCorp')).toBeNull());
     expect(screen.getByText('Send proposal')).toBeInTheDocument();

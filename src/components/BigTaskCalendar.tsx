@@ -801,7 +801,7 @@ export const BigTaskCalendar: React.FC = () => {
               // ISO week number on each Monday (Twenty's record calendar shows week numbers)
               dateHeader: ({ label, date, drilldownView, onDrillDown }: { label: string; date: Date; drilldownView?: string | null; onDrillDown?: (e: React.MouseEvent) => void }) => (
                 <>
-                  {date.getDay() === 1 && <span className="mr-1 text-[10px] text-gray-400" title="Week number">W{getISOWeek(date)}</span>}
+                  {date.getDay() === 1 && <span className="mr-1 text-[10px] text-gray-600" title="Week number">W{getISOWeek(date)}</span>}
                   {drilldownView ? (
                     <button type="button" className="rbc-button-link" onClick={onDrillDown}>
                       {label}
