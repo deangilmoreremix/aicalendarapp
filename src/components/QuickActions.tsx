@@ -44,7 +44,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewContact, onCont
     }
   ];
 
-  const handleDealCreated = (deal: any) => {
+  const _handleDealCreated = (deal: any) => {
     console.log('Deal created:', deal);
     // In a real app, this would update the deals store
     alert(`Deal "${deal.title}" created successfully!`);

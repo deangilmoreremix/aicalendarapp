@@ -5,7 +5,6 @@ import { Input } from './input';
 import { Badge } from './badge';
 import { Textarea } from './textarea';
 import { useContactStore } from '../../store/contactStore';
-import { useAI } from '../../contexts/AIContext';
 import { Contact } from '../../types';
 import { aiApi, activityApi } from '../../services/api';
 import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
@@ -56,7 +55,6 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
   prefilledBody = ''
 }) => {
   const { contacts } = useContactStore();
-  const { isProcessing } = useAI();
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -270,7 +268,7 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
     return recipientId.includes('@') ? recipientId : `${recipientId} <unknown@email.com>`;
   };
 
-  const contactsArray = Object.values(contacts);
+  const _contactsArray = Object.values(contacts);
 
   if (!isOpen) return null;
 

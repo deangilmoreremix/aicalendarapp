@@ -128,7 +128,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     }));
   };
 
-  const handleAIWriting = async (field: 'title' | 'description', context?: string) => {
+  const handleAIWriting = async (field: 'title' | 'description', _context?: string) => {
     setAiWritingLoading(field);
 
     try {

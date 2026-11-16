@@ -259,7 +259,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       // Simulate bulk processing
       for (let i = 0; i < contacts.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
-        const score = await scoreContact(contacts[i]);
+        const _score = await scoreContact(contacts[i]);
         // In real implementation, this would update the contact store
       }
     } finally {

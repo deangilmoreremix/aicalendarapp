@@ -8,28 +8,28 @@ import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
 import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
 import { aiEnrichmentService, ContactEnrichmentData } from '../services/aiEnrichmentService';
 // Placeholder components for missing imports
-const CommunicationHub = ({ contact }: { contact: Contact }) => (
+const CommunicationHub = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Communication Hub</h3>
     <p className="text-gray-600">Communication tools coming soon...</p>
   </div>
 );
 
-const AutomationPanel = ({ contact }: { contact: Contact }) => (
+const AutomationPanel = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Automation Panel</h3>
     <p className="text-gray-600">Automation tools coming soon...</p>
   </div>
 );
 
-const ContactAnalytics = ({ contact }: { contact: Contact }) => (
+const ContactAnalytics = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Contact Analytics</h3>
     <p className="text-gray-600">Analytics dashboard coming soon...</p>
   </div>
 );
 
-const ContactEmailPanel = ({ contact }: { contact: Contact }) => (
+const ContactEmailPanel = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Email Panel</h3>
     <p className="text-gray-600">Email functionality coming soon...</p>
@@ -184,13 +184,13 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
         let updates: Partial<Contact> = {};
         
         if (editingField.startsWith('social_')) {
-          const platform = editingField.replace('social_', '');
+          const _platform = editingField.replace('social_', '');
           const socialProfiles = {
             ...(editedContact.socialProfiles || {}),
           };
           updates = { socialProfiles };
         } else if (editingField.startsWith('custom_')) {
-          const fieldName = editingField.replace('custom_', '');
+          const _fieldName = editingField.replace('custom_', '');
           const customFields = {
             ...(editedContact.customFields || {}),
           };
@@ -274,7 +274,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     }
   };
 
-  const handleRemoveSocialProfile = async (platform: string) => {
+  const _handleRemoveSocialProfile = async (platform: string) => {
     if (!editedContact.socialProfiles) return;
     
     const socialProfiles = { ...editedContact.socialProfiles };

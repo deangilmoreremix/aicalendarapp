@@ -76,7 +76,7 @@ const funnelData = [
 
 export const TasksAndFunnel: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const { optimizeMeetingTime, generateMeetingAgenda, isProcessing } = useAI();
+  const { optimizeMeetingTime, generateMeetingAgenda } = useAI();
   const [meetingSuggestions, setMeetingSuggestions] = useState<Date[]>([]);
   const [suggestedAgenda, setSuggestedAgenda] = useState<string[]>([]);
   const [isLoadingMeetingAI, setIsLoadingMeetingAI] = useState(false);

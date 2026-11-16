@@ -84,7 +84,8 @@ export const RecordTimeline = ({
   const toggleGroup = (key: string) =>
     setCollapsed((cur) => {
       const next = new Set(cur);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 

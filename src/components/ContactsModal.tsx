@@ -16,21 +16,21 @@ interface ContactsModalProps {
   onClose: () => void;
 }
 
-const interestColors = {
+const _interestColors = {
   hot: 'bg-red-500',
   medium: 'bg-yellow-500',
   low: 'bg-blue-500',
   cold: 'bg-gray-400'
 };
 
-const interestLabels = {
+const _interestLabels = {
   hot: 'Hot Client',
   medium: 'Medium Interest',
   low: 'Low Interest',
   cold: 'Non Interest'
 };
 
-const sourceColors: { [key: string]: string } = {
+const _sourceColors: { [key: string]: string } = {
   'LinkedIn': 'bg-blue-600',
   'Facebook': 'bg-blue-500',
   'Email': 'bg-green-500',
@@ -57,8 +57,8 @@ const statusOptions = [
 ];
 
 export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose }) => {
-  const { contacts, isLoading, updateContact, createContact } = useContactStore();
-  const { scoreBulkContacts, generateBulkInsights, isProcessing } = useAI();
+  const { contacts, updateContact } = useContactStore();
+  const { scoreBulkContacts, generateBulkInsights } = useAI();
   
   // UI State
   const [activeFilter, setActiveFilter] = useState('all');
@@ -77,7 +77,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const [aiResults, setAiResults] = useState<{success: number, failed: number} | null>(null);
   const [analyzingContactIds, setAnalyzingContactIds] = useState<string[]>([]);
   const [aiFilterMode, setAiFilterMode] = useState<'all' | 'high-score' | 'needs-attention' | 'opportunities'>('all');
-  const [smartInsights, setSmartInsights] = useState<any[]>([]);
+  const [_smartInsights, setSmartInsights] = useState<any[]>([]);
   
   // Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -304,7 +304,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     setSelectedContact(null);
   };
 
-  const handleSort = (field: typeof sortBy) => {
+  const _handleSort = (field: typeof sortBy) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {

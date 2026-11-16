@@ -25,7 +25,7 @@ export const AIAutoFillButton: React.FC<AIAutoFillButtonProps> = ({
   className = ''
 }) => {
   const [isEnriching, setIsEnriching] = useState(false);
-  const [lastEnrichment, setLastEnrichment] = useState<Date | null>(null);
+  const [_lastEnrichment, setLastEnrichment] = useState<Date | null>(null);
 
   const handleEnrichment = async () => {
     if (!canEnrich()) return;

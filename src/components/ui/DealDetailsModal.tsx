@@ -57,10 +57,9 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
   isOpen,
   onClose,
   dealId,
-  onDealUpdated
 }) => {
   const { contacts } = useContactStore();
-  const { predictDealSuccess, isProcessing } = useAI();
+  const { predictDealSuccess } = useAI();
 
   const { deals: dealViews } = useDealViews(isOpen);
   const [deal, setDeal] = useState<DealDetails | null>(null);

@@ -30,7 +30,7 @@ export const AIInsightsDashboardModal: React.FC<AIInsightsDashboardModalProps> =
   isOpen,
   onClose
 }) => {
-  const { generateInsights, isProcessing } = useAI();
+  const { generateInsights } = useAI();
   const { contacts } = useContactStore();
   const { deals } = useDealStore();
   const { tasks } = useTaskStore();

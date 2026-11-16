@@ -1,7 +1,6 @@
 import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
-import { useContactStore } from '../store/contactStore';
 import { contactApi } from '../services/api';
 import { X, Upload, Download, AlertCircle, CheckCircle, Info, Users, Database, FileSpreadsheet } from 'lucide-react';
 
@@ -101,7 +100,7 @@ const validateContact = (data: Record<string, string>): string[] => {
 export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen, onClose }) => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [_csvData, setCsvData] = useState<string[][]>([]);
   const [parsedContacts, setParsedContacts] = useState<any[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -110,7 +109,6 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
   const [activeTab, setActiveTab] = useState<'guide' | 'upload' | 'preview'>('guide');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { importContacts } = useContactStore();
 
   const downloadTemplate = () => {
     const csvContent = [

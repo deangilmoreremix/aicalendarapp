@@ -14,8 +14,7 @@ import { SlotChooser } from './calendar/SlotChooser';
 import { getISOWeek } from 'date-fns';
 import { useDetailLayout } from '../store/detailLayoutStore';
 import { compareWithinDay, getDayRecords } from './calendar/dayOrder';
-import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
-import { toTimelineCalendarEvent, getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
+import { getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
 import {
   Dialog,
   DialogContent,
@@ -641,7 +640,7 @@ export const BigTaskCalendar: React.FC = () => {
   };
 
   // Custom toolbar
-  const CustomToolbar = ({ date, view, onNavigate, onView }: Pick<ToolbarProps<TaskEvent, object>, 'date' | 'view' | 'onNavigate' | 'onView'>) => {
+  const CustomToolbar = ({ view, onNavigate, onView }: Pick<ToolbarProps<TaskEvent, object>, 'date' | 'view' | 'onNavigate' | 'onView'>) => {
     const navigate = (action: NavigateAction) => {
       onNavigate(action);
     };

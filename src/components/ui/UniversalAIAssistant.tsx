@@ -36,7 +36,7 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
   currentData,
   config
 }) => {
-  const { generateTaskSuggestions, streamTaskSuggestions, isProcessing } = useAI();
+  const { streamTaskSuggestions, isProcessing } = useAI();
   const [prompt, setPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [streamingState, setStreamingState] = useState<StreamingState>({
@@ -44,8 +44,8 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
     currentText: '',
     completedText: ''
   });
-  const [selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
-  const streamingTimeoutRef = useRef<NodeJS.Timeout>();
+  const [_selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
+  const _streamingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     // Auto-populate prompt with current data if available
@@ -231,7 +231,7 @@ export const UniversalAIAssistant: React.FC<UniversalAIAssistantProps> = ({
   };
 
   const renderSuggestionCard = (suggestion: any) => {
-    const Icon = config.icon;
+    const _Icon = config.icon;
 
     switch (config.mode) {
       case 'deal':

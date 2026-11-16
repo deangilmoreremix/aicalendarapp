@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponses, callResponsesJson, hasOpenAIKey, extractCitations } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

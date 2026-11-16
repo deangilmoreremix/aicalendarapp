@@ -25,7 +25,7 @@ export const StreamingContainer: React.FC<StreamingContainerProps> = ({
   children
 }) => {
   const streamingAI = useStreamingAI();
-  const [citations, setCitations] = useState<Citation[]>([]);
+  const [citations, _setCitations] = useState<Citation[]>([]);
   const researchStats = { sourcesFound: 0, citationsCollected: 0, currentSource: 'OpenAI web search' };
 
   // Handle streaming completion
@@ -136,7 +136,7 @@ export const WebResearchContainer: React.FC<{
   query: string;
   onResult?: (result: string, citations: Citation[]) => void;
   className?: string;
-}> = ({ query, onResult, className = '' }) => {
+}> = ({ onResult, className = '' }) => {
   const streamingAI = useStreamingAI();
   const [citations, setCitations] = useState<Citation[]>([]);
 
@@ -158,7 +158,7 @@ export const WebResearchContainer: React.FC<{
     <StreamingContainer
       operationType="web-research"
       className={className}
-      onComplete={(result) => {
+      onComplete={(_result) => {
         // Citations will be set in useEffect above
       }}
     >

@@ -1,4 +1,3 @@
-import { initialsAvatar } from '../utils/avatars';
 import { create } from 'zustand';
 import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
 import { taskApi, calendarEventApi } from '../services/api';

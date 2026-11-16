@@ -4,7 +4,7 @@
  * Uses the app's own dialog and colours.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarPlus, Handshake, ListChecks, Search, Star, User, CalendarDays, Zap } from 'lucide-react';
+import { Handshake, ListChecks, Search, Star, User, CalendarDays, Zap } from 'lucide-react';
 
 import { Dialog, DialogContent } from './ui/dialog';
 import { TaskDetailsModal } from './TaskDetailsModal';

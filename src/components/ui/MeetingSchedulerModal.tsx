@@ -54,7 +54,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
 }) => {
   const { contacts } = useContactStore();
   const { createTask } = useTaskStore();
-  const { optimizeMeetingTime, generateMeetingAgenda, isProcessing } = useAI();
+  const { optimizeMeetingTime, generateMeetingAgenda } = useAI();
 
   const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<{

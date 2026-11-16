@@ -82,7 +82,7 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   Phone
 };
 
-const toolMapping: Record<string, string> = {
+const _toolMapping: Record<string, string> = {
   'leadScoring': 'business-analyzer',
   'emailPersonalization': 'email-composer', 
   'contactEnrichment': 'smart-search',
@@ -221,7 +221,7 @@ export const AIGoalsButton: React.FC<{
   size?: 'sm' | 'md';
   variant?: 'primary' | 'secondary';
   className?: string;
-}> = ({ entityType, entityId, entityData, size = 'sm', variant = 'primary', className = '' }) => {
+}> = ({ size = 'sm', className = '' }) => {
   return (
     <button
       className={`
@@ -243,13 +243,11 @@ export const CustomizableAIToolbar: React.FC<CustomizableAIToolbarProps> = ({
   entityType,
   entityId,
   entityData,
-  location,
-  layout,
   size,
   showCustomizeButton = true
 }) => {
-  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
-  const [customQuickActions, setCustomQuickActions] = useState(defaultQuickActions);
+  const [_showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [customQuickActions, _setCustomQuickActions] = useState(defaultQuickActions);
 
   return (
     <div className="space-y-3">

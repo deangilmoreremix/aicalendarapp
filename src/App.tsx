@@ -12,7 +12,7 @@ import { useAI } from './contexts/AIContext';
 import { Task, TaskFilters } from './types';
 import { useTaskStore } from './store/taskStore';
 import { useContactStore } from './store/contactStore';
-import { formatDate, getPriorityColor, getCategoryColor } from './utils';
+import { getPriorityColor, getCategoryColor } from './utils';
 import { InteractiveContactScorer } from './components/InteractiveContactScorer';
 import { TasksAndFunnel } from './components/TasksAndFunnel';
 import { InteractionHistory } from './components/InteractionHistory';

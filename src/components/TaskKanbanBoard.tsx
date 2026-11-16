@@ -246,13 +246,13 @@ export const TaskKanbanBoard: React.FC = () => {
     isLoading
   } = useTaskStore();
   const selectedTask = selectedTaskId ? allTasks[selectedTaskId] ?? null : null;
-  const { predictNextBestAction, generateInsights, isProcessing } = useAI();
+  const { generateInsights, isProcessing } = useAI();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<Task['status'] | null>(null);
-  const [aiTaskInsights, setAiTaskInsights] = useState<Record<string, string>>({});
+  const [_aiTaskInsights, _setAiTaskInsights] = useState<Record<string, string>>({});
   const [smartSuggestions, setSmartSuggestions] = useState<any[]>([]);
 
   // Memoised: getFilteredTasks() returns a new array every call, and `tasks` drives the AI-insights effect below.

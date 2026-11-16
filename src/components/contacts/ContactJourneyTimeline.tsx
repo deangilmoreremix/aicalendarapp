@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import type { Activity, Contact } from '../../types';
+import React from 'react';
+import type { Contact } from '../../types';
 
 import { RecordTimeline } from './RecordTimeline';
 import type { CalendarTargetType } from '../../services/api';

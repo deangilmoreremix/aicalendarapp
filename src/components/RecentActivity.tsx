@@ -11,7 +11,7 @@ import { AIInsightsDashboardModal } from './ui/AIInsightsDashboardModal';
 
 const RecentActivity: React.FC = () => {
   const { isDark } = useTheme();
-  const { generateInsights, predictDealSuccess, isProcessing } = useAI();
+  const { generateInsights, predictDealSuccess } = useAI();
   const { contacts } = useContactStore();
   const [aiAlerts, setAiAlerts] = useState<any[]>([]);
   const [dealPredictions, setDealPredictions] = useState<Record<string, number>>({});
@@ -23,7 +23,7 @@ const RecentActivity: React.FC = () => {
   const [showAIInsightsModal, setShowAIInsightsModal] = useState(false);
   const [selectedDealId, setSelectedDealId] = useState<string | undefined>();
 
-  const handleViewAllDeals = () => {
+  const _handleViewAllDeals = () => {
     setShowDealsManagementModal(true);
   };
 

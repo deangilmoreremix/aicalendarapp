@@ -6,7 +6,7 @@ import type { FilterGroup, FilterRule } from './types';
 const now = new Date(2026, 10, 16, 15);
 let n = 0;
 const rule = (field: string, operand: FilterRule['operand'], extra: Partial<FilterRule> = {}): FilterRule => ({ id: `r${n++}`, field, operand, ...extra });
-const field = <T,>(defs: any[], key: string) => defs.find((d) => d.key === key);
+const field = <_T,>(defs: any[], key: string) => defs.find((d) => d.key === key);
 const t = (over: any = {}) => ({ id: '1', title: 'Send proposal to TechCorp', status: 'pending', priority: 'high', type: 'proposal', tags: ['sales', 'q4'], completed: false, ...over });
 
 describe('text operands', () => {

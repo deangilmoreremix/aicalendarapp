@@ -26,7 +26,6 @@ export const MoreOptionsModal: React.FC<MoreOptionsModalProps> = ({
   isOpen,
   onClose,
   onOptionSelected,
-  context = 'general',
   title = "More Options"
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'actions' | 'settings' | 'export' | 'collaboration'>('all');

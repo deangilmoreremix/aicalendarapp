@@ -15,14 +15,14 @@ const socialPlatforms = [
 ];
 
 export const CustomerProfile: React.FC = () => {
-  const { predictNextBestAction, analyzeInteractionHistory, isProcessing } = useAI();
+  const { predictNextBestAction, analyzeInteractionHistory } = useAI();
   const { contacts: contactsById } = useContactStore();
   const contacts = React.useMemo(() => Object.values(contactsById), [contactsById]);
   const [selectedContact, setSelectedContact] = useState(contacts[0] || null);
   const [nextBestAction, setNextBestAction] = useState<string | null>(null);
   const [interactionData, setInteractionData] = useState<any>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
+  const [_aiInsights, _setAiInsights] = useState<any[]>([]);
 
   // Load AI insights for the selected contact
   useEffect(() => {

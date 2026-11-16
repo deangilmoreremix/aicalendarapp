@@ -110,7 +110,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [lastEnrichmentData, setLastEnrichmentData] = useState<ContactEnrichmentData | null>(null);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [aiWritingLoading, setAiWritingLoading] = useState<string | null>(null);
+  const [_aiWritingLoading, _setAiWritingLoading] = useState<string | null>(null);
 
   const { createContact } = useContactStore();
 

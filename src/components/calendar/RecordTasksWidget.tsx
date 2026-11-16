@@ -4,7 +4,6 @@
  * grouped by status (rule in groupTasksByStatus.ts), each with a completion checkbox. Styled with this app's design.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
 import { Plus } from 'lucide-react';
 
 import { useTaskStore } from '../../store/taskStore';

@@ -41,7 +41,7 @@ export const AITaskAssistant: React.FC<AITaskAssistantProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<TaskSuggestion | null>(null);
+  const [_selectedSuggestion, setSelectedSuggestion] = useState<TaskSuggestion | null>(null);
 
   useEffect(() => {
     // Auto-populate prompt with current task data if available

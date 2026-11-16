@@ -20,7 +20,7 @@ const toDate = (v: unknown): Date | null => {
 export const toNumber = (v: unknown): number | null => {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   if (typeof v === 'string') {
-    const n = parseFloat(v.replace(/[^0-9.\-]/g, ''));
+    const n = parseFloat(v.replace(/[^0-9.-]/g, ''));
     return Number.isFinite(n) ? n : null;
   }
   return null;

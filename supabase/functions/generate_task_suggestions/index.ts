@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     // Basic sanitization - remove potentially harmful characters
-    const sanitizedPrompt = prompt.replace(/[<>\"'&]/g, '')
+    const sanitizedPrompt = prompt.replace(/[<>"'&]/g, '')
 
     if (stream) {
       return handleStreamingResponse(prompt, context)
@@ -116,7 +116,7 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
   return generateRuleBasedSuggestions(prompt, context)
 }
 
-function generateRuleBasedSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
+function generateRuleBasedSuggestions(prompt: string, _context?: any): Promise<TaskSuggestion[]> {
   // Original rule-based logic as fallback
   const lowerPrompt = prompt.toLowerCase()
 

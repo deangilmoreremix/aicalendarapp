@@ -25,7 +25,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   onNewDeal
 }) => {
   const { contacts } = useContactStore();
-  const { predictDealSuccess, isProcessing } = useAI();
+  const { predictDealSuccess } = useAI();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
@@ -35,12 +35,12 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<Record<string, number>>({});
 
-  const { deals: dealList, isLoading: dealsLoading, error: dealsError } = useDealViews(isOpen);
+  const { deals: dealList } = useDealViews(isOpen);
   const mockDeals = dealList;
 
   // Filter and sort deals
   const filteredDeals = useMemo(() => {
-    let filtered = mockDeals.filter(deal => {
+    const filtered = mockDeals.filter(deal => {
       const contact = contacts[deal.contactId];
       const matchesSearch = deal.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (contact && contact.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -63,11 +63,12 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
           aValue = parseInt(a.probability);
           bValue = parseInt(b.probability);
           break;
-        case 'dueDate':
+        case 'dueDate': {
           const dateOrder = { 'Tomorrow': 1, 'This Week': 2, 'Next Week': 3, 'Next Month': 4 };
           aValue = dateOrder[a.dueDate as keyof typeof dateOrder] || 5;
           bValue = dateOrder[b.dueDate as keyof typeof dateOrder] || 5;
           break;
+        }
         case 'company':
           aValue = a.company.toLowerCase();
           bValue = b.company.toLowerCase();

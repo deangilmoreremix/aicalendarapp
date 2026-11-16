@@ -17,7 +17,7 @@ const dnd = vi.hoisted(() => ({ onDragEnd: null as null | ((r: any) => void) }))
 vi.mock('@hello-pangea/dnd', () => ({
   DragDropContext: ({ children, onDragEnd }: any) => ((dnd.onDragEnd = onDragEnd), <>{children}</>),
   Droppable: ({ children }: any) => children({ innerRef: () => undefined, droppableProps: {}, placeholder: null }),
-  Draggable: ({ children, draggableId, index }: any) =>
+  Draggable: ({ children }: any) =>
     children({ innerRef: () => undefined, draggableProps: {}, dragHandleProps: {} }, { isDragging: false })
 }));
 

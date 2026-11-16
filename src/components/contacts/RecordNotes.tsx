@@ -13,7 +13,7 @@ import type { Activity } from '../../types';
 export type NoteEntityType = Activity['entityType'];
 
 export const noteTitle = (body: string) => {
-  const first = body.trim().split('\n')[0].replace(/[*`#\[\]()]/g, '').trim();
+  const first = body.trim().split('\n')[0].replace(/[*`#[\]()]/g, '').trim();
   return first.length > 60 ? `${first.slice(0, 57)}…` : first || 'Note';
 };
 

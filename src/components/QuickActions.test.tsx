@@ -5,12 +5,12 @@ import { QuickActions } from './QuickActions';
 
 // Mock the modal components
 vi.mock('./ui/MeetingSchedulerModal', () => ({
-  MeetingSchedulerModal: ({ isOpen, onClose }: any) =>
+  MeetingSchedulerModal: ({ isOpen }: any) =>
     isOpen ? <div data-testid="meeting-scheduler-modal">Meeting Scheduler</div> : null,
 }));
 
 vi.mock('./ui/EmailComposerModal', () => ({
-  EmailComposerModal: ({ isOpen, onClose }: any) =>
+  EmailComposerModal: ({ isOpen }: any) =>
     isOpen ? <div data-testid="email-composer-modal">Email Composer</div> : null,
 }));
 
@@ -60,7 +60,7 @@ describe('QuickActions Component - Button Functionality', () => {
   test('all buttons have proper onClick handlers', () => {
     renderQuickActions();
 
-    const buttons = screen.getAllByRole('button');
+    const _buttons = screen.getAllByRole('button');
 
     // Test that clicking buttons calls the expected functions
     const newContactButton = screen.getByText('New Contact');
