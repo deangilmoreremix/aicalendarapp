@@ -42,6 +42,8 @@ const db = {
   activities: [
     { id: 'a1', type: 'email_sent', title: 'Email: Pricing follow-up', description: 'Sent the revised pricing.', user_id: 'u1', user_name: 'Sam Lee', entity_type: 'contact', entity_id: 'c1', created_at: iso(at(Math.max(1, D - 2), 9)) },
     { id: 'a2', type: 'meeting_held', title: 'Discovery meeting', description: '45 min intro call', user_id: 'u1', user_name: 'Sam Lee', entity_type: 'contact', entity_id: 'c1', created_at: iso(at(Math.max(1, D - 5), 15)) },
+    { id: 'n1', type: 'note_added', title: 'Prefers a Thursday call', description: '**Prefers Thursday calls.**\n- Send the pricing deck first\n- Loop in finance: [pricing page](https://example.com/pricing)', user_id: 'u1', user_name: 'You', entity_type: 'contact', entity_id: 'c1', created_at: iso(at(Math.max(1, D - 1), 10)), metadata: { pinned: true } },
+    { id: 'n2', type: 'note_added', title: 'Met at the conference', description: 'Met at the *SaaS summit*. Interested in the enterprise plan.', user_id: 'u1', user_name: 'You', entity_type: 'contact', entity_id: 'c1', created_at: iso(new Date(now.getFullYear(), now.getMonth() - 1, 20, 14)), metadata: {} },
     { id: 'a3', type: 'deal_moved', title: 'Moved to Negotiation', description: '', user_id: 'u1', user_name: 'Sam Lee', entity_type: 'deal', entity_id: 'd1', created_at: iso(at(Math.max(1, D - 1), 11)) }
   ],
   calendar_views: [{ id: 'v1', name: 'Sales pipeline', calendar_layout: 'MONTH', field_by_type: {}, filters: {}, visible_types: ['deal', 'contact', 'event'], position: 0, is_default: false }],
@@ -279,6 +281,16 @@ const linkedEvents = () => ({
   await page.getByRole('menuitem', { name: /New event/ }).click(); await wait(700);
   await shot('38-new-event-prefilled-for-that-day');
   await page.keyboard.press('Escape'); await wait(300);
+
+  // ---------------- 4f. Group B: notes + timeline ----------------
+  await open();
+  await page.getByText('View All Contacts').first().click(); await wait(900);
+  await page.locator('h3:has-text("Ada Lovelace"), h4:has-text("Ada Lovelace")').first().click({ force: true }); await wait(1000);
+  await page.getByRole('button', { name: 'Journey', exact: true }).first().click(); await wait(1000);
+  await shot('39-contact-notes-and-timeline');
+  await page.getByRole('button', { name: 'Emails', exact: true }).first().click().catch(() => {}); await wait(400);
+  await shot('40-timeline-filtered-by-type');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await wait(300);
 
   // ---------------- 5. Delete mock data ----------------
   await open();

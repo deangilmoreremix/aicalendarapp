@@ -432,6 +432,19 @@ export const dealApi = {
 };
 
 // Activity API
+const mapActivityFromDB = (activity: any): Activity => ({
+  id: activity.id,
+  type: activity.type,
+  title: activity.title,
+  description: activity.description,
+  userId: activity.user_id,
+  userName: activity.user_name,
+  entityType: activity.entity_type,
+  entityId: activity.entity_id,
+  createdAt: new Date(activity.created_at),
+  metadata: activity.metadata
+});
+
 export const activityApi = {
   async getAll(): Promise<Activity[]> {
     const { data, error } = await supabase
@@ -441,18 +454,18 @@ export const activityApi = {
 
     if (error) throw error;
 
-    return data.map(activity => ({
-      id: activity.id,
-      type: activity.type,
-      title: activity.title,
-      description: activity.description,
-      userId: activity.user_id,
-      userName: activity.user_name,
-      entityType: activity.entity_type,
-      entityId: activity.entity_id,
-      createdAt: new Date(activity.created_at),
-      metadata: activity.metadata
-    }));
+    return data.map(mapActivityFromDB);
+  },
+
+  /** Activities of one record (server-side filter; the timelines use this instead of loading everything). */
+  async getForEntity(entityId: string): Promise<Activity[]> {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('entity_id', entityId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapActivityFromDB);
   },
 
   async create(activity: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {
@@ -473,20 +486,25 @@ export const activityApi = {
 
     if (error) throw error;
 
-    return {
-      id: data.id,
-      type: data.type,
-      title: data.title,
-      description: data.description,
-      userId: data.user_id,
-      userName: data.user_name,
-      entityType: data.entity_type,
-      entityId: data.entity_id,
-      createdAt: new Date(data.created_at),
-      metadata: data.metadata
-    };
+    return mapActivityFromDB(data);
+  },
+
+  async update(id: string, updates: Partial<Pick<Activity, 'title' | 'description' | 'metadata'>>): Promise<Activity> {
+    const patch: Record<string, unknown> = {};
+    if (updates.title !== undefined) patch.title = updates.title;
+    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.metadata !== undefined) patch.metadata = updates.metadata;
+    const { data, error } = await supabase.from('activities').update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return mapActivityFromDB(data);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('activities').delete().eq('id', id);
+    if (error) throw error;
   }
 };
+
 
 export interface ContactScoreResult {
   score: number;

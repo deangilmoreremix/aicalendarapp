@@ -9,7 +9,8 @@ const { getTimeline, create, getSettings } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/api', () => ({
-  calendarEventApi: { getTimeline, create, getSettings }
+  calendarEventApi: { getTimeline, create, getSettings },
+  activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() }
 }));
 
 import { CalendarEventsCard } from './CalendarEventsCard';

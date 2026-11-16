@@ -2,6 +2,8 @@ import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { LayoutToggle } from './LayoutToggle';
+import { RecordNotes } from '../contacts/RecordNotes';
+import { RecordActivityTimeline } from '../contacts/ContactJourneyTimeline';
 import { useDetailLayout } from '../../store/detailLayoutStore';
 import { Button } from './button';
 import { Badge } from './badge';
@@ -329,6 +331,9 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                 composerContext={{ targets: [{ type: 'deal', id: deal.id }] }}
               />
             )}
+
+            {!isCompact && <RecordNotes entityType="deal" entityId={deal.id} />}
+            {!isCompact && <RecordActivityTimeline entityId={deal.id} entityType="deal" title="Deal activity" />}
 
             {/* Recent Activities */}
             {!isCompact && <div>
