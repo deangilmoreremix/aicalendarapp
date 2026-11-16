@@ -390,6 +390,47 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     expect(await screen.findByLabelText('Related record')).toBeInTheDocument();
   });
 
+  it('edits a calendar event from the context menu: form is prefilled and Save persists the changes', async () => {
+    api.eventUpdate.mockResolvedValue(event({ title: 'Kickoff v2' }));
+    render(<BigTaskCalendar />);
+    fireEvent.contextMenu(await screen.findByText('Kickoff'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    const title = (await screen.findByLabelText('Title')) as HTMLInputElement;
+    expect(title.value).toBe('Kickoff'); // prefilled from the event
+    expect(screen.getByRole('heading', { name: 'Edit event' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Guests')).toBeNull(); // guests are not edited here
+    fireEvent.change(title, { target: { value: 'Kickoff v2' } });
+    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Room 4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.eventUpdate).toHaveBeenCalledWith(
+        'e1',
+        expect.objectContaining({ title: 'Kickoff v2', location: 'Room 4', isAllDay: false, startDate: expect.any(Date), endDate: expect.any(Date) })
+      )
+    );
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit event' })).toBeNull()); // closes after saving
+  });
+
+  it('"Edit Event" in the event details opens the same editor', async () => {
+    render(<BigTaskCalendar />);
+    fireEvent.click(await screen.findByText('Kickoff'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Event' }));
+    expect(await screen.findByRole('heading', { name: 'Edit event' })).toBeInTheDocument();
+    expect(((await screen.findByLabelText('Title')) as HTMLInputElement).value).toBe('Kickoff');
+  });
+
+  it('keeps the event unchanged when the edit is cancelled or fails', async () => {
+    api.eventUpdate.mockRejectedValue(new Error('boom'));
+    render(<BigTaskCalendar />);
+    fireEvent.contextMenu(await screen.findByText('Kickoff'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Changed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Failed to save changes')).toBeInTheDocument(); // stays open with the error
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByText('Kickoff')).toBeInTheDocument(); // calendar still shows the original title
+  });
+
   it('loads events for the visible window', async () => {
     render(<BigTaskCalendar />);
     await waitFor(() => expect(api.getRange).toHaveBeenCalled());

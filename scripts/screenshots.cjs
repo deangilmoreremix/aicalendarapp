@@ -216,6 +216,17 @@ const linkedEvents = () => ({
   await shot('24-new-contact-ai-autofill-and-avatar');
   await page.keyboard.press('Escape'); await wait(300);
 
+  // ---------------- 4b. Edit a calendar event ----------------
+  await open();
+  await page.locator('.rbc-event:has-text("Renewal call")').first().click({ button: 'right' }); await wait(400);
+  await page.getByRole('menuitem', { name: 'Edit' }).click(); await wait(800);
+  await page.getByLabel('Title').fill('Renewal call with Ada (moved to Zoom)'); await wait(300);
+  await shot('27-edit-calendar-event');
+  const patch = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('calendar_events'), { timeout: 8000 }).catch(() => null);
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  const req = await patch; console.log('PATCH calendar_events body:', req ? req.postData() : 'NOT SENT');
+  await wait(800);
+
   // ---------------- 5. Delete mock data ----------------
   await open();
   await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);

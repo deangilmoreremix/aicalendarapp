@@ -15,6 +15,7 @@ import { getCalendarEventDatesAfterModeChange } from '../../vendor/twenty/calend
 import { getCalendarEventDatesAfterStartChange } from '../../vendor/twenty/calendar/utils/getCalendarEventDatesAfterStartChange';
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
+import type { CalendarEvent } from '../../types';
 
 export type CalendarComposerAttendee = { handle: string; displayName?: string; contactId?: string };
 
@@ -27,29 +28,45 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+// All-day values are plain dates (YYYY-MM-DD); timed values are ISO instants
+const localDateString = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const toStoredDate = (value: string, isFullDay: boolean) =>
+  isFullDay ? new Date(`${value}T00:00:00`) : new Date(value);
+
 export const useCalendarEventComposer = ({
   context,
-  onCreated
+  onCreated,
+  editing
 }: {
   context: CalendarComposerContext;
   onCreated: () => void;
+  /** When set, the composer edits this event instead of creating a new one. */
+  editing?: CalendarEvent;
 }) => {
   const [timeZone, setTimeZone] = useState(browserTimeZone);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [conferenceLink, setConferenceLink] = useState('');
-  const [isFullDay, setIsFullDay] = useState(false);
+  const [title, setTitle] = useState(editing?.title ?? '');
+  const [description, setDescription] = useState(editing?.description ?? '');
+  const [location, setLocation] = useState(editing?.location ?? '');
+  const [conferenceLink, setConferenceLink] = useState(editing?.conferenceLink ?? '');
+  const [isFullDay, setIsFullDay] = useState(editing?.isAllDay ?? false);
   const [guestsText, setGuestsText] = useState(context.defaultAttendee?.handle ?? '');
-  const [visibility, setVisibility] = useState<CalendarChannelVisibility>(CalendarChannelVisibility.SHARE_EVERYTHING);
+  const [visibility, setVisibility] = useState<CalendarChannelVisibility>(
+    (editing?.visibility as CalendarChannelVisibility | undefined) ?? CalendarChannelVisibility.SHARE_EVERYTHING
+  );
   const [dates, setDates] = useState(() =>
-    getCalendarEventComposerDefaultDates({ now: Temporal.Now.instant(), timeZone: browserTimeZone() })
+    editing
+      ? editing.isAllDay
+        ? { startsAt: localDateString(editing.startDate), endsAt: localDateString(editing.endDate) }
+        : { startsAt: editing.startDate.toISOString(), endsAt: editing.endDate.toISOString() }
+      : getCalendarEventComposerDefaultDates({ now: Temporal.Now.instant(), timeZone: browserTimeZone() })
   );
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Default visibility comes from the user's calendar settings
+  // Default visibility comes from the user's calendar settings (only for new events; an edited event keeps its own)
   useEffect(() => {
+    if (editing) return;
     calendarEventApi
       .getSettings()
       .then(({ defaultVisibility }) => setVisibility(defaultVisibility))
@@ -63,7 +80,7 @@ export const useCalendarEventComposer = ({
   const invalidGuests = guestHandles.filter((handle) => !EMAIL_PATTERN.test(handle));
 
   const hasValidDateRange = isFullDay ? dates.endsAt > dates.startsAt : Date.parse(dates.endsAt) > Date.parse(dates.startsAt);
-  const canCreate = title.trim().length > 0 && hasValidDateRange && invalidGuests.length === 0 && !isCreating;
+  const canCreate = title.trim().length > 0 && hasValidDateRange && (editing ? true : invalidGuests.length === 0) && !isCreating;
 
   const handleStartChange = (startsAt: string) =>
     setDates((current) => getCalendarEventDatesAfterStartChange({ dates: current, startsAt, isFullDay }));
@@ -85,6 +102,22 @@ export const useCalendarEventComposer = ({
     setIsCreating(true);
     setError(null);
     try {
+      if (editing) {
+        // Guests and record links are left as they are; only the event's own fields change
+        await calendarEventApi.update(editing.id, {
+          title: title.trim(),
+          description,
+          location,
+          startDate: toStoredDate(dates.startsAt, isFullDay),
+          endDate: toStoredDate(dates.endsAt, isFullDay),
+          isAllDay: isFullDay,
+          timeZone,
+          visibility,
+          conferenceLink
+        });
+        onCreated();
+        return;
+      }
       const defaultAttendee = context.defaultAttendee;
       await calendarEventApi.create({
         title: title.trim(),
@@ -105,12 +138,12 @@ export const useCalendarEventComposer = ({
       });
       onCreated();
     } catch (err) {
-      console.error('Failed to create calendar event:', err);
-      setError('Failed to create calendar event');
+      console.error('Failed to save calendar event:', err);
+      setError(editing ? 'Failed to save changes' : 'Failed to create calendar event');
     } finally {
       setIsCreating(false);
     }
-  }, [canCreate, context, title, description, location, dates, isFullDay, timeZone, visibility, conferenceLink, guestHandles, onCreated]);
+  }, [canCreate, editing, context, title, description, location, dates, isFullDay, timeZone, visibility, conferenceLink, guestHandles, onCreated]);
 
   return {
     title,
@@ -135,6 +168,7 @@ export const useCalendarEventComposer = ({
     handleEndChange,
     hasValidDateRange,
     canCreate,
+    isEditing: !!editing,
     isCreating,
     error,
     handleCreate

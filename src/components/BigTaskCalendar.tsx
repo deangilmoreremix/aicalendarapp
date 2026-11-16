@@ -57,6 +57,7 @@ import { CalendarFiltersMenu } from './calendar/CalendarFiltersMenu';
 import { CalendarViewsMenu } from './calendar/CalendarViewsMenu';
 import type { CalendarView, CalendarViewFilters } from '../services/api';
 import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
+import { CalendarEventComposerModal } from './calendar/CalendarEventComposerModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
 const localizer = momentLocalizer(moment);
@@ -315,6 +316,7 @@ export const BigTaskCalendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>('month');
   const [selectedEvent, setSelectedEvent] = useState<TaskEvent | null>(null);
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -444,8 +446,7 @@ export const BigTaskCalendar: React.FC = () => {
     } else if (selectedEvent.resource.type === 'contact') {
       setEditContactId(selectedEvent.resource.record.id);
     } else {
-      // Handle calendar event editing
-      console.log('Edit calendar event:', selectedEvent.resource.data);
+      setEditingCalendarEvent(selectedEvent.resource.record.raw as CalendarEvent);
     }
   };
 
@@ -516,6 +517,7 @@ export const BigTaskCalendar: React.FC = () => {
         setShowTaskModal(true);
       } else if (record.type === 'deal') setEditDealId(record.id);
       else if (record.type === 'contact') setEditContactId(record.id);
+      else if (record.type === 'event') setEditingCalendarEvent(record.raw as CalendarEvent);
     } else if (action === 'duplicate') ok = await duplicateRecord(record);
     else if (action === 'tomorrow') ok = await rescheduleRecordByDays(record, 1);
     else if (action === 'nextWeek') ok = await rescheduleRecordByDays(record, 7);
@@ -797,6 +799,17 @@ export const BigTaskCalendar: React.FC = () => {
             await updateContact(id, updates);
             return useContactStore.getState().contacts[id] ?? contacts[id];
           }}
+        />
+      )}
+
+      {/* Calendar event editor */}
+      {editingCalendarEvent && (
+        <CalendarEventComposerModal
+          isOpen
+          editing={editingCalendarEvent}
+          context={{ targets: [] }}
+          onClose={() => setEditingCalendarEvent(null)}
+          onCreated={() => void loadCalendarEvents(visibleRange.from, visibleRange.to)}
         />
       )}
 

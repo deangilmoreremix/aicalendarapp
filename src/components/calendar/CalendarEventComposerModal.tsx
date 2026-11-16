@@ -8,6 +8,7 @@ import { X } from 'lucide-react';
 
 import { Dialog, DialogContent } from '../ui/dialog';
 import { useCalendarEventComposer, type CalendarComposerContext } from './useCalendarEventComposer';
+import type { CalendarEvent } from '../../types';
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 
 export type { CalendarComposerContext } from './useCalendarEventComposer';
@@ -17,6 +18,8 @@ type CalendarEventComposerModalProps = {
   onClose: () => void;
   onCreated: () => void;
   context: CalendarComposerContext;
+  /** Edit this event instead of creating a new one. */
+  editing?: CalendarEvent;
 };
 
 const inputClass =
@@ -36,9 +39,10 @@ const instantToLocalInput = (instant: string, timeZone: string) =>
 const localInputToInstant = (value: string, timeZone: string) =>
   Temporal.PlainDateTime.from(value).toZonedDateTime(timeZone).toInstant().toString();
 
-export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context }: CalendarEventComposerModalProps) => {
+export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context, editing }: CalendarEventComposerModalProps) => {
   const composer = useCalendarEventComposer({
     context,
+    editing,
     onCreated: () => {
       onCreated();
       onClose();
@@ -60,12 +64,13 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
           }}
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">New event</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{composer.isEditing ? 'Edit event' : 'New event'}</h2>
             <button type="button" aria-label="Close" onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X className="h-5 w-5" />
             </button>
           </div>
 
+          {!composer.isEditing && (
           <label className="block text-sm">
             <span className="mb-1 block text-gray-700 dark:text-gray-300">Guests</span>
             <input
@@ -78,6 +83,7 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
               <span className="mt-1 block text-xs text-red-600">Invalid email: {composer.invalidGuests.join(', ')}</span>
             )}
           </label>
+          )}
 
           <label className="block text-sm">
             <span className="mb-1 block text-gray-700 dark:text-gray-300">Title</span>
@@ -209,7 +215,7 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
               disabled={!composer.canCreate}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {composer.isCreating ? 'Creating...' : 'Create event'}
+              {composer.isCreating ? (composer.isEditing ? 'Saving...' : 'Creating...') : composer.isEditing ? 'Save changes' : 'Create event'}
             </button>
           </div>
         </form>

@@ -39,7 +39,7 @@ export const RecordContextMenu = ({ record, position, onAction, onClose }: Recor
   const left = Math.max(8, Math.min(position.x, window.innerWidth - MENU_WIDTH - 8));
   const top = Math.max(8, Math.min(position.y, window.innerHeight - MENU_HEIGHT - 8));
 
-  const canEdit = record.type !== 'event'; // events have no edit form yet
+  const canEdit = true; // tasks, deals and contacts open their modals; events open the event editor
   const canDuplicate = record.type !== 'contact';
   const deleteLabel = record.type === 'contact' ? 'Clear follow-up' : 'Delete';
 

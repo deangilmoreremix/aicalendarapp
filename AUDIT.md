@@ -88,3 +88,9 @@ Earlier sweeps reported that pressing **Edit Task** "did nothing". It was not a 
 
 ## Delete mock data button
 Previously the button only emptied the in-browser stores: nothing was deleted from Supabase (data came back on refresh) and real records on screen were wiped too. It now deletes rows flagged `is_sample` from the database (children before parents) and removes exactly those records from the stores; a database error leaves the screen untouched and is shown in the dialog. Covered by `src/__tests__/audit/sampleData.audit.test.tsx` and verified on Postgres 16 as role `anon` (only flagged rows deleted). Existing demo rows must be flagged once (see `DEPLOY.md`).
+
+## Calendar event editing
+Events could be created, moved and deleted but not edited. The existing event composer now has an edit mode (title, all-day, start/end, time zone, location, video link, description, visibility; guests and record links are left unchanged). It opens from the event details dialog ("Edit Event") and the right-click menu ("Edit"), prefilled, and saves with `calendarEventApi.update`; a failed save keeps the dialog open with an error. Tests in `recordCalendar.test.tsx`; the real browser sends the expected `PATCH calendar_events` body.
+
+## Status of the 12 AI Calendar features
+Done and tested: record calendar, card customization, persisted drag-and-drop, selection/keyboard, filtering, saved views, activity-linked tasks, record timeline, task grouping, embedded task widgets, contextual menus. Not done: detail layouts (#12, no upstream code), within-day position reordering (records have no `position`), external Google/Microsoft sync (excluded by decision). Filters, menu actions, saved-view UI and selection are labelled glue rather than verbatim Twenty code, since upstream has nothing portable there.

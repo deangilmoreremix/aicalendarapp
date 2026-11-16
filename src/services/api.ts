@@ -757,14 +757,17 @@ export const calendarEventApi = {
     return (data ?? []).map(mapCalendarEventFromDB);
   },
 
-  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean }): Promise<CalendarEvent> {
+  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string }): Promise<CalendarEvent> {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (updates.startDate) patch.start_date = updates.startDate.toISOString();
     if (updates.endDate) patch.end_date = updates.endDate.toISOString();
     if (updates.title !== undefined) patch.title = updates.title;
-    if (updates.location !== undefined) patch.location = updates.location;
-    if (updates.description !== undefined) patch.description = updates.description;
+    if (updates.location !== undefined) patch.location = updates.location || null;
+    if (updates.description !== undefined) patch.description = updates.description || null;
     if (updates.isAllDay !== undefined) patch.is_all_day = updates.isAllDay;
+    if (updates.timeZone !== undefined) patch.time_zone = updates.timeZone;
+    if (updates.visibility !== undefined) patch.visibility = updates.visibility;
+    if (updates.conferenceLink !== undefined) patch.conference_link = updates.conferenceLink || null;
     const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', id).select().single();
     if (error) throw error;
     return mapCalendarEventFromDB(data);
