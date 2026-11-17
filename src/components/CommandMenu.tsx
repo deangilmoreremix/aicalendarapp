@@ -240,7 +240,8 @@ export const CommandMenu = ({
           isOpen
           context={{ targets: [] }}
           onClose={() => setCreating(null)}
-          onCreated={() => undefined}
+          // an open calendar only loads events when its range changes, so reload them to show the new event
+          onCreated={() => void useTaskStore.getState().reloadCalendarEvents()}
         />
       )}
     </>

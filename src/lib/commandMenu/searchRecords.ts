@@ -13,7 +13,8 @@ export interface Searchable {
 }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
-const words = (s: string) => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+// split on anything that is not a letter or digit in any script (so 张伟, Иван and Ada all give words)
+const words = (s: string) => norm(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
 /** Score of one query word against one text (0 = no match). */
 const wordScore = (q: string, text: string): number => {

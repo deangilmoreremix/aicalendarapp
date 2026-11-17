@@ -23,6 +23,20 @@ describe('searchRecords', () => {
   it('ignores case and accents', () => {
     expect(searchRecords('ÁDA', recs).map((r) => r.id)).toContain('1');
   });
+  it('finds records written in other scripts (Cyrillic, Chinese, mixed)', () => {
+    const international: Searchable[] = [
+      { type: 'contact', id: 'ru', title: 'Иван Петров', subtitle: 'Москва' },
+      { type: 'contact', id: 'zh', title: '张伟', subtitle: '北京' },
+      { type: 'deal', id: 'mix', title: 'Acme 合同 2026' },
+      { type: 'task', id: 'en', title: 'Call Ada' }
+    ];
+    expect(searchRecords('иван', international).map((r) => r.id)).toEqual(['ru']);
+    expect(searchRecords('петров иван', international).map((r) => r.id)).toEqual(['ru']);
+    expect(searchRecords('张伟', international).map((r) => r.id)).toEqual(['zh']);
+    expect(searchRecords('acme 合同', international).map((r) => r.id)).toEqual(['mix']);
+    expect(scoreRecord('张伟', international[1])).toBeGreaterThan(0);
+    expect(searchRecords('ada', international).map((r) => r.id)).toEqual(['en']); // Latin behaviour unchanged
+  });
   it('returns nothing for an empty query and honours the limit', () => {
     expect(searchRecords('  ', recs)).toEqual([]);
     expect(searchRecords('a', recs, 2)).toHaveLength(2);

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
+const api = vi.hoisted(() => ({ eventCreate: vi.fn() }));
 vi.mock('../services/api', async (orig) => {
   const actual = await orig<typeof import('../services/api')>();
   return {
@@ -9,7 +10,7 @@ vi.mock('../services/api', async (orig) => {
     taskApi: { ...actual.taskApi, getAll: vi.fn().mockResolvedValue([]) },
     dealApi: { ...actual.dealApi, getAll: vi.fn().mockResolvedValue([]) },
     contactApi: { ...actual.contactApi, getAll: vi.fn().mockResolvedValue([]) },
-    calendarEventApi: { ...actual.calendarEventApi, getSettings: vi.fn().mockResolvedValue({ defaultVisibility: 'SHARE_EVERYTHING' }), getTimeline: vi.fn().mockResolvedValue({ timelineCalendarEvents: [], totalNumberOfCalendarEvents: 0 }) },
+    calendarEventApi: { ...actual.calendarEventApi, create: api.eventCreate, getSettings: vi.fn().mockResolvedValue({ defaultVisibility: 'SHARE_EVERYTHING' }), getTimeline: vi.fn().mockResolvedValue({ timelineCalendarEvents: [], totalNumberOfCalendarEvents: 0 }) },
     activityApi: { ...actual.activityApi, getForEntity: vi.fn().mockResolvedValue([]), getAll: vi.fn().mockResolvedValue([]) }
   };
 });
@@ -116,5 +117,20 @@ describe('CommandMenu', () => {
     press();
     fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'zzzzqq' } });
     expect(screen.getByText(/No results for/)).toBeInTheDocument();
+  });
+
+  it('reloads the calendar events after "New event" is saved, so the open calendar shows it', async () => {
+    api.eventCreate.mockResolvedValue('new-id');
+    const reload = vi.fn().mockResolvedValue(undefined);
+    useTaskStore.setState({ reloadCalendarEvents: reload });
+    render(<CommandMenu {...handlers()} />);
+    press();
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'new event' } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Kickoff' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
+    await waitFor(() => expect(api.eventCreate).toHaveBeenCalled());
+    await waitFor(() => expect(reload).toHaveBeenCalled());
   });
 });
