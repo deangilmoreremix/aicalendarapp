@@ -41,7 +41,7 @@ export interface UnifiedCalendarRecord {
 
 /** Which date field places each record type on the calendar (saved per view). */
 export const DEFAULT_FIELD_BY_TYPE: Record<UnifiedRecordType, string> = {
-  task: 'dueDate',
+  task: 'scheduled',
   deal: 'dueDate',
   contact: 'nextFollowUp',
   event: 'startDate'
@@ -49,6 +49,7 @@ export const DEFAULT_FIELD_BY_TYPE: Record<UnifiedRecordType, string> = {
 
 export const DATE_FIELD_OPTIONS: Record<UnifiedRecordType, { value: string; label: string }[]> = {
   task: [
+    { value: 'scheduled', label: 'Scheduled time, else due date' },
     { value: 'dueDate', label: 'Due date' },
     { value: 'startTime', label: 'Start time' }
   ],
@@ -122,16 +123,30 @@ export const buildUnifiedRecords = ({
 
   if (visibleTypes.includes('task')) {
     for (const task of tasks) {
-      const timed = !!task.startTime && !!task.endTime;
-      const anchor = field('task') === 'startTime' ? task.startTime : task.startTime ?? task.dueDate;
-      if (!anchor) continue;
+      // the chosen field decides where the task sits: its due date, its time block, or (default) the time block when it has one
+      const chosen = field('task');
+      let start: Date | undefined;
+      let end: Date | undefined;
+      let timed = false;
+      if (chosen === 'dueDate') {
+        start = end = task.dueDate;
+      } else if (chosen === 'startTime') {
+        start = task.startTime;
+        end = task.endTime ?? task.startTime;
+        timed = !!task.startTime && !!task.endTime;
+      } else {
+        start = task.startTime ?? task.dueDate;
+        end = task.endTime ?? task.dueDate ?? start;
+        timed = !!task.startTime && !!task.endTime;
+      }
+      if (!start || !end) continue;
       out.push({
         key: `task:${task.id}`,
         id: task.id,
         type: 'task',
         title: task.title,
-        start: task.startTime ?? task.dueDate!,
-        end: task.endTime ?? task.dueDate ?? anchor,
+        start,
+        end,
         allDay: !timed,
         status: task.status,
         ownerId: task.assignedUserId,

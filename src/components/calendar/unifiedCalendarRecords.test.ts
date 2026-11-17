@@ -132,6 +132,25 @@ describe('buildUnifiedRecords', () => {
     expect(timed.allDay).toBe(false);
     expect(allDay.allDay).toBe(true);
   });
+
+  it('places a time-blocked task by the selected date field', () => {
+    const blocked = task({
+      id: 'a',
+      dueDate: new Date(2030, 2, 12, 12),
+      startTime: new Date(2030, 2, 10, 9),
+      endTime: new Date(2030, 2, 10, 10)
+    });
+    const place = (task: 'scheduled' | 'dueDate' | 'startTime') =>
+      buildUnifiedRecords({ tasks: [blocked], deals: [], contacts: [], events: [], fieldByType: { task } })[0];
+    expect(place('scheduled').start.getDate()).toBe(10); // default: the time block
+    expect(place('scheduled').allDay).toBe(false);
+    expect(place('dueDate').start.getDate()).toBe(12); // the deadline, as an all-day card
+    expect(place('dueDate').allDay).toBe(true);
+    expect(place('startTime').start.getDate()).toBe(10);
+    // a task with no start time is not shown under "Start time", and one with no due date not under "Due date"
+    expect(buildUnifiedRecords({ tasks: [task({ id: 'b' })], deals: [], contacts: [], events: [], fieldByType: { task: 'startTime' } })).toHaveLength(0);
+    expect(buildUnifiedRecords({ tasks: [task({ id: 'c', dueDate: undefined, startTime: new Date(2030, 2, 10, 9), endTime: new Date(2030, 2, 10, 10) })], deals: [], contacts: [], events: [], fieldByType: { task: 'dueDate' } })).toHaveLength(0);
+  });
 });
 
 describe('applyRecordFilters', () => {

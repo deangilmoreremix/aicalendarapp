@@ -29,6 +29,8 @@ interface TaskActions {
   /** Optimistic update used by calendar drag/reschedule (no global loading flag, rolls back on failure). */
   rescheduleTask: (id: string, taskData: TaskUpdate) => Promise<boolean>;
   loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
+  /** Re-load the range that was last requested (e.g. after an event was created elsewhere). */
+  reloadCalendarEvents: () => Promise<void>;
   rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date; position?: number }) => Promise<boolean>;
   removeCalendarEvent: (id: string) => Promise<boolean>;
   /** Update one loaded event in place (used after an edit saved elsewhere). */
@@ -49,6 +51,7 @@ const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
 
 // only the latest range request may write the store: navigating quickly must not let an older response win
 let latestCalendarRangeRequest = 0;
+let lastCalendarRange: { from: Date; to: Date } | null = null;
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: {},
@@ -256,6 +259,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   loadCalendarEvents: async (from, to) => {
+    lastCalendarRange = { from, to };
     const request = ++latestCalendarRangeRequest;
     try {
       const events = await calendarEventApi.getRange(from, to);
@@ -264,6 +268,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       console.error('Failed to load calendar events:', error);
       if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
     }
+  },
+
+  reloadCalendarEvents: async () => {
+    if (lastCalendarRange) await get().loadCalendarEvents(lastCalendarRange.from, lastCalendarRange.to);
   },
 
   rescheduleCalendarEvent: async (id, updates) => {

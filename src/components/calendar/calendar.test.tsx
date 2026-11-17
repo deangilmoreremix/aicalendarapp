@@ -99,6 +99,23 @@ describe('CalendarEventsCard', () => {
     expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
   });
 
+  it('refreshes the main calendar events after an event is created from the card', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    create.mockResolvedValue('new-id');
+    const reload = vi.fn();
+    const { useTaskStore } = await import('../../store/taskStore');
+    const original = useTaskStore.getState().reloadCalendarEvents;
+    useTaskStore.setState({ reloadCalendarEvents: reload });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    fireEvent.click(screen.getAllByRole('button', { name: /new event/i })[0]);
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Kickoff' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    useTaskStore.setState({ reloadCalendarEvents: original });
+  });
+
   it('shows the empty state with the object name', async () => {
     getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
     render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);

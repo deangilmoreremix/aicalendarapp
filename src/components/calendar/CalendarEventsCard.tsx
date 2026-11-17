@@ -12,6 +12,7 @@ import { CalendarEventDetailsModal } from './CalendarEventDetailsModal';
 import { TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE } from '../../vendor/twenty/calendar/constants/Calendar';
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
+import { useTaskStore } from '../../store/taskStore';
 
 type CalendarEventsCardProps = {
   targetType: CalendarTargetType;
@@ -107,7 +108,11 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         <CalendarEventComposerModal
           isOpen
           onClose={() => setIsComposerOpen(false)}
-          onCreated={() => void load()}
+          onCreated={() => {
+            void load();
+            // the main calendar may be open behind this card: refresh its events too
+            void useTaskStore.getState().reloadCalendarEvents();
+          }}
           context={composerContext ?? { targets: [{ type: targetType, id: targetId }] }}
         />
       )}

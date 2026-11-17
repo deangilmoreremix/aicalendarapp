@@ -710,6 +710,9 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
   };
 };
 
+const GUEST_BATCH_SIZE = 100;
+type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
+
 export const calendarEventApi = {
   async getTimeline(
     targetType: CalendarTargetType,
@@ -795,13 +798,19 @@ export const calendarEventApi = {
     if (events.length === 0) return events;
 
     // guests live in their own table; load them so events opened from the calendar show who is invited
-    const { data: guests, error: guestsError } = await supabase
-      .from('calendar_event_participants')
-      .select('calendar_event_id, handle, display_name, contact_id')
-      .in('calendar_event_id', events.map((e) => e.id));
-    if (guestsError) throw guestsError;
+    // in batches, so a dense range doesn't produce a URL longer than PostgREST accepts
+    const ids = events.map((e) => e.id);
+    const guests: GuestRow[] = [];
+    for (let i = 0; i < ids.length; i += GUEST_BATCH_SIZE) {
+      const { data: batch, error: guestsError } = await supabase
+        .from('calendar_event_participants')
+        .select('calendar_event_id, handle, display_name, contact_id')
+        .in('calendar_event_id', ids.slice(i, i + GUEST_BATCH_SIZE));
+      if (guestsError) throw guestsError;
+      guests.push(...((batch ?? []) as GuestRow[]));
+    }
     const byEvent = new Map<string, CalendarEventParticipant[]>();
-    for (const g of (guests ?? []) as { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null }[]) {
+    for (const g of guests) {
       const list = byEvent.get(g.calendar_event_id) ?? [];
       list.push({ firstName: '', lastName: '', displayName: g.display_name || g.handle, handle: g.handle, personId: g.contact_id ?? undefined });
       byEvent.set(g.calendar_event_id, list);

@@ -10,6 +10,19 @@ import { useTaskStore } from './taskStore';
 
 const ev = (id: string) => ({ id, title: id, startDate: new Date(), endDate: new Date(), isAllDay: false }) as any;
 
+describe('reloadCalendarEvents', () => {
+  it('re-requests the last range', async () => {
+    api.getRange.mockReset();
+    api.getRange.mockResolvedValue([]);
+    const from = new Date(2031, 3, 1);
+    const to = new Date(2031, 3, 30);
+    await useTaskStore.getState().loadCalendarEvents(from, to);
+    api.getRange.mockClear();
+    await useTaskStore.getState().reloadCalendarEvents();
+    expect(api.getRange).toHaveBeenCalledWith(from, to);
+  });
+});
+
 describe('loadCalendarEvents', () => {
   it('ignores a slower, older range response that finishes after a newer one', async () => {
     let resolveOld!: (v: any[]) => void;
