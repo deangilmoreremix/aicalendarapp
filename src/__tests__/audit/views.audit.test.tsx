@@ -83,6 +83,15 @@ describe('CalendarSettings', () => {
     expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
+  it('tells an open calendar that the preferences changed', () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-preferences:changed', heard);
+    render(<CalendarSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    window.removeEventListener('calendar-preferences:changed', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
   it('never goes below a 5 minute default meeting', () => {
     render(<CalendarSettings />);
     fireEvent.change(screen.getByDisplayValue('30'), { target: { value: '-3' } });

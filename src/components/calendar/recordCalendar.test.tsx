@@ -437,6 +437,20 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     await waitFor(() => expect(api.taskUpdate).toHaveBeenCalledWith('t1', expect.objectContaining({ relatedTo: null })));
   });
 
+  it('picks up a new "Week starts on" saved in Calendar Settings without reopening the calendar', async () => {
+    localStorage.removeItem('calendar-preferences');
+    render(<BigTaskCalendar />);
+    await screen.findByText('Send proposal');
+    await waitFor(() => expect(api.getRange).toHaveBeenCalled());
+    expect(api.getRange.mock.calls.at(-1)![0].getDay()).toBe(1); // default: weeks start on Monday
+    localStorage.setItem('calendar-preferences', JSON.stringify({ weekStartsOn: 0 }));
+    act(() => {
+      window.dispatchEvent(new Event('calendar-preferences:changed'));
+    });
+    await waitFor(() => expect(api.getRange.mock.calls.at(-1)![0].getDay()).toBe(0)); // now Sunday
+    localStorage.removeItem('calendar-preferences');
+  });
+
   it('the agenda loads events for the 30 days it shows, not the month grid', async () => {
     render(<BigTaskCalendar />);
     await screen.findByText('Send proposal');

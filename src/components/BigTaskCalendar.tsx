@@ -68,6 +68,8 @@ import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
 import { CalendarEventComposerModal } from './calendar/CalendarEventComposerModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
+import { CALENDAR_PREFERENCES_CHANGED } from '../lib/calendarPreferences';
+
 const localizer = momentLocalizer(moment);
 
 const DnDCalendar = withDragAndDrop<TaskEvent>(Calendar);
@@ -348,7 +350,17 @@ export const BigTaskCalendar: React.FC = () => {
   const [editDealId, setEditDealId] = useState<string | null>(null);
   const [editContactId, setEditContactId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const weekStartsOn = useMemo(readWeekStartsOn, []);
+  // follows Calendar Settings while the calendar is open (same tab: our event; other tabs: the storage event)
+  const [weekStartsOn, setWeekStartsOn] = useState(readWeekStartsOn);
+  useEffect(() => {
+    const refresh = () => setWeekStartsOn(readWeekStartsOn());
+    window.addEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   // Week start from Calendar Settings applies to the week grid
   useEffect(() => {

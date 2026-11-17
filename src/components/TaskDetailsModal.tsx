@@ -44,7 +44,7 @@ interface TaskDetailsModalProps {
 }
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ 
-  task, 
+  task: taskProp, 
   isOpen, 
   onClose, 
   defaultStatus,
@@ -53,6 +53,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   startInEditMode = false
 }) => {
   const { createTask, updateTask, deleteTask } = useTaskStore();
+  // read the task from the store, so a change made while the details are open (the star, an edit elsewhere) shows up
+  // whichever screen opened this modal; if it was deleted meanwhile, keep showing the copy we were given
+  const liveTask = useTaskStore((s) => (taskProp ? s.tasks[taskProp.id] : undefined));
+  const task = taskProp ? liveTask ?? taskProp : null;
   const [isEditing, setIsEditing] = useState(!task || startInEditMode);
   const [formData, setFormData] = useState<Partial<Task>>({
     title: '',

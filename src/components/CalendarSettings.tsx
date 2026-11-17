@@ -15,6 +15,8 @@ interface CalendarPreferences {
   weekStartsOn: 0 | 1;
 }
 
+import { CALENDAR_PREFERENCES_CHANGED } from '../lib/calendarPreferences';
+
 const STORAGE_KEY = 'calendar-preferences';
 
 const defaults: CalendarPreferences = {
@@ -75,6 +77,7 @@ export const CalendarSettings: React.FC = () => {
     } catch (error) {
       console.error('Could not save calendar preferences:', error);
     }
+    window.dispatchEvent(new Event(CALENDAR_PREFERENCES_CHANGED));
     setSaved(true);
   };
 
