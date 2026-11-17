@@ -39,6 +39,9 @@ export const applyRescheduleUpdates = async (record: UnifiedCalendarRecord, upda
 export const rescheduleRecordByDays = (record: UnifiedCalendarRecord, days: number) =>
   applyRescheduleUpdates(record, getShiftedRecordUpdates(record, days));
 
+const localDateString = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export const duplicateRecord = async (record: UnifiedCalendarRecord): Promise<boolean> => {
   switch (record.type) {
     case 'task': {
@@ -58,8 +61,9 @@ export const duplicateRecord = async (record: UnifiedCalendarRecord): Promise<bo
           title: `${event.title} (copy)`,
           description: event.description,
           location: event.location,
-          startsAt: event.startDate.toISOString(),
-          endsAt: event.endDate.toISOString(),
+          // all-day events are stored from plain local dates (as the composer does); timed ones from ISO instants
+          startsAt: event.isAllDay ? localDateString(event.startDate) : event.startDate.toISOString(),
+          endsAt: event.isAllDay ? localDateString(event.endDate) : event.endDate.toISOString(),
           isFullDay: event.isAllDay,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           visibility: (event.visibility as CalendarChannelVisibility) ?? CalendarChannelVisibility.SHARE_EVERYTHING,

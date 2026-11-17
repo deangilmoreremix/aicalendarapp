@@ -120,7 +120,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {
-      await updateTask(task.id, formData);
+      // an omitted (undefined) field is skipped by taskApi.update, so unlinking has to be sent as an explicit null
+      const unlinked = !!task.relatedTo && !formData.relatedTo;
+      await updateTask(task.id, unlinked ? { ...formData, relatedTo: null as unknown as undefined } : formData);
     } else {
       await createTask(formData);
     }

@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   getRange: vi.fn(),
   eventUpdate: vi.fn(),
   eventDelete: vi.fn(),
+  eventCreate: vi.fn(),
   viewsGetAll: vi.fn(),
   viewsCreate: vi.fn(),
   viewsDelete: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('../../services/api', async (importOriginal) => {
       getRange: api.getRange,
       update: api.eventUpdate,
       delete: api.eventDelete,
+      create: api.eventCreate,
       getTimeline: api.timeline
     },
     calendarViewApi: { getAll: api.viewsGetAll, create: api.viewsCreate, delete: api.viewsDelete, update: vi.fn() }
@@ -57,7 +59,7 @@ import { CalendarFiltersMenu } from './CalendarFiltersMenu';
 import { CalendarViewsMenu } from './CalendarViewsMenu';
 import { RecordTasksWidget } from './RecordTasksWidget';
 import { applyRescheduleUpdates, deleteRecord, duplicateRecord } from './recordCalendarActions';
-import { buildUnifiedRecords } from './unifiedCalendarRecords';
+import { buildUnifiedRecords, canRescheduleRecord } from './unifiedCalendarRecords';
 import { useTaskStore } from '../../store/taskStore';
 import { useDealStore } from '../../store/dealStore';
 import { useContactStore } from '../../store/contactStore';
@@ -211,6 +213,23 @@ describe('record calendar actions', () => {
     expect(api.eventDelete).toHaveBeenCalledWith('e1');
   });
 
+  it('duplicates an all-day event from plain dates (no invalid-time error)', async () => {
+    const base = useTaskStore.getState().calendarEvents[0];
+    const allDay = { ...base, isAllDay: true, startDate: new Date(2031, 0, 5), endDate: new Date(2031, 0, 6) };
+    const record = buildUnifiedRecords({ tasks: [], deals: [], contacts: [], events: [allDay] })[0];
+    api.eventCreate.mockClear();
+    expect(await duplicateRecord(record)).toBe(true);
+    expect(api.eventCreate).toHaveBeenCalledWith(expect.objectContaining({ isFullDay: true, startsAt: '2031-01-05', endsAt: '2031-01-06' }));
+  });
+
+  it('a deal or contact placed by its creation date cannot be rescheduled', () => {
+    expect(canRescheduleRecord({ type: 'deal' }, { deal: 'createdAt' })).toBe(false);
+    expect(canRescheduleRecord({ type: 'contact' }, { contact: 'createdAt' })).toBe(false);
+    expect(canRescheduleRecord({ type: 'deal' }, {})).toBe(true);
+    expect(canRescheduleRecord({ type: 'task' }, { task: 'startTime' })).toBe(true);
+    expect(canRescheduleRecord({ type: 'event' }, {})).toBe(true);
+  });
+
   it('"deleting" a contact from the calendar only clears the follow-up', async () => {
     expect(await deleteRecord(rec('contact'))).toBe(true);
     expect(api.contactUpdate).toHaveBeenCalledWith('c1', { nextFollowUp: null });
@@ -228,6 +247,11 @@ describe('RecordContextMenu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /reschedule \+1 week/i }));
     expect(onAction).toHaveBeenCalledWith('nextWeek', record);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('hides the reschedule actions when the record cannot be moved', () => {
+    render(<RecordContextMenu record={record} position={{ x: 0, y: 0 }} onAction={vi.fn()} onClose={vi.fn()} canReschedule={false} />);
+    expect(screen.queryByRole('menuitem', { name: /reschedule/i })).toBeNull();
   });
 
   it('closes on Escape', () => {
@@ -391,6 +415,27 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     expect(await screen.findByLabelText('Related record')).toBeInTheDocument(); // the edit form, not the read-only view
     expect(screen.getByRole('button', { name: 'Update Task' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit Task' })).toBeNull();
+  });
+
+  it('choosing "None" as the related record sends an explicit null so the link is really removed', async () => {
+    useTaskStore.setState({
+      tasks: { ...useTaskStore.getState().tasks, t1: { ...useTaskStore.getState().tasks.t1, relatedTo: { type: 'contact', id: 'c1', name: 'Ada' } } }
+    });
+    render(<BigTaskCalendar />);
+    fireEvent.contextMenu(await screen.findByText('Send proposal'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    fireEvent.change(await screen.findByLabelText('Related record'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update Task' }));
+    await waitFor(() => expect(api.taskUpdate).toHaveBeenCalledWith('t1', expect.objectContaining({ relatedTo: null })));
+  });
+
+  it('duplicating an event reloads the visible range so the copy shows up', async () => {
+    render(<BigTaskCalendar />);
+    fireEvent.contextMenu(await screen.findByText('Kickoff'));
+    const calls = api.getRange.mock.calls.length;
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+    await waitFor(() => expect(api.eventCreate).toHaveBeenCalled());
+    await waitFor(() => expect(api.getRange.mock.calls.length).toBeGreaterThan(calls));
   });
 
   it('the context menu "Edit" also opens a task in edit mode', async () => {

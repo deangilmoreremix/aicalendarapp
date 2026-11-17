@@ -232,6 +232,18 @@ export const applyRecordFilters = (records: UnifiedCalendarRecord[], filters: Ca
   return result;
 };
 
+/**
+ * A deal or contact placed by its creation date can't be moved on the calendar: a drop would change
+ * a different field (due date / follow-up) from the one the card is positioned by.
+ */
+export const canRescheduleRecord = (
+  record: Pick<UnifiedCalendarRecord, 'type'>,
+  fieldByType: Partial<Record<UnifiedRecordType, string>> = {}
+): boolean => {
+  if (record.type !== 'deal' && record.type !== 'contact') return true;
+  return (fieldByType[record.type] ?? DEFAULT_FIELD_BY_TYPE[record.type]) !== 'createdAt';
+};
+
 export interface RescheduleUpdates {
   task?: Partial<Task>;
   deal?: Partial<Deal>;

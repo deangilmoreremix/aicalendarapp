@@ -53,6 +53,7 @@ import {
   ALL_RECORD_TYPES,
   buildUnifiedRecords,
   getDropUpdates,
+  canRescheduleRecord,
   userTimeZone,
   type UnifiedCalendarRecord,
   type UnifiedRecordType
@@ -544,7 +545,11 @@ export const BigTaskCalendar: React.FC = () => {
       ok = await toggleFavorite(record);
     } else if (action === 'day') {
       setDayListDate(record.start);
-    } else if (action === 'duplicate') ok = await duplicateRecord(record);
+    } else if (action === 'duplicate') {
+      ok = await duplicateRecord(record);
+      // events live in their own range-loaded list, so reload it to show the copy straight away
+      if (ok && record.type === 'event') void loadCalendarEvents(visibleRange.from, visibleRange.to);
+    }
     else if (action === 'tomorrow') ok = await rescheduleRecordByDays(record, 1);
     else if (action === 'nextWeek') ok = await rescheduleRecordByDays(record, 7);
     else if (action === 'delete') {
@@ -783,6 +788,7 @@ export const BigTaskCalendar: React.FC = () => {
           onNavigate={handleNavigate}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
+          draggableAccessor={(event) => canRescheduleRecord(event.resource.record, fieldByType)}
           selectable
           onSelectSlot={(info) => {
             // a click or double click on an empty day offers to create something there (drag-select is ignored)
@@ -793,7 +799,7 @@ export const BigTaskCalendar: React.FC = () => {
           onShowMore={(_events, date) => setDayListDate(date)}
           onEventDrop={handleEventDrop}
           onEventResize={handleEventResize}
-          resizableAccessor={isTimed}
+          resizableAccessor={(event) => isTimed(event) && canRescheduleRecord(event.resource.record, fieldByType)}
           popup
           components={{
             toolbar: () => null, // We use custom toolbar
@@ -832,6 +838,7 @@ export const BigTaskCalendar: React.FC = () => {
       {contextMenu && (
         <RecordContextMenu
           record={contextMenu.record}
+          canReschedule={canRescheduleRecord(contextMenu.record, fieldByType)}
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onAction={handleMenuAction}
           onClose={() => setContextMenu(null)}

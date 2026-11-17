@@ -173,7 +173,7 @@ export const mapTaskFromDB = (task: TaskDB): Task => ({
   tags: task.tags,
   attachments: task.attachments || [],
   subtasks: task.subtasks || [],
-  relatedTo: task.related_to,
+  relatedTo: task.related_to ?? undefined,
   position: task.position ?? undefined,
   isFavorite: task.is_favorite ?? false,
   notes: task.notes

@@ -15,9 +15,11 @@ type RecordContextMenuProps = {
   position: { x: number; y: number };
   onAction: (action: RecordMenuAction, record: UnifiedCalendarRecord) => void;
   onClose: () => void;
+  /** false hides the reschedule actions (e.g. a deal placed by its creation date) */
+  canReschedule?: boolean;
 };
 
-export const RecordContextMenu = ({ record, position, onAction, onClose }: RecordContextMenuProps) => {
+export const RecordContextMenu = ({ record, position, onAction, onClose, canReschedule = true }: RecordContextMenuProps) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,8 +76,8 @@ export const RecordContextMenu = ({ record, position, onAction, onClose }: Recor
       )}
       {canEdit && <Item action="edit" icon={<Pencil className="h-4 w-4" />} label="Edit" />}
       {canDuplicate && <Item action="duplicate" icon={<Copy className="h-4 w-4" />} label="Duplicate" />}
-      <Item action="tomorrow" icon={<CalendarClock className="h-4 w-4" />} label="Reschedule to tomorrow" />
-      <Item action="nextWeek" icon={<CalendarPlus className="h-4 w-4" />} label="Reschedule +1 week" />
+      {canReschedule && <Item action="tomorrow" icon={<CalendarClock className="h-4 w-4" />} label="Reschedule to tomorrow" />}
+      {canReschedule && <Item action="nextWeek" icon={<CalendarPlus className="h-4 w-4" />} label="Reschedule +1 week" />}
       <Item action="delete" icon={<Trash2 className="h-4 w-4" />} label={deleteLabel} danger />
     </div>
   );
