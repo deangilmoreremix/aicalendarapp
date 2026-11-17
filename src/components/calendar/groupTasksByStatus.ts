@@ -16,4 +16,5 @@ export const groupTasksByStatus = (tasks: Task[]): [Task['status'], Task[]][] =>
 export const completionUpdate = (value: boolean): Partial<Task> =>
   value
     ? { status: 'completed', completed: true, completedAt: new Date() }
-    : { status: 'pending', completed: false, completedAt: undefined };
+    // explicit null: taskApi.update skips undefined, so a stale completion time would otherwise stay
+    : { status: 'pending', completed: false, completedAt: null as unknown as undefined };

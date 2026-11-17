@@ -31,6 +31,8 @@ interface TaskActions {
   loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
   rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date; position?: number }) => Promise<boolean>;
   removeCalendarEvent: (id: string) => Promise<boolean>;
+  /** Update one loaded event in place (used after an edit saved elsewhere). */
+  patchCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
 }
 
 type TaskStore = TaskState & TaskActions;
@@ -262,6 +264,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set({ calendarEvents: previous, error: 'Failed to reschedule event' });
       return false;
     }
+  },
+
+  patchCalendarEvent: (id, updates) => {
+    set((state) => ({ calendarEvents: state.calendarEvents.map((e) => (e.id === id ? { ...e, ...updates } : e)) }));
   },
 
   removeCalendarEvent: async (id) => {

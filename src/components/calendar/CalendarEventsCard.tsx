@@ -102,12 +102,15 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         timelineCalendarEvents={events}
       />
 
-      <CalendarEventComposerModal
-        isOpen={isComposerOpen}
-        onClose={() => setIsComposerOpen(false)}
-        onCreated={() => void load()}
-        context={composerContext ?? { targets: [{ type: targetType, id: targetId }] }}
-      />
+      {/* mounted only while open, so every new event starts from empty fields */}
+      {isComposerOpen && (
+        <CalendarEventComposerModal
+          isOpen
+          onClose={() => setIsComposerOpen(false)}
+          onCreated={() => void load()}
+          context={composerContext ?? { targets: [{ type: targetType, id: targetId }] }}
+        />
+      )}
       <CalendarEventDetailsModal event={openedEvent} onClose={() => setOpenedEventId(null)} />
     </div>
   );

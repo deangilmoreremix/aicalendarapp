@@ -777,7 +777,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 <Button variant="outline" onClick={onClose}>
                   Close
                 </Button>
-                <Button onClick={() => setIsEditing(true)}>
+                <Button
+                  onClick={() => {
+                    // re-seed from the current task, so changes made while viewing (e.g. the favorite star) aren't overwritten on save
+                    if (task) setFormData((prev) => ({ ...prev, ...task }));
+                    setIsEditing(true);
+                  }}
+                >
                   Edit Task
                 </Button>
               </>

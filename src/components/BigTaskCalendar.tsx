@@ -83,6 +83,8 @@ const readWeekStartsOn = (): number => {
   }
 };
 
+const AGENDA_LENGTH_DAYS = 30;
+
 const LAYOUT_BY_VIEW: Record<string, ViewCalendarLayout> = {
   month: ViewCalendarLayout.MONTH,
   agenda: ViewCalendarLayout.MONTH,
@@ -381,6 +383,12 @@ export const BigTaskCalendar: React.FC = () => {
       calendarLayout: LAYOUT_BY_VIEW[currentView] ?? ViewCalendarLayout.MONTH,
       weekStartsOnDayIndex: weekStartsOn,
     });
+    if (currentView === 'agenda') {
+      // the agenda lists AGENDA_LENGTH_DAYS days from the current date, not the month grid
+      const from = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + AGENDA_LENGTH_DAYS, 0, 0, -1);
+      return { firstDay, lastDay, from, to };
+    }
     return {
       firstDay,
       lastDay,
@@ -440,17 +448,20 @@ export const BigTaskCalendar: React.FC = () => {
     [records]
   );
 
-  // filter choices come from the unfiltered records, so picking one status doesn't hide the others
+  // filter choices come from the records of the visible types/calendars before the status/assignee filters apply,
+  // so picking one status doesn't hide the others and hidden types don't contribute options
   const statusOptions = useMemo(() => {
     const all = buildUnifiedRecords({
       tasks: Object.values(tasks),
       deals: Object.values(deals),
       contacts: Object.values(contacts),
       events: calendarEvents,
-      fieldByType
+      fieldByType,
+      visibleTypes,
+      visibleCalendars
     });
     return Array.from(new Set(all.map((r) => r.status).filter((v): v is string => !!v))).sort();
-  }, [tasks, deals, contacts, calendarEvents, fieldByType]);
+  }, [tasks, deals, contacts, calendarEvents, fieldByType, visibleTypes, visibleCalendars]);
   const assigneeOptions = useMemo(() => {
     const byId = new Map<string, string>();
     Object.values(tasks).forEach((t) => t.assignedUserId && byId.set(t.assignedUserId, t.assignedUserName || t.assignedUserId));
@@ -790,6 +801,7 @@ export const BigTaskCalendar: React.FC = () => {
           startAccessor="start"
           endAccessor="end"
           view={currentView}
+          length={AGENDA_LENGTH_DAYS}
           onView={handleViewChange}
           date={currentDate}
           onNavigate={handleNavigate}

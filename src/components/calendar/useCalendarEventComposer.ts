@@ -41,7 +41,8 @@ export const useCalendarEventComposer = ({
   initialDate
 }: {
   context: CalendarComposerContext;
-  onCreated: () => void;
+  /** Called after a save; an edit passes the saved fields so callers can patch their copy. */
+  onCreated: (saved?: Partial<CalendarEvent>) => void;
   /** When set, the composer edits this event instead of creating a new one. */
   editing?: CalendarEvent;
   /** New events start at 9:00 on this day (e.g. the empty day that was clicked on the calendar). */
@@ -113,7 +114,7 @@ export const useCalendarEventComposer = ({
     try {
       if (editing) {
         // Guests and record links are left as they are; only the event's own fields change
-        await calendarEventApi.update(editing.id, {
+        const saved = {
           title: title.trim(),
           description,
           location,
@@ -123,8 +124,9 @@ export const useCalendarEventComposer = ({
           timeZone,
           visibility,
           conferenceLink
-        });
-        onCreated();
+        };
+        await calendarEventApi.update(editing.id, saved);
+        onCreated(saved as Partial<CalendarEvent>);
         return;
       }
       const defaultAttendee = context.defaultAttendee;

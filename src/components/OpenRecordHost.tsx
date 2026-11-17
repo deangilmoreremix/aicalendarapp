@@ -52,7 +52,7 @@ export const OpenRecordHost = () => {
           editing={calendarEvents.find((e) => e.id === target.id)}
           context={{ targets: [] }}
           onClose={close}
-          onCreated={() => undefined}
+          onCreated={(saved) => saved && useTaskStore.getState().patchCalendarEvent(target.id, saved)}
         />
       );
   }

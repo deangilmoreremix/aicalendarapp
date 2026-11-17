@@ -235,6 +235,6 @@ describe('task grouping (upstream TaskGroupsContent rule)', () => {
 
   it('completion flips status and completed flag', () => {
     expect(completionUpdate(true)).toMatchObject({ status: 'completed', completed: true });
-    expect(completionUpdate(false)).toMatchObject({ status: 'pending', completed: false, completedAt: undefined });
+    expect(completionUpdate(false)).toMatchObject({ status: 'pending', completed: false, completedAt: null });
   });
 });

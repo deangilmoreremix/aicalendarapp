@@ -82,6 +82,22 @@ describe('CalendarEventsCard', () => {
     expect(getTimeline).toHaveBeenCalledWith('contact', 'c1', 10, 0);
   });
 
+  it('opens a fresh, empty composer each time (no values left from the previous event)', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    create.mockResolvedValue('new-id');
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    fireEvent.click(screen.getAllByRole('button', { name: /new event/i })[0]);
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Kickoff' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByLabelText('Title')).toBeNull());
+    fireEvent.click(screen.getAllByRole('button', { name: /new event/i })[0]);
+    expect(await screen.findByLabelText('Title')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+  });
+
   it('shows the empty state with the object name', async () => {
     getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
     render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);

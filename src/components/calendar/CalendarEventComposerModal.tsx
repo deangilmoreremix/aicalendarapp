@@ -16,7 +16,7 @@ export type { CalendarComposerContext } from './useCalendarEventComposer';
 type CalendarEventComposerModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (saved?: Partial<CalendarEvent>) => void;
   context: CalendarComposerContext;
   /** Edit this event instead of creating a new one. */
   editing?: CalendarEvent;
@@ -45,8 +45,8 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
     context,
     editing,
     initialDate,
-    onCreated: () => {
-      onCreated();
+    onCreated: (saved) => {
+      onCreated(saved);
       onClose();
     }
   });

@@ -148,6 +148,9 @@ describe('applyBulk', () => {
     expect(api.dealUpdate).toHaveBeenCalledWith('d1', { stage: 'proposal' });
     expect(await applyBulk('task', ['t1'], { type: 'complete' })).toEqual({ done: 1, failed: 0 });
     expect(api.taskUpdate).toHaveBeenCalledWith('t1', { completed: true, status: 'completed', completedAt: expect.any(Date) });
+    api.taskUpdate.mockClear();
+    expect(await applyBulk('task', ['t1'], { type: 'set', field: 'status', value: 'pending' })).toEqual({ done: 1, failed: 0 });
+    expect(api.taskUpdate).toHaveBeenCalledWith('t1', { status: 'pending', completed: false, completedAt: null }); // explicit null clears a stale completion time
     expect(await applyBulk('contact', ['a', 'missing'], { type: 'addTag', tag: 'vip' })).toEqual({ done: 1, failed: 1 });
     expect(api.contactUpdate).toHaveBeenCalledWith('a', { tags: ['vip'] });
   });

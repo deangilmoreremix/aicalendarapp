@@ -429,6 +429,29 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     await waitFor(() => expect(api.taskUpdate).toHaveBeenCalledWith('t1', expect.objectContaining({ relatedTo: null })));
   });
 
+  it('the agenda loads events for the 30 days it shows, not the month grid', async () => {
+    render(<BigTaskCalendar />);
+    await screen.findByText('Send proposal');
+    api.getRange.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Agenda' }));
+    await waitFor(() => expect(api.getRange).toHaveBeenCalled());
+    const [from, to] = api.getRange.mock.calls.at(-1)!;
+    const days = (+to - +from) / 86400_000;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThan(30.1);
+    expect(dnd.props.length).toBe(30);
+  });
+
+  it('status filter options only come from the record types that are visible', async () => {
+    useTaskStore.setState({ tasks: { ...useTaskStore.getState().tasks, t1: { ...useTaskStore.getState().tasks.t1, status: 'in-progress' } } });
+    render(<BigTaskCalendar />);
+    await screen.findByText('Send proposal');
+    fireEvent.click(screen.getByRole('button', { name: /^filters/i }));
+    expect(await screen.findByLabelText('in-progress')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Tasks' })); // hide the task type
+    await waitFor(() => expect(screen.queryByLabelText('in-progress')).toBeNull());
+  });
+
   it('duplicating an event reloads the visible range so the copy shows up', async () => {
     render(<BigTaskCalendar />);
     fireEvent.contextMenu(await screen.findByText('Kickoff'));
