@@ -58,7 +58,7 @@ import {
   type UnifiedCalendarRecord,
   type UnifiedRecordType
 } from './calendar/unifiedCalendarRecords';
-import { applyRescheduleUpdates, deleteRecord, duplicateRecord, rescheduleRecordByDays } from './calendar/recordCalendarActions';
+import { applyRescheduleUpdates, deleteRecord, duplicateRecord, rescheduleRecordByDays, rescheduleRecordToDay } from './calendar/recordCalendarActions';
 import { RecordCalendarEventCard } from './calendar/RecordCalendarEventCard';
 import { RecordContextMenu, type RecordMenuAction } from './calendar/RecordContextMenu';
 import { CalendarFiltersMenu } from './calendar/CalendarFiltersMenu';
@@ -557,7 +557,7 @@ export const BigTaskCalendar: React.FC = () => {
       // events live in their own range-loaded list, so reload it to show the copy straight away
       if (ok && record.type === 'event') void loadCalendarEvents(visibleRange.from, visibleRange.to);
     }
-    else if (action === 'tomorrow') ok = await rescheduleRecordByDays(record, 1);
+    else if (action === 'tomorrow') ok = await rescheduleRecordToDay(record, moment().add(1, 'day').toDate());
     else if (action === 'nextWeek') ok = await rescheduleRecordByDays(record, 7);
     else if (action === 'delete') {
       const label = record.type === 'contact' ? 'Clear the follow-up date for' : 'Delete';

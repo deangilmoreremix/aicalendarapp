@@ -539,14 +539,18 @@ describe('BigTaskCalendar: unified CRM calendar', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not move "Send proposal".');
   });
 
-  it('right-click selects the record and opens its menu; reschedule to tomorrow saves', async () => {
+  it('right-click selects the record and opens its menu; reschedule to tomorrow moves it to tomorrow, not +1 day', async () => {
+    // a deal that is currently due well in the past must land on tomorrow's date
+    const d1 = useDealStore.getState().deals.d1;
+    useDealStore.setState({ deals: { ...useDealStore.getState().deals, d1: { ...d1, dueDate: ymd(noon(-20)) } } });
     render(<BigTaskCalendar />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Previous$/ }));
     const card = (await screen.findByText('TechCorp')).closest('[data-record-type]')!;
     fireEvent.contextMenu(card);
     expect(useCalendarSelectionStore.getState().selectedKeys).toEqual(['deal:d1']);
     const menu = screen.getByRole('menu');
     fireEvent.click(within(menu).getByRole('menuitem', { name: /reschedule to tomorrow/i }));
-    await waitFor(() => expect(api.dealUpdate).toHaveBeenCalledWith('d1', { dueDate: ymd(new Date(noon(1).getTime() + 86400_000)) }));
+    await waitFor(() => expect(api.dealUpdate).toHaveBeenCalledWith('d1', { dueDate: ymd(new Date(Date.now() + 86400_000)) })); // the real tomorrow
   });
 
   it('Escape clears the selection', async () => {

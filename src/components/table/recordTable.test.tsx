@@ -147,7 +147,7 @@ describe('applyBulk', () => {
     expect(await applyBulk('deal', ['d1'], { type: 'set', field: 'stage', value: 'proposal' })).toEqual({ done: 1, failed: 0 });
     expect(api.dealUpdate).toHaveBeenCalledWith('d1', { stage: 'proposal' });
     expect(await applyBulk('task', ['t1'], { type: 'complete' })).toEqual({ done: 1, failed: 0 });
-    expect(api.taskUpdate).toHaveBeenCalledWith('t1', { completed: true, status: 'completed' });
+    expect(api.taskUpdate).toHaveBeenCalledWith('t1', { completed: true, status: 'completed', completedAt: expect.any(Date) });
     expect(await applyBulk('contact', ['a', 'missing'], { type: 'addTag', tag: 'vip' })).toEqual({ done: 1, failed: 1 });
     expect(api.contactUpdate).toHaveBeenCalledWith('a', { tags: ['vip'] });
   });

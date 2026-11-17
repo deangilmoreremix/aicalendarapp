@@ -40,6 +40,15 @@ const rec = (id: string, type: UnifiedCalendarRecord['type'], position: number, 
 });
 
 describe('getDayRecords', () => {
+  it('includes multi-day events on every day they cover (exclusive midnight end)', () => {
+    const multi: UnifiedCalendarRecord = { ...rec('m', 'event', 0), start: new Date(2026, 10, 10), end: new Date(2026, 10, 13), allDay: true }; // Nov 10-12
+    const ids = (d: number) => getDayRecords([multi], new Date(2026, 10, d)).map((r) => r.id);
+    expect(ids(9)).toEqual([]);
+    expect(ids(10)).toEqual(['m']);
+    expect(ids(12)).toEqual(['m']);
+    expect(ids(13)).toEqual([]);
+  });
+
   it('keeps only that day and orders by position, then time', () => {
     const records = [rec('b', 'deal', 2), rec('a', 'task', 1), rec('t', 'task', 2, 9), { ...rec('x', 'deal', 0), start: new Date(2026, 10, 13) }];
     expect(getDayRecords(records, day).map((r) => r.id)).toEqual(['a', 'b', 't']); // equal positions fall back to time

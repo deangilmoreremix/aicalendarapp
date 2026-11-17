@@ -10,6 +10,7 @@ import { calendarEventApi } from '../../services/api';
 import type { CalendarEvent, Deal, Task } from '../../types';
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import {
+  getDayOffset,
   getShiftedRecordUpdates,
   type RescheduleUpdates,
   type UnifiedCalendarRecord
@@ -41,6 +42,10 @@ export const rescheduleRecordByDays = (record: UnifiedCalendarRecord, days: numb
 
 const localDateString = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Move a record to a given day (context menu: "tomorrow"), whatever day it is on now. */
+export const rescheduleRecordToDay = (record: UnifiedCalendarRecord, target: Date) =>
+  applyRescheduleUpdates(record, getShiftedRecordUpdates(record, getDayOffset(record.start, target)));
 
 export const duplicateRecord = async (record: UnifiedCalendarRecord): Promise<boolean> => {
   switch (record.type) {

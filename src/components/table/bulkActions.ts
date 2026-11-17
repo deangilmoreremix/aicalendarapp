@@ -3,6 +3,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { useDealStore } from '../../store/dealStore';
 import { useContactStore } from '../../store/contactStore';
 import type { TableObject } from '../../lib/recordFilters/fields';
+import { completionUpdate } from '../calendar/groupTasksByStatus';
 
 export type BulkAction =
   | { type: 'favorite'; value: boolean }
@@ -24,9 +25,9 @@ const one = async (object: TableObject, id: string, action: BulkAction): Promise
       const task = store.tasks[id];
       if (!task) return false;
       if (action.type === 'favorite') return store.rescheduleTask(id, { isFavorite: action.value });
-      if (action.type === 'complete') return store.rescheduleTask(id, { completed: true, status: 'completed' });
+      if (action.type === 'complete') return store.rescheduleTask(id, completionUpdate(true));
       if (action.type === 'set' && action.field === 'status') {
-        return store.rescheduleTask(id, { status: action.value as never, completed: action.value === 'completed' });
+        return store.rescheduleTask(id, action.value === 'completed' ? completionUpdate(true) : { status: action.value as never, completed: false });
       }
       if (action.type === 'addTag') return store.rescheduleTask(id, { tags: [...new Set([...(task.tags ?? []), action.tag])] });
       return false;

@@ -17,8 +17,20 @@ const sameDay = (a: Date, b: Date) =>
 export const compareWithinDay = (a: UnifiedCalendarRecord, b: UnifiedCalendarRecord) =>
   (a.position ?? 0) - (b.position ?? 0) || +a.start - +b.start || a.title.localeCompare(b.title);
 
-export const getDayRecords = (records: UnifiedCalendarRecord[], day: Date): UnifiedCalendarRecord[] =>
-  records.filter((r) => sameDay(r.start, day)).sort(compareWithinDay);
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** The last calendar day a record covers; an end exactly at midnight is exclusive (all-day events, overnight blocks). */
+const lastDayOf = (r: UnifiedCalendarRecord): Date => {
+  if (+r.end <= +r.start) return startOfDay(r.start);
+  const end = startOfDay(r.end);
+  return +end === +r.end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1) : end;
+};
+
+/** Records that cover the day, including multi-day events that started earlier. */
+export const getDayRecords = (records: UnifiedCalendarRecord[], day: Date): UnifiedCalendarRecord[] => {
+  const d = +startOfDay(day);
+  return records.filter((r) => +startOfDay(r.start) <= d && d <= +lastDayOf(r)).sort(compareWithinDay);
+};
 
 export type PositionUpdate = { record: UnifiedCalendarRecord; position: number };
 
