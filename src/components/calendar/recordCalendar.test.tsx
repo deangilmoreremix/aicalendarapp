@@ -375,6 +375,14 @@ describe('RecordTasksWidget', () => {
     });
   });
 
+  it('the opened task follows the live store (a change made while the details are open shows up)', async () => {
+    render(<RecordTasksWidget targetType="contact" targetId="c1" targetName="Ada" />);
+    fireEvent.click(screen.getByText('Call Ada'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    act(() => useTaskStore.setState({ tasks: { ...useTaskStore.getState().tasks, a: { ...useTaskStore.getState().tasks.a, title: 'Call Ada today' } } }));
+    expect(await within(screen.getByRole('dialog')).findByText('Call Ada today')).toBeInTheDocument();
+  });
+
   it('lists only the record\'s tasks, grouped by status', () => {
     render(<RecordTasksWidget targetType="contact" targetId="c1" targetName="Ada" />);
     expect(screen.getByText('Call Ada')).toBeInTheDocument();

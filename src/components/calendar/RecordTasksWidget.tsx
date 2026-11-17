@@ -29,7 +29,9 @@ const STATUS_LABELS: Record<Task['status'], string> = {
 
 export const RecordTasksWidget = ({ targetType, targetId, targetName }: RecordTasksWidgetProps) => {
   const { tasks, loadInitialData, rescheduleTask } = useTaskStore();
-  const [openTask, setOpenTask] = useState<Task | null>(null);
+  // keep only the id and read the task from the store, so changes made while its details are open (e.g. the star) show up
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const openTask: Task | null = openTaskId ? tasks[openTaskId] ?? null : null;
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export const RecordTasksWidget = ({ targetType, targetId, targetName }: RecordTa
                       checked={task.completed}
                       onChange={(e) => void rescheduleTask(task.id, completionUpdate(e.target.checked))}
                     />
-                    <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => setOpenTask(task)}>
+                    <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => setOpenTaskId(task.id)}>
                       <span className={`font-medium text-gray-900 dark:text-gray-100 ${task.completed ? 'line-through' : ''}`}>{task.title}</span>
                     </button>
                     <AssigneeAvatar name={task.assignedUserName} />
@@ -93,13 +95,13 @@ export const RecordTasksWidget = ({ targetType, targetId, targetName }: RecordTa
         ))
       )}
 
-      {(openTask || isCreating) && (
+      {(openTaskId || isCreating) && (
         <TaskDetailsModal
           task={openTask}
           isOpen
           defaultRelatedTo={isCreating ? { type: targetType, id: targetId, name: targetName } : undefined}
           onClose={() => {
-            setOpenTask(null);
+            setOpenTaskId(null);
             setIsCreating(false);
           }}
         />

@@ -132,7 +132,7 @@ describe('TaskKanbanBoard', () => {
     await act(async () => {
       await dnd.onDragEnd({ draggableId: 't3', source: { droppableId: 'completed', index: 0 }, destination: { droppableId: 'pending', index: 0 } });
     });
-    expect(api.taskUpdate).toHaveBeenCalledWith('t3', expect.objectContaining({ status: 'pending', completed: false }));
+    expect(api.taskUpdate).toHaveBeenCalledWith('t3', expect.objectContaining({ status: 'pending', completed: false, completedAt: null })); // reopened: completion time cleared
   });
 
   it('does not wipe the board with a global loading state while a task is being moved', async () => {

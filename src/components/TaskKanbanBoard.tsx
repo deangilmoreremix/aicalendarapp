@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { useAI } from '../contexts/AIContext';
-import { Task } from '../types';
+import { Task, TaskUpdate } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -321,12 +321,13 @@ export const TaskKanbanBoard: React.FC = () => {
 
     const newStatus = destination.droppableId as Task['status'];
     // Keep the `completed` flag in step with the status (stats and other views read the flag).
-    const updates: Partial<Task> = { status: newStatus };
+    const updates: TaskUpdate = { status: newStatus };
     if (newStatus === 'completed') {
       updates.completed = true;
       updates.completedAt = new Date();
     } else if (source.droppableId === 'completed') {
       updates.completed = false;
+      updates.completedAt = null; // reopened: drop the completion time so the weekly trend stops counting it
     }
     // Optimistic update: no global loading state, so the board does not blank out while a card moves.
     await rescheduleTask(draggableId, updates);

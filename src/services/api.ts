@@ -4,7 +4,7 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
-import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent } from '../types';
+import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent, CalendarEventParticipant } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
 // TaskSuggestion interface for AI API
@@ -791,7 +791,22 @@ export const calendarEventApi = {
       .or(`end_date.gte.${from.toISOString()},end_date.is.null`)
       .order('start_date');
     if (error) throw error;
-    return (data ?? []).map(mapCalendarEventFromDB);
+    const events = (data ?? []).map(mapCalendarEventFromDB);
+    if (events.length === 0) return events;
+
+    // guests live in their own table; load them so events opened from the calendar show who is invited
+    const { data: guests, error: guestsError } = await supabase
+      .from('calendar_event_participants')
+      .select('calendar_event_id, handle, display_name, contact_id')
+      .in('calendar_event_id', events.map((e) => e.id));
+    if (guestsError) throw guestsError;
+    const byEvent = new Map<string, CalendarEventParticipant[]>();
+    for (const g of (guests ?? []) as { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null }[]) {
+      const list = byEvent.get(g.calendar_event_id) ?? [];
+      list.push({ firstName: '', lastName: '', displayName: g.display_name || g.handle, handle: g.handle, personId: g.contact_id ?? undefined });
+      byEvent.set(g.calendar_event_id, list);
+    }
+    return events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
   },
 
   async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {
