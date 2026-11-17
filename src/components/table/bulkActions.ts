@@ -27,7 +27,7 @@ const one = async (object: TableObject, id: string, action: BulkAction): Promise
       if (action.type === 'favorite') return store.rescheduleTask(id, { isFavorite: action.value });
       if (action.type === 'complete') return store.rescheduleTask(id, completionUpdate(true));
       if (action.type === 'set' && action.field === 'status') {
-        return store.rescheduleTask(id, action.value === 'completed' ? completionUpdate(true) : { status: action.value as never, completed: false, completedAt: null as unknown as undefined });
+        return store.rescheduleTask(id, action.value === 'completed' ? completionUpdate(true) : { status: action.value as never, completed: false, completedAt: null });
       }
       if (action.type === 'addTag') return store.rescheduleTask(id, { tags: [...new Set([...(task.tags ?? []), action.tag])] });
       return false;

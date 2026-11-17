@@ -4,7 +4,7 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
-import { Contact, Task, Deal, Activity, AIInsight, CalendarEvent } from '../types';
+import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
 // TaskSuggestion interface for AI API
@@ -323,13 +323,13 @@ export const taskApi = {
     return mapTaskFromDB(data);
   },
 
-  async update(id: string, updates: Partial<Task>): Promise<Task> {
+  async update(id: string, updates: TaskUpdate): Promise<Task> {
     const updateData: any = {};
 
     Object.keys(updates).forEach(key => {
       const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      if (updates[key as keyof Task] !== undefined) {
-        const value = updates[key as keyof Task];
+      if (updates[key as keyof TaskUpdate] !== undefined) {
+        const value = updates[key as keyof TaskUpdate];
         updateData[dbKey] = value instanceof Date ? value.toISOString() : value;
       }
     });
@@ -683,6 +683,7 @@ interface CalendarEventDB {
   conference_solution?: string | null;
   conference_link?: string | null;
   visibility?: string | null;
+  time_zone?: string | null;
 }
 
 export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent => {
@@ -704,7 +705,8 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
     conferenceSolution: event.conference_solution ?? undefined,
     conferenceLink: event.conference_link ?? undefined,
     visibility: (event.visibility as CalendarEvent['visibility']) ?? 'SHARE_EVERYTHING',
-    position: event.position ?? undefined
+    position: event.position ?? undefined,
+    timeZone: event.time_zone ?? undefined
   };
 };
 

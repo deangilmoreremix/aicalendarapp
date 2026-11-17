@@ -48,7 +48,7 @@ export const useCalendarEventComposer = ({
   /** New events start at 9:00 on this day (e.g. the empty day that was clicked on the calendar). */
   initialDate?: Date;
 }) => {
-  const [timeZone, setTimeZone] = useState(browserTimeZone);
+  const [timeZone, setTimeZone] = useState(() => editing?.timeZone || browserTimeZone());
   const [title, setTitle] = useState(editing?.title ?? '');
   const [description, setDescription] = useState(editing?.description ?? '');
   const [location, setLocation] = useState(editing?.location ?? '');

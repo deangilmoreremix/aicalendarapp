@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
+import { Task, TaskUpdate, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
 import { taskApi, calendarEventApi } from '../services/api';
 import { generateId } from '../utils';
 
@@ -16,7 +16,7 @@ interface TaskState {
 
 interface TaskActions {
   createTask: (taskData: Partial<Task>) => Promise<void>;
-  updateTask: (id: string, taskData: Partial<Task>) => Promise<void>;
+  updateTask: (id: string, taskData: TaskUpdate) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   markTaskComplete: (id: string, completed: boolean) => void;
   selectTask: (id: string | null) => void;
@@ -27,7 +27,7 @@ interface TaskActions {
   setSelectedTask: (task: Task | null) => void;
   loadInitialData: () => Promise<void>;
   /** Optimistic update used by calendar drag/reschedule (no global loading flag, rolls back on failure). */
-  rescheduleTask: (id: string, taskData: Partial<Task>) => Promise<boolean>;
+  rescheduleTask: (id: string, taskData: TaskUpdate) => Promise<boolean>;
   loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
   rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date; position?: number }) => Promise<boolean>;
   removeCalendarEvent: (id: string) => Promise<boolean>;
@@ -37,6 +37,18 @@ interface TaskActions {
 
 type TaskStore = TaskState & TaskActions;
 
+
+/** Local copy of a task after a patch; `null` (clear this value) becomes `undefined` on the in-memory task. */
+const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
+  const { completedAt, relatedTo, ...rest } = update;
+  const next: Task = { ...task, ...rest };
+  if (completedAt !== undefined) next.completedAt = completedAt ?? undefined;
+  if (relatedTo !== undefined) next.relatedTo = relatedTo ?? undefined;
+  return next;
+};
+
+// only the latest range request may write the store: navigating quickly must not let an older response win
+let latestCalendarRangeRequest = 0;
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: {},
@@ -231,7 +243,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   rescheduleTask: async (id, taskData) => {
     const previous = get().tasks[id];
     if (!previous) return false;
-    set((state) => ({ tasks: { ...state.tasks, [id]: { ...previous, ...taskData } } }));
+    set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
     try {
       const saved = await taskApi.update(id, taskData);
       set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
@@ -244,12 +256,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   loadCalendarEvents: async (from, to) => {
+    const request = ++latestCalendarRangeRequest;
     try {
       const events = await calendarEventApi.getRange(from, to);
-      set({ calendarEvents: events });
+      if (request === latestCalendarRangeRequest) set({ calendarEvents: events });
     } catch (error) {
       console.error('Failed to load calendar events:', error);
-      set({ error: 'Failed to load calendar events' });
+      if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
     }
   },
 

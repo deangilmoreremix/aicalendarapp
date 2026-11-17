@@ -4,7 +4,7 @@
  *   Object.entries(groupBy(tasks, ({ status }) => status)).sort(([statusA], [statusB]) => statusB.localeCompare(statusA))
  * Same rule here; lodash groupBy is replaced by the vendored upstream groupArrayItemsBy.
  */
-import type { Task } from '../../types';
+import type { Task, TaskUpdate } from '../../types';
 import { groupArrayItemsBy } from '../../vendor/twenty/calendar/shared/array/groupArrayItemsBy';
 
 export const groupTasksByStatus = (tasks: Task[]): [Task['status'], Task[]][] =>
@@ -13,8 +13,8 @@ export const groupTasksByStatus = (tasks: Task[]): [Task['status'], Task[]][] =>
   );
 
 /** Same semantics as upstream useCompleteTask: complete -> done status, uncomplete -> back to the open status. */
-export const completionUpdate = (value: boolean): Partial<Task> =>
+export const completionUpdate = (value: boolean): TaskUpdate =>
   value
     ? { status: 'completed', completed: true, completedAt: new Date() }
     // explicit null: taskApi.update skips undefined, so a stale completion time would otherwise stay
-    : { status: 'pending', completed: false, completedAt: null as unknown as undefined };
+    : { status: 'pending', completed: false, completedAt: null };

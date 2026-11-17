@@ -59,6 +59,14 @@ export interface CalendarEventParticipant {
   workspaceMemberId?: string;
 }
 
+/**
+ * A task patch. `null` clears a stored value (the API skips `undefined`, which means "leave as is").
+ */
+export type TaskUpdate = Partial<Omit<Task, 'completedAt' | 'relatedTo'>> & {
+  completedAt?: Date | null;
+  relatedTo?: Task['relatedTo'] | null;
+};
+
 export interface CalendarEvent {
   /** Manual order among records on the same calendar day (Twenty record position). */
   position?: number;
@@ -78,6 +86,8 @@ export interface CalendarEvent {
   conferenceSolution?: string;
   conferenceLink?: string;
   visibility?: 'SHARE_EVERYTHING' | 'METADATA';
+  /** IANA zone the event was saved in; the editor keeps it unless the user changes it. */
+  timeZone?: string;
 }
 
 export interface Activity {

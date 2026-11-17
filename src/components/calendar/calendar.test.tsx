@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-const { getTimeline, create, getSettings } = vi.hoisted(() => ({
+const { getTimeline, create, getSettings, update } = vi.hoisted(() => ({
+  update: vi.fn(),
   getTimeline: vi.fn(),
   create: vi.fn(),
   getSettings: vi.fn()
 }));
 
 vi.mock('../../services/api', () => ({
-  calendarEventApi: { getTimeline, create, getSettings },
+  calendarEventApi: { getTimeline, create, getSettings, update },
   activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   attachmentApi: { list: () => Promise.resolve([]), upload: vi.fn(), remove: vi.fn(), getDownloadUrl: vi.fn() },
   MAX_ATTACHMENT_BYTES: 25 * 1024 * 1024
@@ -157,6 +158,16 @@ describe('CalendarEventComposerModal', () => {
     expect(input.targets).toEqual([{ type: 'contact', id: 'c1' }]);
     expect(Date.parse(input.endsAt)).toBeGreaterThan(Date.parse(input.startsAt));
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
+  });
+
+  it('keeps the saved time zone when an event is edited (title-only save)', async () => {
+    update.mockResolvedValue(undefined);
+    const editing = { id: 'e9', title: 'Tokyo sync', startDate: new Date('2030-03-01T01:00:00Z'), endDate: new Date('2030-03-01T02:00:00Z'), isAllDay: false, timeZone: 'Asia/Tokyo' } as any;
+    render(<CalendarEventComposerModal isOpen onClose={() => {}} onCreated={() => {}} context={{ targets: [] }} editing={editing} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Tokyo sync v2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][1].timeZone).toBe('Asia/Tokyo');
   });
 
   it('flags invalid guest emails and blocks creation', async () => {
