@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 const api = vi.hoisted(() => ({ update: vi.fn() }));
@@ -26,5 +26,26 @@ describe('OpenRecordHost: editing an event from the command menu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(api.update).toHaveBeenCalled());
     await waitFor(() => expect(useTaskStore.getState().calendarEvents[0].title).toBe('New title'));
+  });
+
+  it('shows the other event when the open event changes (no values carried over, saves go to the right event)', async () => {
+    api.update.mockClear();
+    api.update.mockResolvedValue(undefined);
+    useTaskStore.setState({
+      calendarEvents: [
+        { id: 'a', title: 'Event A', startDate: new Date(2031, 0, 5, 9), endDate: new Date(2031, 0, 5, 10), isAllDay: false } as any,
+        { id: 'b', title: 'Event B', startDate: new Date(2031, 0, 6, 9), endDate: new Date(2031, 0, 6, 10), isAllDay: false } as any
+      ]
+    });
+    useOpenRecordStore.setState({ target: { type: 'event', id: 'a' } as any });
+    render(<OpenRecordHost />);
+    expect(await screen.findByDisplayValue('Event A')).toBeInTheDocument();
+    act(() => useOpenRecordStore.setState({ target: { type: 'event', id: 'b' } as any }));
+    expect(await screen.findByDisplayValue('Event B')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Event A')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.update).toHaveBeenCalled());
+    expect(api.update.mock.calls[0][0]).toBe('b');
+    expect(api.update.mock.calls[0][1]).toMatchObject({ title: 'Event B' });
   });
 });

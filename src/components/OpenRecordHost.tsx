@@ -48,6 +48,8 @@ export const OpenRecordHost = () => {
     case 'event':
       return (
         <CalendarEventComposerModal
+          // the editor only reads the event when it mounts: a different event needs a fresh editor
+          key={target.id}
           isOpen
           editing={calendarEvents.find((e) => e.id === target.id)}
           context={{ targets: [] }}
