@@ -440,10 +440,17 @@ export const BigTaskCalendar: React.FC = () => {
     [records]
   );
 
-  const statusOptions = useMemo(
-    () => Array.from(new Set(records.map((r) => r.status).filter((v): v is string => !!v))).sort(),
-    [records]
-  );
+  // filter choices come from the unfiltered records, so picking one status doesn't hide the others
+  const statusOptions = useMemo(() => {
+    const all = buildUnifiedRecords({
+      tasks: Object.values(tasks),
+      deals: Object.values(deals),
+      contacts: Object.values(contacts),
+      events: calendarEvents,
+      fieldByType
+    });
+    return Array.from(new Set(all.map((r) => r.status).filter((v): v is string => !!v))).sort();
+  }, [tasks, deals, contacts, calendarEvents, fieldByType]);
   const assigneeOptions = useMemo(() => {
     const byId = new Map<string, string>();
     Object.values(tasks).forEach((t) => t.assignedUserId && byId.set(t.assignedUserId, t.assignedUserName || t.assignedUserId));

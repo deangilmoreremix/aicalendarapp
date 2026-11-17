@@ -203,6 +203,8 @@ export const mapTaskToDB = (task: Omit<Task, 'id' | 'createdAt'>) => ({
   notes: task.notes
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const mapDealFromDB = (deal: DealDB): Deal => ({
   id: deal.id,
   title: deal.title ?? undefined,
@@ -475,7 +477,8 @@ export const activityApi = {
         type: activity.type,
         title: activity.title,
         description: activity.description,
-        user_id: activity.userId,
+        // activities.user_id is a uuid; the app has no sign-in, so placeholders like 'current-user' are stored as null
+        user_id: activity.userId && UUID_RE.test(activity.userId) ? activity.userId : null,
         user_name: activity.userName,
         entity_type: activity.entityType,
         entity_id: activity.entityId,
