@@ -2,29 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { format, isToday, isYesterday, isThisWeek, subDays } from 'date-fns';
 import { useAI } from '../contexts/AIContext';
 import { useContactStore } from '../store/contactStore';
-import {
-  CheckCircle2,
-  Circle,
-  Plus,
-  Edit,
-  Trash2,
-  User,
-  Calendar,
-  FileText,
-  MessageSquare,
-  Phone,
-  Mail,
-  Filter,
-  Search,
-  AlertCircle,
-  Brain,
-  Sparkles,
-  TrendingUp,
-  Target,
-  Zap,
-  Loader2,
-  Video,
-} from 'lucide-react';
+import { CheckCircle2, Circle, Plus, Edit, Trash2, User, Calendar, FileText, MessageSquare, Phone, Mail, Filter, Search, AlertCircle, Brain, Sparkles, Target, Zap, Loader2, Video } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { Activity } from '../types';
 import { Button } from './ui/button';
@@ -69,6 +47,7 @@ const activityIcons: Record<Activity['type'], React.ElementType> = {
   contact_updated: User,
   file_uploaded: FileText,
   reminder_sent: AlertCircle,
+  ai_insight_generated: Zap,
 };
 
 const activityColors: Partial<Record<Activity['type'], string>> = {
@@ -239,7 +218,8 @@ interface ActivityFilters {
 export const ActivityFeed: React.FC = () => {
   const { activities, addActivity } = useTaskStore();
   const { generateInsights, isProcessing } = useAI();
-  const { contacts } = useContactStore();
+  const { contacts: contactsById } = useContactStore();
+  const contacts = React.useMemo(() => Object.values(contactsById), [contactsById]);
   
   const [filters, setFilters] = useState<ActivityFilters>({
     dateRange: 'week'

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Plus,
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
 import { useAI } from '../contexts/AIContext';
-import { Task } from '../types';
+import { Task, TaskUpdate } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -34,7 +34,7 @@ import {
   DropdownMenuCheckboxItem,
 } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
-import { Card, CardContent, CardHeader } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { SkeletonList } from './ui/Skeleton';
 
@@ -98,9 +98,11 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) 
                   {task.priority.toUpperCase()}
                 </Badge>
               </div>
-              {task.attachments.length > 0 && (
-                <Paperclip className="h-4 w-4 text-gray-400" />
-              )}
+              <div className="flex items-center space-x-2">
+                {task.attachments.length > 0 && (
+                  <Paperclip className="h-4 w-4 text-gray-400" />
+                )}
+              </div>
             </div>
 
             {/* Title */}
@@ -204,7 +206,7 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, index, onClick }) 
 TaskCard.displayName = 'TaskCard';
 
 interface ColumnHeaderProps {
-  column: typeof statusColumns[0];
+  column: { id: string; title: string; headerColor: string };
   taskCount: number;
   onAddTask: () => void;
 }
@@ -222,6 +224,7 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
         size="sm"
         variant="ghost"
         onClick={onAddTask}
+        aria-label="Add task to column"
         className="h-6 w-6 p-0 hover:bg-white/50 dark:hover:bg-gray-700/50"
       >
         <Plus className="h-4 w-4" />
@@ -233,23 +236,28 @@ const ColumnHeader: React.FC<ColumnHeaderProps> = ({ column, taskCount, onAddTas
 export const TaskKanbanBoard: React.FC = () => {
   const {
     getFilteredTasks,
-    updateTask,
+    rescheduleTask,
     filters,
     setFilters,
     setSelectedTask,
-    selectedTask,
+    selectedTask: selectedTaskId,
+    tasks: allTasks,
     isLoading
   } = useTaskStore();
-  const { predictNextBestAction, generateInsights, isProcessing } = useAI();
+  const selectedTask = selectedTaskId ? allTasks[selectedTaskId] ?? null : null;
+  const { generateInsights, isProcessing } = useAI();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<Task['status'] | null>(null);
-  const [aiTaskInsights, setAiTaskInsights] = useState<Record<string, string>>({});
+  const [_aiTaskInsights, _setAiTaskInsights] = useState<Record<string, string>>({});
   const [smartSuggestions, setSmartSuggestions] = useState<any[]>([]);
 
-  const tasks = getFilteredTasks();
+  // Memoised: getFilteredTasks() returns a new array every call, and `tasks` drives the AI-insights effect below.
+  // A fresh array each render re-ran that effect (an AI call + a state update) on every render, forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getFilteredTasks reads tasks/filters from the store, so they must retrigger it
+  const tasks = useMemo(() => getFilteredTasks(), [getFilteredTasks, allTasks, filters]);
 
   // Update search filter when search term changes
   useEffect(() => {
@@ -258,7 +266,11 @@ export const TaskKanbanBoard: React.FC = () => {
 
   // Generate AI insights for tasks
   useEffect(() => {
-    generateTaskInsights();
+    if (tasks.length === 0) return;
+    // short debounce so a burst of changes (drag, typing in search) triggers one request, not one per change
+    const timer = setTimeout(() => void generateTaskInsights(), 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
   const generateTaskInsights = async () => {
@@ -269,7 +281,7 @@ export const TaskKanbanBoard: React.FC = () => {
         name: task.assignedUserName || 'Unassigned',
         firstName: task.assignedUserName?.split(' ')[0] || 'User',
         lastName: task.assignedUserName?.split(' ').slice(1).join(' ') || '',
-        email: `${task.assignedUserName?.toLowerCase().replace(' ', '.')}@company.com` || 'user@company.com',
+        email: task.assignedUserName ? `${task.assignedUserName.toLowerCase().replace(/\s+/g, '.')}@company.com` : 'user@company.com',
         title: 'Team Member',
         company: 'Internal',
         industry: 'Technology',
@@ -308,7 +320,17 @@ export const TaskKanbanBoard: React.FC = () => {
     }
 
     const newStatus = destination.droppableId as Task['status'];
-    await updateTask(draggableId, { status: newStatus });
+    // Keep the `completed` flag in step with the status (stats and other views read the flag).
+    const updates: TaskUpdate = { status: newStatus };
+    if (newStatus === 'completed') {
+      updates.completed = true;
+      updates.completedAt = new Date();
+    } else if (source.droppableId === 'completed') {
+      updates.completed = false;
+      updates.completedAt = null; // reopened: drop the completion time so the weekly trend stops counting it
+    }
+    // Optimistic update: no global loading state, so the board does not blank out while a card moves.
+    await rescheduleTask(draggableId, updates);
   };
 
   const handleTaskClick = (task: Task) => {
@@ -335,7 +357,7 @@ export const TaskKanbanBoard: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             Task Board
@@ -354,7 +376,7 @@ export const TaskKanbanBoard: React.FC = () => {
           )}
         </div>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
           {/* AI Task Optimizer */}
           <Button 
             onClick={generateTaskInsights}
@@ -475,7 +497,9 @@ export const TaskKanbanBoard: React.FC = () => {
         )}
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-4 gap-6 h-full">
+          {/* On narrow screens the four columns scroll sideways inside the board instead of widening the whole page */}
+          <div className="overflow-x-auto h-full">
+          <div className="grid grid-cols-4 gap-6 h-full min-w-[960px]">
             {statusColumns.map((column) => {
               const columnTasks = getTasksByStatus(column.id);
               
@@ -527,6 +551,7 @@ export const TaskKanbanBoard: React.FC = () => {
                 </div>
               );
             })}
+          </div>
           </div>
         </DragDropContext>
       </div>

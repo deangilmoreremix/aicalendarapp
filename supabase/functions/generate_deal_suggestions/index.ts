@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     }
 
     // Basic sanitization - remove potentially harmful characters
-    const sanitizedPrompt = prompt.replace(/[<>\"'&]/g, '')
+    const sanitizedPrompt = prompt.replace(/[<>"'&]/g, '')
 
     // Generate AI deal suggestions
     const suggestions = await generateDealSuggestions(sanitizedPrompt, context)
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
   }
 })
 
-async function generateDealSuggestions(prompt: string, context?: any): Promise<DealSuggestion[]> {
+async function generateDealSuggestions(prompt: string, _context?: any): Promise<DealSuggestion[]> {
   const lowerPrompt = prompt.toLowerCase()
 
   // Analyze deal characteristics

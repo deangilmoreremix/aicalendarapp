@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAI } from '../contexts/AIContext';
-import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { ContactDetailView } from './ContactDetailView';
 import { ImportContactsModal } from './ImportContactsModal';
@@ -10,57 +9,29 @@ import { Contact } from '../types';
 import { AIEnhancedContactCard } from './contacts/AIEnhancedContactCard';
 import { DarkModeToggle } from './ui/DarkModeToggle';
 import Fuse from 'fuse.js';
-import { 
-  X, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Edit,
-  Plus,
-  Users,
-  ChevronDown,
-  Brain,
-  Download,
-  Upload,
-  Zap,
-  CheckCheck,
-  Grid3X3,
-  List,
-  ArrowUp,
-  ArrowDown,
-  Settings,
-  Target,
-  BarChart3,
-  RefreshCw,
-  Sparkles,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  Info,
-  TrendingUp,
-  Award
-} from 'lucide-react';
+import { aiApi } from '../services/api';
+import { X, Search, Filter, Plus, Users, ChevronDown, Brain, Download, Upload, Zap, CheckCheck, Grid3X3, List, Target, Sparkles, AlertCircle, CheckCircle, Loader2, TrendingUp, Award } from 'lucide-react';
 
 interface ContactsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const interestColors = {
+const _interestColors = {
   hot: 'bg-red-500',
   medium: 'bg-yellow-500',
   low: 'bg-blue-500',
   cold: 'bg-gray-400'
 };
 
-const interestLabels = {
+const _interestLabels = {
   hot: 'Hot Client',
   medium: 'Medium Interest',
   low: 'Low Interest',
   cold: 'Non Interest'
 };
 
-const sourceColors: { [key: string]: string } = {
+const _sourceColors: { [key: string]: string } = {
   'LinkedIn': 'bg-blue-600',
   'Facebook': 'bg-blue-500',
   'Email': 'bg-green-500',
@@ -87,8 +58,8 @@ const statusOptions = [
 ];
 
 export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose }) => {
-  const { contacts, isLoading, updateContact, createContact } = useContactStore();
-  const { scoreBulkContacts, generateBulkInsights, isProcessing } = useAI();
+  const { contacts, updateContact } = useContactStore();
+  const { scoreBulkContacts, generateBulkInsights } = useAI();
   
   // UI State
   const [activeFilter, setActiveFilter] = useState('all');
@@ -107,7 +78,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const [aiResults, setAiResults] = useState<{success: number, failed: number} | null>(null);
   const [analyzingContactIds, setAnalyzingContactIds] = useState<string[]>([]);
   const [aiFilterMode, setAiFilterMode] = useState<'all' | 'high-score' | 'needs-attention' | 'opportunities'>('all');
-  const [smartInsights, setSmartInsights] = useState<any[]>([]);
+  const [_smartInsights, setSmartInsights] = useState<any[]>([]);
   
   // Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -231,11 +202,9 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
   const handleAnalyzeContact = async (contact: Contact) => {
     setAnalyzingContactIds(prev => [...prev, contact.id]);
     try {
-      // This will be handled by the contact card's internal AI logic now
-      // We'll keep this for compatibility but the real work happens in AIEnhancedContactCard
-      await updateContact(contact.id, { 
-        aiScore: contact.aiScore || Math.floor(Math.random() * 40) + 60 // Placeholder - real scoring happens in card
-      });
+      // Real AI score from the contacts_score function (cached per contact for a few minutes)
+      const { score } = await aiApi.scoreContact(contact);
+      await updateContact(contact.id, { aiScore: score });
       return true;
     } catch (error) {
       console.error('Analysis failed:', error);
@@ -334,7 +303,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
     setSelectedContact(null);
   };
 
-  const handleSort = (field: typeof sortBy) => {
+  const _handleSort = (field: typeof sortBy) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -752,7 +721,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ isOpen, onClose })
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-2">
               {/* Sort Dropdown */}
-              <select
+              <select aria-label="Sort contacts"
                 value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [field, order] = e.target.value.split('-');

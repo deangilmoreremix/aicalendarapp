@@ -1,3 +1,5 @@
+-- NOTE: every statement is guarded so this migration is a no-op for tables that do not exist in this database
+-- (it was written for a larger schema; this app only has contacts, tasks, deals, activities, calendar_*).
 /*
   # Add Missing Foreign Key Indexes
 
@@ -18,148 +20,258 @@
 */
 
 -- ai_context_state foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_context_state_current_funnel_id ON public.ai_context_state(current_funnel_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_context_state_tenant_id_fk ON public.ai_context_state(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- ai_execution_history foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_execution_history_function_call_id ON public.ai_execution_history(function_call_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_execution_history_tenant_id_fk ON public.ai_execution_history(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- ai_pending_actions foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_pending_actions_function_call_id ON public.ai_pending_actions(function_call_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_pending_actions_tenant_id_fk ON public.ai_pending_actions(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- ai_undo_snapshots foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_undo_snapshots_execution_history_id ON public.ai_undo_snapshots(execution_history_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_undo_snapshots_tenant_id_fk ON public.ai_undo_snapshots(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- ai_user_permissions foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_user_permissions_tenant_id_fk ON public.ai_user_permissions(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- ai_workflows foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_ai_workflows_tenant_id_fk ON public.ai_workflows(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- api_access_logs foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_api_access_logs_api_key_id ON public.api_access_logs(api_key_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- api_usage foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON public.api_usage(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- app_settings foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_app_settings_user_id ON public.app_settings(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- appointments foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_appointments_deal_id ON public.appointments(deal_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- assistant_reports foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_assistant_reports_user_id ON public.assistant_reports(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- communication_templates foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_communication_templates_customer_id ON public.communication_templates(customer_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- contact_segments foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_contact_segments_customer_id ON public.contact_segments(customer_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- content_templates foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_content_templates_user_id ON public.content_templates(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- conversation_context_cache foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_conversation_context_cache_user_id ON public.conversation_context_cache(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- cost_tracking foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_cost_tracking_generation_id ON public.cost_tracking(generation_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- entitlements foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_entitlements_product_name ON public.entitlements(product_name);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_entitlements_source_purchase_id ON public.entitlements(source_purchase_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- funnel_conversions foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_funnel_conversions_user_id ON public.funnel_conversions(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- funnel_responses foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_funnel_responses_user_id ON public.funnel_responses(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- funnel_sessions foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_funnel_sessions_user_id ON public.funnel_sessions(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- funnel_views foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_funnel_views_user_id ON public.funnel_views(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- generated_content foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_generated_content_content_type_id ON public.generated_content(content_type_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- generated_images foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_generated_images_user_id ON public.generated_images(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- generated_videos foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_generated_videos_image_id ON public.generated_videos(image_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_generated_videos_user_id ON public.generated_videos(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- openai_embeddings foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_openai_embeddings_user_id ON public.openai_embeddings(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- partner_applications foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_partner_applications_partner_id ON public.partner_applications(partner_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- partner_customers foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_partner_customers_tenant_id ON public.partner_customers(tenant_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- pending_entitlements foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_pending_entitlements_claimed_by ON public.pending_entitlements(claimed_by);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_pending_entitlements_purchase_event_id ON public.pending_entitlements(purchase_event_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- project_images foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_project_images_image_id ON public.project_images(image_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_project_images_project_id ON public.project_images(project_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- purchases foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_purchases_product_name ON public.purchases(product_name);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- reasoning_history foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_reasoning_history_user_id ON public.reasoning_history(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- reference_images foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_reference_images_user_id ON public.reference_images(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- response_activities foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_response_activities_user_id ON public.response_activities(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- sales_activities foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_sales_activities_appointment_id ON public.sales_activities(appointment_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_sales_activities_communication_id ON public.sales_activities(communication_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- sales_goals foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_sales_goals_customer_id ON public.sales_goals(customer_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- sales_sequences foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_sales_sequences_customer_id ON public.sales_sequences(customer_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- streaming_sessions foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_streaming_sessions_user_id ON public.streaming_sessions(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- stripe_payment_methods foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_stripe_payment_methods_customer_id ON public.stripe_payment_methods(customer_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- stripe_prices foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_stripe_prices_product ON public.stripe_prices(product);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- sync_jobs foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_sync_jobs_started_by ON public.sync_jobs(started_by);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- template_categories foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_template_categories_parent_id ON public.template_categories(parent_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- tool_execution_logs foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_tool_execution_logs_user_id ON public.tool_execution_logs(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- user_fonts foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_user_fonts_user_id ON public.user_fonts(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- user_projects foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_user_projects_user_id ON public.user_projects(user_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- video_sharing foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_video_sharing_recipient_id ON public.video_sharing(recipient_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;
 
 -- web_search_results foreign key indexes
+DO $guard$ BEGIN
 CREATE INDEX IF NOT EXISTS idx_web_search_results_message_id ON public.web_search_results(message_id);
+EXCEPTION WHEN undefined_table OR undefined_column THEN NULL; END $guard$;

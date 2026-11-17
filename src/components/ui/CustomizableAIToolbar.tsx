@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useContactAI, useCommunicationAI } from '../../contexts/AIContext';
+import { useAI } from '../../contexts/AIContext';
+import { aiApi } from '../../services/api';
 import { 
   BarChart3, 
   Mail, 
@@ -81,7 +82,7 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   Phone
 };
 
-const toolMapping: Record<string, string> = {
+const _toolMapping: Record<string, string> = {
   'leadScoring': 'business-analyzer',
   'emailPersonalization': 'email-composer', 
   'contactEnrichment': 'smart-search',
@@ -116,8 +117,8 @@ const QuickAIButton: React.FC<QuickAIButtonProps> = ({
   const [lastResult, setLastResult] = useState<any>(null);
   
   // Connect to AI services based on entity type
-  const contactAI = entityType === 'contact' ? useContactAI(entityId) : null;
-  const communicationAI = useCommunicationAI();
+  const ai = useAI();
+  const contactAI = entityType === 'contact' ? ai : null;
 
   const handleClick = () => {
     if (onClick) {
@@ -138,12 +139,12 @@ const QuickAIButton: React.FC<QuickAIButtonProps> = ({
         case 'leadScoring':
           if (contactAI) {
             result = await contactAI.scoreContact(entityData);
-            setLastResult({ type: 'score', value: result.overall });
+            setLastResult({ type: 'score', value: result });
           }
           break;
           
         case 'emailPersonalization':
-          result = await communicationAI.generateEmail(entityData, 'introduction');
+          result = await aiApi.composeEmail(entityData, 'Introduction email');
           setLastResult({ type: 'email', value: 'Generated' });
           break;
           
@@ -156,7 +157,7 @@ const QuickAIButton: React.FC<QuickAIButtonProps> = ({
           
         case 'businessIntelligence':
           if (contactAI) {
-            result = await contactAI.generateInsights(entityData, ['opportunity', 'prediction']);
+            result = await contactAI.generateInsights([entityData]);
             setLastResult({ type: 'insights', value: result.length });
           }
           break;
@@ -220,7 +221,7 @@ export const AIGoalsButton: React.FC<{
   size?: 'sm' | 'md';
   variant?: 'primary' | 'secondary';
   className?: string;
-}> = ({ entityType, entityId, entityData, size = 'sm', variant = 'primary', className = '' }) => {
+}> = ({ size = 'sm', className = '' }) => {
   return (
     <button
       className={`
@@ -242,13 +243,11 @@ export const CustomizableAIToolbar: React.FC<CustomizableAIToolbarProps> = ({
   entityType,
   entityId,
   entityData,
-  location,
-  layout,
   size,
   showCustomizeButton = true
 }) => {
-  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
-  const [customQuickActions, setCustomQuickActions] = useState(defaultQuickActions);
+  const [_showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [customQuickActions, _setCustomQuickActions] = useState(defaultQuickActions);
 
   return (
     <div className="space-y-3">

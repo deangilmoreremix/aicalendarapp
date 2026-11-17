@@ -1,45 +1,13 @@
-import React, { useState } from 'react';
+import { initialsAvatar } from '../utils/avatars';
+import { AIEnrichmentService } from '../services/aiEnrichmentService';
+import React, { useState, useEffect } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { AIAutoFillButton } from './ui/AIAutoFillButton';
 import { AIResearchButton } from './ui/AIResearchButton';
-import { UniversalAIAssistant, AIAssistantConfig } from './ui/UniversalAIAssistant';
+import { UniversalAIAssistant } from './ui/UniversalAIAssistant';
 import { useContactStore } from '../store/contactStore';
 import { ContactEnrichmentData } from '../services/aiEnrichmentService';
-import { Contact } from '../types';
-import {
-  X, 
-  User, 
-  Mail, 
-  Phone, 
-  Building, 
-  Tag, 
-  Globe, 
-  Target,
-  Save,
-  UserPlus,
-  AlertCircle,
-  CheckCircle,
-  Heart,
-  MessageSquare,
-  Linkedin,
-  Twitter,
-  Facebook,
-  Instagram,
-  Plus,
-  Database,
-  Smartphone,
-  Clock,
-  Star,
-  Briefcase,
-  MapPin,
-  Calendar,
-  Brain,
-  Sparkles,
-  Wand2,
-  RefreshCw,
-  Camera,
-  Loader2
-} from 'lucide-react';
+import { X, User, Building, Tag, Globe, Target, Save, UserPlus, AlertCircle, CheckCircle, Heart, MessageSquare, Linkedin, Twitter, Facebook, Instagram, Plus, Database, Briefcase, MapPin, Brain, Sparkles, RefreshCw } from 'lucide-react';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -142,7 +110,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [lastEnrichmentData, setLastEnrichmentData] = useState<ContactEnrichmentData | null>(null);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [aiWritingLoading, setAiWritingLoading] = useState<string | null>(null);
+  const [_aiWritingLoading, _setAiWritingLoading] = useState<string | null>(null);
 
   const { createContact } = useContactStore();
 
@@ -290,11 +258,13 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
       }
     }
     
-    // Notes
-    if (enrichmentData.notes && !formData.notes) {
-      updates.notes = enrichmentData.notes;
-    } else if (enrichmentData.bio && !formData.notes) {
-      updates.notes = enrichmentData.bio;
+    // Notes: bio/summary plus the public sources used
+    if (!formData.notes) {
+      const lines = [enrichmentData.bio, enrichmentData.summary, enrichmentData.notes].filter(Boolean) as string[];
+      if (enrichmentData.sources?.length) {
+        lines.push('Sources:\n' + enrichmentData.sources.slice(0, 8).map(src => `- ${src.title}: ${src.url}`).join('\n'));
+      }
+      if (lines.length) updates.notes = lines.join('\n');
     }
     
     setFormData(prev => ({ ...prev, ...updates }));
@@ -316,7 +286,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
         title: formData.title,
         company: formData.company,
         industry: formData.industry || undefined,
-        avatarSrc: formData.avatarSrc || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2`,
+        avatarSrc: formData.avatarSrc || initialsAvatar(`${formData.firstName} ${formData.lastName}`),
         sources: formData.sources.length > 0 ? formData.sources : ['Manual Entry'],
         interestLevel: formData.interestLevel,
         status: formData.status,
@@ -406,6 +376,14 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
     setShowAIAssistant(false);
   };
 
+  // Escape closes the modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   if (isSuccess) {
@@ -466,6 +444,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
 
             <button
               onClick={handleClose}
+              aria-label="Close"
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-6 h-6" />
@@ -511,11 +490,13 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        // Trigger new image search
+                      onClick={async () => {
                         if (formData.firstName || formData.lastName) {
-                          // Find new image logic would go here
-                          console.log('Finding new image...');
+                          const url = await AIEnrichmentService.findContactImage(
+                            `${formData.firstName} ${formData.lastName}`.trim(),
+                            formData.company
+                          );
+                          setFormData(prev => ({ ...prev, avatarSrc: url }));
                         }
                       }}
                       className="absolute -bottom-1 -right-1 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-lg"
@@ -569,6 +550,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   </label>
                   <input
                     type="date"
+                    aria-label="Birthday"
                     value={formData.birthday}
                     onChange={(e) => handleInputChange('birthday', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -617,7 +599,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Preferred Contact Method
                   </label>
-                  <select
+                  <select aria-label="Preferred contact method"
                     value={formData.preferredContact}
                     onChange={(e) => handleInputChange('preferredContact', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -708,7 +690,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Industry
                   </label>
-                  <select
+                  <select aria-label="Industry"
                     value={formData.industry}
                     onChange={(e) => handleInputChange('industry', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -844,7 +826,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
-                  <select
+                  <select aria-label="Status"
                     value={formData.status}
                     onChange={(e) => handleInputChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -970,6 +952,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
                       <button
                         type="button"
                         onClick={() => handleRemoveCustomField(fieldName)}
+                        aria-label={`Remove ${fieldName}`}
                         className="p-1 text-red-400 hover:text-red-600 transition-colors"
                       >
                         <X className="w-4 h-4" />
@@ -1072,7 +1055,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({ isOpen, onClos
             <div className="flex items-center justify-between pt-6 border-t border-gray-200 bg-gray-50 -mx-6 -mb-6 px-6 py-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Brain className="w-4 h-4 text-purple-500" />
-                <span>Powered by OpenAI & Gemini AI</span>
+                <span>Powered by OpenAI</span>
               </div>
               
               <div className="flex items-center space-x-4">

@@ -5,17 +5,11 @@ import { Input } from './input';
 import { Badge } from './badge';
 import { useContactStore } from '../../store/contactStore';
 import { Contact } from '../../types';
-import {
-  X,
-  User,
-  Search,
-  Plus,
-  Check,
-  Loader2,
-  Users,
-  Mail,
-  Phone
-} from 'lucide-react';
+import { X, User, Search, Plus, Check, Loader2, Users, Mail } from 'lucide-react';
+
+// Module-level default: a fresh `[]` default prop is a new array on every render, and effects that depend on it
+// (to reset the form while the modal is open) would run on every render and wipe the form in a loop.
+const NO_IDS: string[] = [];
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -30,7 +24,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
   isOpen,
   onClose,
   onUsersAdded,
-  preselectedUsers = [],
+  preselectedUsers = NO_IDS,
   title = "Add Team Members",
   description = "Select contacts to add to this task or project"
 }) => {
@@ -121,6 +115,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <X size={20} />

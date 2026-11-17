@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { useDetailLayout } from '../store/detailLayoutStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Task, Subtask, CalendarEvent } from '../types';
+import { Task, Subtask } from '../types';
 import { useTaskStore } from '../store/taskStore';
+import { useContactStore } from '../store/contactStore';
+import { useDealStore } from '../store/dealStore';
+import { calendarEventApi } from '../services/api';
+import { RecordActivityTimeline } from './contacts/ContactJourneyTimeline';
+import { RecordNotes } from './contacts/RecordNotes';
+import { RecordAttachments } from './contacts/RecordAttachments';
 import { AITaskAssistant } from './ui/AITaskAssistant';
 import {
   X,
@@ -19,6 +27,7 @@ import {
   Check,
   Brain,
   Video,
+  Star
 } from 'lucide-react';
 
 interface TaskDetailsModalProps {
@@ -26,16 +35,29 @@ interface TaskDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultStatus?: Task['status'];
+  /** Pre-links a new task to a record (used by the embedded record tasks widget). */
+  defaultRelatedTo?: Task['relatedTo'];
+  /** Due date for a new task (e.g. the empty day clicked on the calendar). */
+  defaultDueDate?: Date;
+  /** Open an existing task straight in edit mode (used when the user already pressed "Edit"). */
+  startInEditMode?: boolean;
 }
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ 
-  task, 
+  task: taskProp, 
   isOpen, 
   onClose, 
-  defaultStatus 
+  defaultStatus,
+  defaultRelatedTo,
+  defaultDueDate,
+  startInEditMode = false
 }) => {
   const { createTask, updateTask, deleteTask } = useTaskStore();
-  const [isEditing, setIsEditing] = useState(!task);
+  // read the task from the store, so a change made while the details are open (the star, an edit elsewhere) shows up
+  // whichever screen opened this modal; if it was deleted meanwhile, keep showing the copy we were given
+  const liveTask = useTaskStore((s) => (taskProp ? s.tasks[taskProp.id] : undefined));
+  const task = taskProp ? liveTask ?? taskProp : null;
+  const [isEditing, setIsEditing] = useState(!task || startInEditMode);
   const [formData, setFormData] = useState<Partial<Task>>({
     title: '',
     description: '',
@@ -49,6 +71,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     subtasks: [],
   });
 
+  const [detailLayout] = useDetailLayout('task');
+  const isCompact = detailLayout === 'compact';
   const [newTag, setNewTag] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [showAIAssistant, setShowAIAssistant] = useState(false);
@@ -74,12 +98,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   useEffect(() => {
     if (task) {
       setFormData(task);
-      setIsEditing(false);
+      setIsEditing(startInEditMode);
     } else {
       setFormData({
         title: '',
         description: '',
-        dueDate: new Date(),
+        dueDate: defaultDueDate ?? new Date(),
         startTime: undefined,
         endTime: undefined,
         priority: 'medium',
@@ -89,14 +113,20 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         completed: false,
         tags: [],
         subtasks: [],
+        relatedTo: defaultRelatedTo,
       });
       setIsEditing(true);
     }
-  }, [task, defaultStatus]);
+    // Keyed on stable ids, not object identity: callers build `task` / `defaultRelatedTo` fresh on each render, and
+    // depending on the objects reset the form (and left edit mode) on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, defaultStatus, defaultRelatedTo?.type, defaultRelatedTo?.id, startInEditMode, defaultDueDate?.getTime()]);
 
   const handleSubmit = async () => {
     if (task?.id && isEditing) {
-      await updateTask(task.id, formData);
+      // an omitted (undefined) field is skipped by taskApi.update, so unlinking has to be sent as an explicit null
+      const unlinked = !!task.relatedTo && !formData.relatedTo;
+      await updateTask(task.id, unlinked ? { ...formData, relatedTo: null } : formData);
     } else {
       await createTask(formData);
     }
@@ -183,8 +213,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const { calendarEvents } = useTaskStore();
-
   const getConferenceIcon = (provider?: string) => {
     switch (provider?.toLowerCase()) {
       case 'zoom': return '📺';
@@ -194,9 +222,53 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  const relatedCalendarEvent = task?.relatedTo?.type === 'contact' || task?.relatedTo?.type === 'deal' 
-    ? calendarEvents.find(e => e.id === task.relatedTo?.id)
-    : undefined;
+  // Linked calendar event: the most recent event linked to the task's contact/deal (calendar_event_targets).
+  // (This used to look an event up by the contact/deal id itself, which never matched.)
+  const [relatedCalendarEvent, setRelatedCalendarEvent] = useState<
+    | {
+        title: string;
+        conferenceSolution?: string;
+        conferenceLink?: string;
+        participants?: { displayName: string; handle?: string; avatarUrl?: string }[];
+      }
+    | undefined
+  >(undefined);
+
+  useEffect(() => {
+    const relatedTo = task?.relatedTo;
+    if (!relatedTo || (relatedTo.type !== 'contact' && relatedTo.type !== 'deal')) {
+      setRelatedCalendarEvent(undefined);
+      return;
+    }
+    let cancelled = false;
+    calendarEventApi
+      .getTimeline(relatedTo.type, relatedTo.id, 1, 0)
+      .then(({ timelineCalendarEvents }) => {
+        const event = timelineCalendarEvents[0];
+        if (cancelled) return;
+        setRelatedCalendarEvent(
+          event
+            ? {
+                title: event.title ?? 'Calendar event',
+                conferenceSolution: event.conferenceLink?.primaryLinkLabel,
+                conferenceLink: event.conferenceLink?.primaryLinkUrl,
+                participants: event.participants?.map(p => ({ displayName: p.displayName, handle: p.handle, avatarUrl: p.avatarUrl }))
+              }
+            : undefined
+        );
+      })
+      .catch(() => !cancelled && setRelatedCalendarEvent(undefined));
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.relatedTo?.type, task?.relatedTo?.id]);
+
+  const contacts = useContactStore(state => state.contacts);
+  const deals = useDealStore(state => state.deals);
+  const loadDeals = useDealStore(state => state.loadDeals);
+  useEffect(() => {
+    if (isOpen && Object.keys(useDealStore.getState().deals).length === 0) void loadDeals();
+  }, [isOpen, loadDeals]);
 
   if (!isOpen) return null;
 
@@ -209,6 +281,18 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               {task ? (isEditing ? 'Edit Task' : 'Task Details') : 'Create New Task'}
             </DialogTitle>
             <div className="flex items-center space-x-2">
+              {task && !isEditing && (
+                <button
+                  type="button"
+                  aria-label={task.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-pressed={!!task.isFavorite}
+                  onClick={() => void updateTask(task.id, { isFavorite: !task.isFavorite })}
+                  className={`rounded-lg p-2 hover:bg-white/10 ${task.isFavorite ? 'text-amber-300' : 'text-white/70 hover:text-white'}`}
+                >
+                  <Star size={18} className={task.isFavorite ? 'fill-current' : ''} />
+                </button>
+              )}
+              {task && !isEditing && <LayoutToggle kind="task" onDark />}
               {!task && (
                 <button
                   onClick={() => setShowAIAssistant(true)}
@@ -220,6 +304,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               )}
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -308,7 +393,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Priority
                     </label>
-                    <select
+                    <select aria-label="Priority"
                       value={formData.priority}
                       onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as Task['priority'] }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -324,7 +409,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
-                  <select
+                  <select aria-label="Status"
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Task['status'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -344,7 +429,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category
                   </label>
-                  <select
+                  <select aria-label="Category"
                     value={formData.category}
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as Task['category'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -361,7 +446,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Type
                   </label>
-                  <select
+                  <select aria-label="Type"
                     value={formData.type}
                     onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as Task['type'] }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -376,6 +461,39 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     <option value="other">Other</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Related record (contact or deal) */}
+              <div>
+                <label htmlFor="task-related-record" className="block text-sm font-medium text-gray-700 mb-2">
+                  Related record
+                </label>
+                <select
+                  id="task-related-record"
+                  value={formData.relatedTo ? `${formData.relatedTo.type}:${formData.relatedTo.id}` : ''}
+                  onChange={(e) => {
+                    const [type, id] = e.target.value.split(':');
+                    if (!type || !id) {
+                      setFormData(prev => ({ ...prev, relatedTo: undefined }));
+                      return;
+                    }
+                    const name = type === 'contact' ? contacts[id]?.name : deals[id]?.company;
+                    setFormData(prev => ({ ...prev, relatedTo: { type: type as 'contact' | 'deal', id, name: name ?? '' } }));
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="">None</option>
+                  <optgroup label="Contacts">
+                    {Object.values(contacts).map(c => (
+                      <option key={c.id} value={`contact:${c.id}`}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Deals">
+                    {Object.values(deals).map(d => (
+                      <option key={d.id} value={`deal:${d.id}`}>{d.company}</option>
+                    ))}
+                  </optgroup>
+                </select>
               </div>
 
               {/* Tags */}
@@ -475,7 +593,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </div>
 
                 {/* Description */}
-                {task.description && (
+                {!isCompact && task.description && (
                   <div>
                     <p className="text-gray-600">{task.description}</p>
                   </div>
@@ -503,7 +621,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {task.estimatedDuration && (
+                  {!isCompact && task.estimatedDuration && (
                     <div className="flex items-center space-x-2">
                       <Clock size={16} className="text-gray-400" />
                       <div>
@@ -513,17 +631,25 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     </div>
                   )}
 
-<div className="flex items-center space-x-2">
+{!isCompact && <div className="flex items-center space-x-2">
                      <Calendar size={16} className="text-gray-400" />
                      <div>
                        <div className="font-medium text-gray-700">Created</div>
                        <div className="text-gray-600">{task.createdAt.toLocaleDateString()}</div>
                      </div>
-                   </div>
+                   </div>}
                  </div>
 
+                 {task && !isCompact && (
+                   <div className="border-t pt-4 mt-4">
+                     <RecordNotes entityType="task" entityId={task.id} />
+                     <div className="mt-4"><RecordAttachments entityType="task" entityId={task.id} /></div>
+                     <div className="mt-4"><RecordActivityTimeline entityId={task.id} entityType="task" title="Task activity" /></div>
+                   </div>
+                 )}
+
                  {/* Calendar Event Integration - Twenty Enhanced */}
-                 {relatedCalendarEvent && (
+                 {!isCompact && relatedCalendarEvent && (
                    <div className="border-t pt-4 mt-4">
                      <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                        <Calendar size={16} className="mr-2" />
@@ -581,7 +707,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                  )}
 
                  {/* Tags */}
-                 {task.tags.length > 0 && (
+                 {!isCompact && task.tags.length > 0 && (
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2 flex items-center">
                       <Tag size={16} className="mr-1" />
@@ -655,7 +781,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 <Button variant="outline" onClick={onClose}>
                   Close
                 </Button>
-                <Button onClick={() => setIsEditing(true)}>
+                <Button
+                  onClick={() => {
+                    // re-seed from the current task, so changes made while viewing (e.g. the favorite star) aren't overwritten on save
+                    if (task) setFormData((prev) => ({ ...prev, ...task }));
+                    setIsEditing(true);
+                  }}
+                >
                   Edit Task
                 </Button>
               </>

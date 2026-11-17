@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogHeader } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Textarea } from './textarea';
 import { useContactStore } from '../../store/contactStore';
-import { useAI } from '../../contexts/AIContext';
 import { Contact } from '../../types';
+import { aiApi, activityApi } from '../../services/api';
 import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
 import { Mail, Brain } from 'lucide-react';
 import {
@@ -21,6 +21,10 @@ import {
   EyeOff,
   CheckCircle
 } from 'lucide-react';
+
+// Module-level default: a fresh `[]` default prop is a new array on every render, and effects that depend on it
+// (to reset the form while the modal is open) would run on every render and wipe the form in a loop.
+const NO_IDS: string[] = [];
 
 interface EmailComposerModalProps {
   isOpen: boolean;
@@ -46,12 +50,11 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
   isOpen,
   onClose,
   onEmailSent,
-  preselectedContacts = [],
+  preselectedContacts = NO_IDS,
   prefilledSubject = '',
   prefilledBody = ''
 }) => {
   const { contacts } = useContactStore();
-  const { isProcessing } = useAI();
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -145,24 +148,16 @@ export const EmailComposerModal: React.FC<EmailComposerModalProps> = ({
 
     setIsLoading(true);
     try {
-      // Simulate AI email generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const recipientNames = formData.to.map(id => {
-        const contact = contacts[id];
-        return contact ? contact.name : 'Valued Contact';
-      });
-
-      const generatedSubject = `Follow-up: ${recipientNames.join(', ')}`;
-      const generatedBody = `Dear ${recipientNames.join(', ')},
-
-I hope this email finds you well. I wanted to follow up on our recent conversation and discuss how we can work together to achieve your goals.
-
-Please let me know if you'd like to schedule a call or if you have any questions in the meantime.
-
-Best regards,
-Your Name
-Contact Information`;
+      const recipients = formData.to.map(id => contacts[id]).filter(Boolean) as Contact[];
+      const target = recipients.length === 1 ? recipients[0] : { name: recipients.map(c => c.name).join(', ') };
+      const body = await aiApi.composeEmail(
+        target as Partial<Contact>,
+        formData.subject ? `Subject idea: ${formData.subject}. ${formData.body}`.trim() : formData.body || 'Friendly follow-up'
+      );
+      // First line "Subject: ..." is used as the subject when present.
+      const m = body.match(/^\s*Subject:\s*(.+)\n+/i);
+      const generatedSubject = m ? m[1].trim() : formData.subject || `Follow-up: ${recipients.map(c => c.name).join(', ')}`;
+      const generatedBody = m ? body.slice(m[0].length) : body;
 
       setAiSuggestions({ subject: generatedSubject, body: generatedBody });
       setFormData(prev => ({ ...prev, aiGenerated: true }));
@@ -229,21 +224,36 @@ Contact Information`;
 
     setIsLoading(true);
     try {
-      // Simulate email sending
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      // No email delivery provider exists in the Netlify/Supabase/OpenAI stack:
+      // the email is saved to each recipient's activity log, not delivered.
       const email = {
         id: `email_${Date.now()}`,
         ...formData,
         sentAt: new Date(),
-        status: 'sent'
+        status: 'logged'
       };
+      await Promise.all(
+        formData.to
+          .filter(id => contacts[id])
+          .map(id =>
+            activityApi.create({
+              type: 'email_sent',
+              title: `Email: ${formData.subject}`,
+              description: formData.body,
+              userId: 'current-user',
+              userName: 'You',
+              entityType: 'contact',
+              entityId: id,
+              metadata: { subject: formData.subject, aiGenerated: !!formData.aiGenerated }
+            })
+          )
+      );
 
       onEmailSent?.(email);
       onClose();
     } catch (error) {
       console.error('Failed to send email:', error);
-      alert('Failed to send email. Please try again.');
+      alert('Failed to save email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -258,7 +268,7 @@ Contact Information`;
     return recipientId.includes('@') ? recipientId : `${recipientId} <unknown@email.com>`;
   };
 
-  const contactsArray = Object.values(contacts);
+  const _contactsArray = Object.values(contacts);
 
   if (!isOpen) return null;
 
@@ -289,6 +299,7 @@ Contact Information`;
               </Button>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -313,6 +324,7 @@ Contact Information`;
                     <button
                       type="button"
                       onClick={() => removeRecipient('to', recipientId)}
+                      aria-label="Remove recipient"
                       className="ml-1 text-gray-500 hover:text-gray-700"
                     >
                       <X size={12} />
@@ -321,7 +333,7 @@ Contact Information`;
                 ))}
               </div>
               <div className="flex gap-2">
-                <select
+                <select aria-label="Recipient type"
                   value={recipientType}
                   onChange={(e) => setRecipientType(e.target.value as 'to' | 'cc' | 'bcc')}
                   className="px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -337,7 +349,7 @@ Contact Information`;
                   onKeyPress={(e) => e.key === 'Enter' && addRecipient()}
                   className="flex-1 rounded-l-none"
                 />
-                <Button type="button" onClick={addRecipient} size="sm">
+                <Button type="button" onClick={addRecipient} size="sm" aria-label="Add recipient">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -359,6 +371,7 @@ Contact Information`;
                       <button
                         type="button"
                         onClick={() => removeRecipient('cc', recipientId)}
+                      aria-label="Remove recipient"
                         className="ml-1 text-gray-500 hover:text-gray-700"
                       >
                         <X size={12} />
@@ -382,6 +395,7 @@ Contact Information`;
                       <button
                         type="button"
                         onClick={() => removeRecipient('bcc', recipientId)}
+                      aria-label="Remove recipient"
                         className="ml-1 text-gray-500 hover:text-gray-700"
                       >
                         <X size={12} />
@@ -505,6 +519,7 @@ Contact Information`;
                   <button
                     type="button"
                     onClick={() => removeAttachment(index)}
+                    aria-label="Remove attachment"
                     className="text-red-500 hover:text-red-700"
                   >
                     <X size={16} />
@@ -535,7 +550,7 @@ Contact Information`;
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Priority
             </label>
-            <select
+            <select aria-label="Priority"
               value={formData.priority}
               onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'low' | 'normal' | 'high' }))}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -566,7 +581,7 @@ Contact Information`;
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              <span>{isLoading ? 'Sending...' : 'Send Email'}</span>
+              <span>{isLoading ? 'Saving...' : 'Save to Activity Log'}</span>
             </Button>
           </div>
         </form>

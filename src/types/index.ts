@@ -1,5 +1,8 @@
 // Consolidated type definitions to resolve conflicts
 export interface Task {
+  isFavorite?: boolean;
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   title: string;
   description?: string;
@@ -56,7 +59,17 @@ export interface CalendarEventParticipant {
   workspaceMemberId?: string;
 }
 
+/**
+ * A task patch. `null` clears a stored value (the API skips `undefined`, which means "leave as is").
+ */
+export type TaskUpdate = Partial<Omit<Task, 'completedAt' | 'relatedTo'>> & {
+  completedAt?: Date | null;
+  relatedTo?: Task['relatedTo'] | null;
+};
+
 export interface CalendarEvent {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   title: string;
   description?: string;
@@ -73,6 +86,8 @@ export interface CalendarEvent {
   conferenceSolution?: string;
   conferenceLink?: string;
   visibility?: 'SHARE_EVERYTHING' | 'METADATA';
+  /** IANA zone the event was saved in; the editor keeps it unless the user changes it. */
+  timeZone?: string;
 }
 
 export interface Activity {
@@ -127,6 +142,8 @@ export interface Appointment {
 }
 
 export interface Contact {
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
   firstName: string;
   lastName: string;
@@ -156,10 +173,17 @@ export interface Contact {
   createdAt: Date;
   updatedAt: Date;
   aiScore?: number;
+  /** YYYY-MM-DD; places the contact on the calendar */
+  nextFollowUp?: string | null;
 }
 
 export interface Deal {
+  isFavorite?: boolean;
+  /** Manual order among records on the same calendar day (Twenty record position). */
+  position?: number;
   id: string;
+  /** Optional deal name entered in the New Deal form */
+  title?: string;
   company: string;
   value: string;
   probability: string;

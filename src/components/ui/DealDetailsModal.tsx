@@ -1,51 +1,46 @@
+import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { LayoutToggle } from './LayoutToggle';
+import { RecordNotes } from '../contacts/RecordNotes';
+import { RecordAttachments } from '../contacts/RecordAttachments';
+import { RecordActivityTimeline } from '../contacts/ContactJourneyTimeline';
+import { useDetailLayout } from '../../store/detailLayoutStore';
 import { Button } from './button';
 import { Badge } from './badge';
+import { useDealViews, DealView } from '../../hooks/useDealViews';
+import { activityApi } from '../../services/api';
+import { RecordTasksWidget } from '../calendar/RecordTasksWidget';
+import { CalendarEventsCard } from '../calendar/CalendarEventsCard';
 import { useContactStore } from '../../store/contactStore';
+import { useDealStore } from '../../store/dealStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
-import {
-  X,
-  DollarSign,
-  Calendar,
-  User,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Target,
-  Brain,
-  Loader2,
-  Edit,
-  Archive,
-  Trash2,
-  Mail,
-  FileText
-} from 'lucide-react';
+import { Star, X, DollarSign, Calendar, User, AlertTriangle, CheckCircle, Clock, Target, Brain, Loader2, Edit, Archive, Mail, FileText } from 'lucide-react';
+
+const DealFavoriteStar = ({ dealId }: { dealId: string }) => {
+  const isFavorite = useDealStore((s) => !!s.deals[dealId]?.isFavorite);
+  const updateDeal = useDealStore((s) => s.updateDeal);
+  return (
+    <button
+      type="button"
+      aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      aria-pressed={isFavorite}
+      onClick={() => void updateDeal(dealId, { isFavorite: !isFavorite })}
+      className={`rounded-lg p-2 hover:bg-white/10 ${isFavorite ? 'text-amber-300' : 'text-white/70 hover:text-white'}`}
+    >
+      <Star size={18} className={isFavorite ? 'fill-current' : ''} />
+    </button>
+  );
+};
 
 interface DealDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dealId?: number;
+  dealId?: string | number;
   onDealUpdated?: (deal: any) => void;
 }
 
-interface Deal {
-  id: number;
-  company: string;
-  value: string;
-  probability: string;
-  dueDate: string;
-  contactId: string;
-  status: 'online' | 'offline';
-  description?: string;
-  stage: 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost';
-  priority: 'low' | 'medium' | 'high';
-  aiPrediction?: number;
-  createdAt: string;
-  updatedAt: string;
-  notes?: string;
+interface DealDetails extends DealView {
   activities: DealActivity[];
 }
 
@@ -62,143 +57,55 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
   isOpen,
   onClose,
   dealId,
-  onDealUpdated
 }) => {
   const { contacts } = useContactStore();
-  const { predictDealSuccess, isProcessing } = useAI();
+  const { predictDealSuccess } = useAI();
 
-  const [deal, setDeal] = useState<Deal | null>(null);
+  const { deals: dealViews } = useDealViews(isOpen);
+  const [deal, setDeal] = useState<DealDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [aiPrediction, setAiPrediction] = useState<number | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
 
-  // Mock deal data - in a real app, this would come from an API
-  const mockDeals: Record<number, Deal> = {
-    1: {
-      id: 1,
-      company: 'TechCorp Solutions',
-      value: '$85,000',
-      probability: '85%',
-      dueDate: 'Tomorrow',
-      contactId: '1',
-      status: 'online',
-      description: 'Enterprise software implementation project for TechCorp Solutions. This is a high-value deal involving custom development and integration services.',
-      stage: 'negotiation',
-      priority: 'high',
-      aiPrediction: 87,
-      createdAt: '2024-01-15',
-      updatedAt: '2024-12-20',
-      notes: 'Client is very interested in our AI capabilities. Key decision maker is the CTO. Follow up on technical requirements.',
-      activities: [
-        {
-          id: '1',
-          type: 'meeting',
-          title: 'Product Demo',
-          description: 'Demonstrated AI capabilities and integration options',
-          date: '2024-12-18',
-          user: 'John Doe'
-        },
-        {
-          id: '2',
-          type: 'email',
-          title: 'Proposal Sent',
-          description: 'Sent detailed technical proposal and pricing',
-          date: '2024-12-16',
-          user: 'Jane Smith'
-        },
-        {
-          id: '3',
-          type: 'call',
-          title: 'Follow-up Call',
-          description: 'Discussed implementation timeline and next steps',
-          date: '2024-12-14',
-          user: 'John Doe'
-        }
-      ]
-    },
-    2: {
-      id: 2,
-      company: 'Innovation Labs',
-      value: '$120,000',
-      probability: '60%',
-      dueDate: 'Friday',
-      contactId: '2',
-      status: 'offline',
-      description: 'AI-powered analytics platform implementation for Innovation Labs. Focus on data integration and custom reporting features.',
-      stage: 'proposal',
-      priority: 'medium',
-      aiPrediction: 72,
-      createdAt: '2024-02-10',
-      updatedAt: '2024-12-18',
-      notes: 'Client needs extensive customization. Budget approval pending from CFO.',
-      activities: [
-        {
-          id: '1',
-          type: 'meeting',
-          title: 'Requirements Gathering',
-          description: 'Detailed discussion of analytics requirements',
-          date: '2024-12-15',
-          user: 'Jane Smith'
-        },
-        {
-          id: '2',
-          type: 'task',
-          title: 'Custom Proposal',
-          description: 'Prepared customized proposal with specific features',
-          date: '2024-12-12',
-          user: 'Mike Johnson'
-        }
-      ]
-    },
-    3: {
-      id: 3,
-      company: 'Global Dynamics',
-      value: '$95,500',
-      probability: '75%',
-      dueDate: 'Next Week',
-      contactId: '3',
-      status: 'online',
-      description: 'Cloud migration and modernization project for Global Dynamics. Includes legacy system migration and new feature development.',
-      stage: 'qualification',
-      priority: 'high',
-      aiPrediction: 81,
-      createdAt: '2024-03-05',
-      updatedAt: '2024-12-19',
-      notes: 'Strong technical fit. Client has urgent timeline requirements.',
-      activities: [
-        {
-          id: '1',
-          type: 'call',
-          title: 'Initial Consultation',
-          description: 'Discussed migration requirements and timeline',
-          date: '2024-12-19',
-          user: 'John Doe'
-        },
-        {
-          id: '2',
-          type: 'email',
-          title: 'Technical Assessment',
-          description: 'Sent detailed technical assessment report',
-          date: '2024-12-17',
-          user: 'Mike Johnson'
-        }
-      ]
-    }
-  };
-
-  // Load deal data when modal opens
+  // Real deal from the store + its activities from Supabase
   useEffect(() => {
-    if (isOpen && dealId) {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        const dealData = mockDeals[dealId];
-        setDeal(dealData || null);
-        setAiPrediction(dealData?.aiPrediction || null);
-        setIsLoading(false);
-      }, 500);
+    if (!isOpen || dealId === undefined) return;
+    let cancelled = false;
+    const found = dealViews.find(d => d.id === String(dealId));
+    if (!found) {
+      setDeal(null);
+      return;
     }
-  }, [isOpen, dealId]);
+    setIsLoading(true);
+    activityApi
+      .getAll()
+      .then(all => {
+        if (cancelled) return;
+        const activities: DealActivity[] = all
+          .filter(a => a.entityType === 'deal' && a.entityId === found.id)
+          .map(a => ({
+            id: a.id,
+            type: /email/.test(a.type) ? 'email' : /call/.test(a.type) ? 'call' : /meeting/.test(a.type) ? 'meeting' : /task/.test(a.type) ? 'task' : 'note',
+            title: a.title,
+            description: a.description ?? '',
+            date: a.createdAt.toISOString(),
+            user: a.userName
+          }));
+        setDeal({ ...found, activities });
+        setAiPrediction(found.aiPrediction ?? null);
+      })
+      .catch(error => {
+        console.error('Failed to load deal activities:', error);
+        if (!cancelled) {
+          setDeal({ ...found, activities: [] });
+          setAiPrediction(found.aiPrediction ?? null);
+        }
+      })
+      .finally(() => !cancelled && setIsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, dealId, dealViews]);
 
   const handleAIPrediction = async () => {
     if (!deal) return;
@@ -247,6 +154,9 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
     }
   };
 
+  const [detailLayout] = useDetailLayout('deal');
+  const isCompact = detailLayout === 'compact';
+
   if (!isOpen) return null;
 
   const contact = deal ? contacts[deal.contactId] : null;
@@ -260,12 +170,17 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
               <DollarSign className="w-5 h-5 text-green-500" />
               <DialogTitle>Deal Details</DialogTitle>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center space-x-2">
+              {deal && <DealFavoriteStar dealId={deal.id} />}
+              <LayoutToggle kind="deal" onDark />
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -354,7 +269,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                 </h3>
                 <div className="flex items-center space-x-3">
                   <img
-                    src={contact.avatarSrc || contact.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+                    src={contact.avatarSrc || contact.avatar || initialsAvatar(contact.name)}
                     alt={contact.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
@@ -368,7 +283,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
             )}
 
             {/* Deal Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {!isCompact && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Deal Information</h3>
                 <div className="space-y-3">
@@ -405,10 +320,25 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
+
+            {/* Tasks and calendar events linked to this deal */}
+            {!isCompact && <RecordTasksWidget targetType="deal" targetId={deal.id} targetName={deal.company} />}
+            {!isCompact && (
+              <CalendarEventsCard
+                targetType="deal"
+                targetId={deal.id}
+                objectName="deal"
+                composerContext={{ targets: [{ type: 'deal', id: deal.id }] }}
+              />
+            )}
+
+            {!isCompact && <RecordNotes entityType="deal" entityId={deal.id} />}
+            {!isCompact && <RecordAttachments entityType="deal" entityId={deal.id} />}
+            {!isCompact && <RecordActivityTimeline entityId={deal.id} entityType="deal" title="Deal activity" />}
 
             {/* Recent Activities */}
-            <div>
+            {!isCompact && <div>
               <h3 className="font-semibold text-gray-900 mb-3">Recent Activities</h3>
               <div className="space-y-3">
                 {deal.activities.map(activity => (
@@ -428,7 +358,7 @@ export const DealDetailsModal: React.FC<DealDetailsModalProps> = ({
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-3 pt-4 border-t">

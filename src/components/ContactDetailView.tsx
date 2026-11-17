@@ -1,61 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
-import { CustomizableAIToolbar } from './ui/CustomizableAIToolbar';
 import { AIResearchButton } from './ui/AIResearchButton';
+import { CalendarEventsCard } from './calendar/CalendarEventsCard';
+import { RecordTasksWidget } from './calendar/RecordTasksWidget';
+import { ContactJourneyTimeline } from './contacts/ContactJourneyTimeline';
+import { ContactAIInsightsPanel as AIInsightsPanel } from './contacts/ContactAIInsightsPanel';
 import { aiEnrichmentService, ContactEnrichmentData } from '../services/aiEnrichmentService';
 // Placeholder components for missing imports
-const ContactJourneyTimeline = ({ contact }: { contact: Contact }) => (
-  <div className="p-4 bg-gray-50 rounded-lg">
-    <h3 className="text-lg font-semibold mb-2">Contact Journey Timeline</h3>
-    <p className="text-gray-600">Timeline functionality coming soon...</p>
-  </div>
-);
-
-const AIInsightsPanel = ({ contact }: { contact: Contact }) => (
-  <div className="p-4 bg-gray-50 rounded-lg">
-    <h3 className="text-lg font-semibold mb-2">AI Insights Panel</h3>
-    <p className="text-gray-600">AI insights functionality coming soon...</p>
-  </div>
-);
-
-const CommunicationHub = ({ contact }: { contact: Contact }) => (
+const CommunicationHub = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Communication Hub</h3>
     <p className="text-gray-600">Communication tools coming soon...</p>
   </div>
 );
 
-const AutomationPanel = ({ contact }: { contact: Contact }) => (
+const AutomationPanel = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Automation Panel</h3>
     <p className="text-gray-600">Automation tools coming soon...</p>
   </div>
 );
 
-const ContactAnalytics = ({ contact }: { contact: Contact }) => (
+const ContactAnalytics = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Contact Analytics</h3>
     <p className="text-gray-600">Analytics dashboard coming soon...</p>
   </div>
 );
 
-const ContactEmailPanel = ({ contact }: { contact: Contact }) => (
+const ContactEmailPanel = (_props: { contact: Contact }) => (
   <div className="p-4 bg-gray-50 rounded-lg">
     <h3 className="text-lg font-semibold mb-2">Email Panel</h3>
     <p className="text-gray-600">Email functionality coming soon...</p>
   </div>
 );
 import { Contact } from '../types';
-import { 
-  X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, MoreHorizontal, 
-  User, Globe, Clock, Building, Tag, Star, ExternalLink, Brain, TrendingUp, 
-  BarChart3, Zap, Users, Activity, Settings, Database, Shield, Target, 
-  Smartphone, Video, Linkedin, Twitter, Facebook, Instagram, Save, 
-  Ambulance as Cancel, Heart, HeartOff, MapPin, Briefcase, Award, 
-  CheckCircle, AlertCircle, Wifi, WifiOff, Search, DollarSign, RefreshCw,
-  Sparkles, Camera, Wand2
-} from 'lucide-react';
+import { aiApi } from '../services/api';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { RecordNotes } from './contacts/RecordNotes';
+import { RecordAttachments } from './contacts/RecordAttachments';
+import { useDetailLayout } from '../store/detailLayoutStore';
+import { X, Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, User, Globe, Clock, Building, Tag, Brain, TrendingUp, BarChart3, Zap, Activity, Database, Target, Linkedin, Twitter, Facebook, Instagram, Save, Ambulance as Cancel, Heart, HeartOff, Search, Sparkles, Camera, Wand2 } from 'lucide-react';
 
 interface ContactDetailViewProps {
   contact: Contact;
@@ -67,14 +53,14 @@ interface ContactDetailViewProps {
 const interestColors = {
   hot: 'bg-red-500',
   medium: 'bg-yellow-500',
-  low: 'bg-blue-500',
+  warm: 'bg-blue-500',
   cold: 'bg-gray-400'
 };
 
 const interestLabels = {
   hot: 'Hot Client',
   medium: 'Medium Interest',
-  low: 'Low Interest',
+  warm: 'Warm Interest',
   cold: 'Non Interest'
 };
 
@@ -104,6 +90,8 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   onUpdate 
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [detailLayout] = useDetailLayout('contact');
+  const isCompact = detailLayout === 'compact';
   const [isEditing, setIsEditing] = useState(false);
   const [editedContact, setEditedContact] = useState<Contact>(contact);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -128,6 +116,8 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'journey', label: 'Journey', icon: TrendingUp },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
+    { id: 'tasks', label: 'Tasks', icon: Target },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'automation', label: 'Automation', icon: Zap },
@@ -195,13 +185,13 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
         let updates: Partial<Contact> = {};
         
         if (editingField.startsWith('social_')) {
-          const platform = editingField.replace('social_', '');
+          const _platform = editingField.replace('social_', '');
           const socialProfiles = {
             ...(editedContact.socialProfiles || {}),
           };
           updates = { socialProfiles };
         } else if (editingField.startsWith('custom_')) {
-          const fieldName = editingField.replace('custom_', '');
+          const _fieldName = editingField.replace('custom_', '');
           const customFields = {
             ...(editedContact.customFields || {}),
           };
@@ -285,11 +275,11 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     }
   };
 
-  const handleRemoveSocialProfile = async (platform: string) => {
+  const _handleRemoveSocialProfile = async (platform: string) => {
     if (!editedContact.socialProfiles) return;
     
     const socialProfiles = { ...editedContact.socialProfiles };
-    delete socialProfiles[platform];
+    delete (socialProfiles as Record<string, string | undefined>)[platform];
     
     setEditedContact(prev => ({
       ...prev,
@@ -341,7 +331,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
     }
   };
 
-  const handleChangeInterestLevel = async (level: 'hot' | 'medium' | 'low' | 'cold') => {
+  const handleChangeInterestLevel = async (level: 'hot' | 'medium' | 'warm' | 'cold') => {
     setEditedContact(prev => ({
       ...prev,
       interestLevel: level
@@ -361,9 +351,8 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
   const handleAnalyzeContact = async () => {
     setIsAnalyzing(true);
     try {
-      // Simulate AI analysis
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const newScore = Math.floor(Math.random() * 40) + 60; // Random score between 60-100
+      // Real AI score from the contacts_score function
+      const { score: newScore } = await aiApi.scoreContact(editedContact);
       const updatedContact = { ...editedContact, aiScore: newScore };
       setEditedContact(updatedContact);
       
@@ -385,22 +374,31 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
       // Apply enrichment data to contact
       const updates: any = {};
       
-      if (enrichmentData.phone && !editedContact.phone) {
-        updates.phone = enrichmentData.phone;
-      }
-      if (enrichmentData.industry && !editedContact.industry) {
-        updates.industry = enrichmentData.industry;
-      }
+      // Only fill fields that are empty; never overwrite what the user already entered.
+      if (enrichmentData.title && !editedContact.title) updates.title = enrichmentData.title;
+      if (enrichmentData.company && !editedContact.company) updates.company = enrichmentData.company;
+      if (enrichmentData.phone && !editedContact.phone) updates.phone = enrichmentData.phone;
+      if (enrichmentData.industry && !editedContact.industry) updates.industry = enrichmentData.industry;
       if (enrichmentData.avatar && enrichmentData.avatar !== editedContact.avatarSrc) {
         updates.avatarSrc = enrichmentData.avatar;
       }
-      if (enrichmentData.notes) {
-        updates.notes = editedContact.notes ? 
-          `${editedContact.notes}\n\nAI Research: ${enrichmentData.notes}` : 
-          enrichmentData.notes;
+
+      // Research notes: bio/summary, location and the public sources used (appended, dated).
+      const noteLines: string[] = [];
+      if (enrichmentData.bio) noteLines.push(enrichmentData.bio);
+      if (enrichmentData.summary) noteLines.push(enrichmentData.summary);
+      if (enrichmentData.notes) noteLines.push(enrichmentData.notes);
+      const loc = [enrichmentData.location?.city, enrichmentData.location?.state, enrichmentData.location?.country].filter(Boolean).join(', ');
+      if (loc) noteLines.push(`Location: ${loc}`);
+      if (enrichmentData.sources?.length) {
+        noteLines.push('Sources:\n' + enrichmentData.sources.slice(0, 8).map(src => `- ${src.title}: ${src.url}`).join('\n'));
       }
-      
-      // Social profiles
+      if (noteLines.length) {
+        const entry = `AI Research (${new Date().toLocaleDateString()}, confidence ${Math.round(enrichmentData.confidence)}%):\n${noteLines.join('\n')}`;
+        updates.notes = editedContact.notes ? `${editedContact.notes}\n\n${entry}` : entry;
+      }
+
+      // Social profiles (fill empty ones only)
       if (enrichmentData.socialProfiles) {
         const socialUpdates: any = {};
         Object.entries(enrichmentData.socialProfiles).forEach(([key, value]) => {
@@ -412,12 +410,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
           updates.socialProfiles = { ...editedContact.socialProfiles, ...socialUpdates };
         }
       }
-      
-      // Update AI score if provided
-      if (enrichmentData.confidence) {
-        updates.aiScore = Math.round(enrichmentData.confidence);
-      }
-      
+
       const updatedContact = { ...editedContact, ...updates };
       setEditedContact(updatedContact);
       
@@ -530,7 +523,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   src={editedContact.avatarSrc}
                   alt={editedContact.name}
                   size="xl"
-                  status={editedContact.status}
+                  status={(['active', 'inactive', 'pending'] as const).find(st => st === editedContact.status)}
                 />
                 
                 {/* AI Score Badge */}
@@ -670,17 +663,16 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   if (lastEnrichment) {
                     handleAIEnrichment(lastEnrichment);
                   } else {
-                    const mockEnrichment: ContactEnrichmentData = {
-                      firstName: editedContact.firstName,
-                      lastName: editedContact.lastName,
-                      email: editedContact.email,
-                      company: editedContact.company,
-                      phone: editedContact.phone || `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-                      industry: editedContact.industry || ['Technology', 'Finance', 'Healthcare', 'Education'][Math.floor(Math.random() * 4)],
-                      notes: "Auto-enriched with AI on " + new Date().toLocaleDateString(),
-                      confidence: 85
-                    };
-                    handleAIEnrichment(mockEnrichment);
+                    setIsEnriching(true);
+                    aiEnrichmentService
+                      .enrich(editedContact)
+                      .then((result) => {
+                        if (result) {
+                          setLastEnrichment(result);
+                          return handleAIEnrichment(result);
+                        }
+                      })
+                      .finally(() => setIsEnriching(false));
                   }
                 }}
                 className="w-full flex items-center justify-center py-2 px-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 text-sm font-medium transition-all duration-200 border border-purple-300/50 shadow-sm hover:shadow-md hover:scale-105"
@@ -861,7 +853,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                       <div className="flex space-x-1 mt-1">
                         {socialPlatforms.slice(0, 4).map((social, index) => {
                           const Icon = social.icon;
-                          const profileUrl = editedContact.socialProfiles?.[social.key];
+                          const profileUrl = (editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[social.key];
                           return (
                             <div 
                               key={index} 
@@ -895,7 +887,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   <div className="p-3 bg-gray-50 rounded-lg">
                     <div className="mb-2">
                       <label className="block text-xs text-gray-500 mb-1">Platform</label>
-                      <select
+                      <select aria-label="Social platform"
                         value={selectedSocialPlatform}
                         onChange={(e) => setSelectedSocialPlatform(e.target.value)}
                         className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
@@ -940,6 +932,40 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   </div>
                 )}
 
+                {/* Next follow-up: places the contact on the calendar */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-6 h-6 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Next Follow-up</p>
+                      {editingField === 'nextFollowUp' ? (
+                        <input
+                          type="date"
+                          aria-label="Next follow-up date"
+                          value={editedContact.nextFollowUp || ''}
+                          onChange={(e) => handleEditField('nextFollowUp', e.target.value || null)}
+                          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
+                          onBlur={handleSaveField}
+                          autoFocus
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-gray-900 leading-tight">
+                          {editedContact.nextFollowUp || 'Not scheduled'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleStartEditingField('nextFollowUp')}
+                    aria-label="Edit next follow-up"
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  >
+                    <Edit className="w-3 h-3" />
+                  </button>
+                </div>
+
                 {/* Last Connected - Full Text Visible */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
@@ -951,7 +977,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                       {editingField === 'lastConnected' ? (
                         <input
                           type="text"
-                          value={editedContact.lastConnected || ''}
+                          value={editedContact.customFields?.lastConnected || ''}
                           onChange={(e) => handleEditField('lastConnected', e.target.value)}
                           className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
                           onBlur={handleSaveField}
@@ -959,7 +985,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                         />
                       ) : (
                         <p className="text-sm font-medium text-gray-900 leading-tight">
-                          {editedContact.lastConnected || '06/15/2023 at 7:16 pm'}
+                          {editedContact.customFields?.lastConnected || new Date(editedContact.updatedAt).toLocaleString()}
                         </p>
                       )}
                     </div>
@@ -994,7 +1020,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                 </div>
                 {editInterestLevel ? (
                   <div className="space-y-2 mb-2">
-                    {(['hot', 'medium', 'low', 'cold'] as const).map(level => (
+                    {(['hot', 'medium', 'warm', 'cold'] as const).map(level => (
                       <button
                         key={level}
                         onClick={() => handleChangeInterestLevel(level)}
@@ -1020,7 +1046,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                         const isActive = 
                           (editedContact.interestLevel === 'hot' && i < 5) ||
                           (editedContact.interestLevel === 'medium' && i < 3) ||
-                          (editedContact.interestLevel === 'low' && i < 2) ||
+                          (editedContact.interestLevel === 'warm' && i < 2) ||
                           (editedContact.interestLevel === 'cold' && i < 1);
                         
                         return (
@@ -1197,8 +1223,9 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
           <div className="flex-1 overflow-y-auto bg-gray-50 min-h-0">
             {activeTab === 'overview' && (
               <div className="p-6 space-y-6">
+                <div className="flex justify-end"><LayoutToggle kind="contact" /></div>
                 {/* AI Enhancement Notice */}
-                {lastEnrichment && (
+                {!isCompact && lastEnrichment && (
                   <div className="bg-gradient-to-r from-purple-50 via-blue-50 to-green-50 border border-purple-200 rounded-xl p-4">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-purple-500 rounded-lg">
@@ -1207,7 +1234,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                       <div>
                         <h4 className="font-semibold text-purple-900">Contact Enhanced with AI Research</h4>
                         <p className="text-purple-700 text-sm">
-                          This contact was enriched with additional information from OpenAI & Gemini research
+                          This contact was enriched with additional information from OpenAI research
                         </p>
                       </div>
                     </div>
@@ -1275,6 +1302,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   </div>
                 </div>
 
+                {!isCompact && (<>
                 {/* Social Profiles */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -1293,7 +1321,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {socialPlatforms.map((platform, index) => {
                       const Icon = platform.icon;
-                      const profileUrl = editedContact.socialProfiles?.[platform.key];
+                      const profileUrl = (editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[platform.key];
                       
                       return (
                         <div key={index} className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -1305,7 +1333,7 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                             {editingField === `social_${platform.key}` ? (
                               <input
                                 type="text"
-                                value={editedContact.socialProfiles?.[platform.key] || ''}
+                                value={(editedContact.socialProfiles as Record<string, string | undefined> | undefined)?.[platform.key] || ''}
                                 onChange={(e) => {
                                   const socialProfiles = {
                                     ...(editedContact.socialProfiles || {}),
@@ -1446,12 +1474,37 @@ export const ContactDetailView: React.FC<ContactDetailViewProps> = ({
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
             )}
 
             {activeTab === 'journey' && (
-              <div className="p-6">
+              <div className="p-6 space-y-6">
+                <RecordNotes entityType="contact" entityId={editedContact.id} />
+                <RecordAttachments entityType="contact" entityId={editedContact.id} />
                 <ContactJourneyTimeline contact={editedContact} />
+              </div>
+            )}
+
+            {activeTab === 'tasks' && (
+              <div className="p-6">
+                <RecordTasksWidget targetType="contact" targetId={editedContact.id} targetName={editedContact.name} />
+              </div>
+            )}
+
+            {activeTab === 'calendar' && (
+              <div className="p-6">
+                <CalendarEventsCard
+                  targetType="contact"
+                  targetId={editedContact.id}
+                  objectName="contact"
+                  composerContext={{
+                    targets: [{ type: 'contact', id: editedContact.id }],
+                    defaultAttendee: editedContact.email
+                      ? { handle: editedContact.email, displayName: editedContact.name, contactId: editedContact.id }
+                      : undefined
+                  }}
+                />
               </div>
             )}
 

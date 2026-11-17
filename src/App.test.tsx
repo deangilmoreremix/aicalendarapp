@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { vi, describe, test, expect, beforeEach } from 'vitest';
 import App from './App';
@@ -7,19 +6,15 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AIProvider } from './contexts/AIContext';
 
 // Mock the stores
+// Stores are read both as `useStore()` and with selectors (`useStore(s => s.x)`), so the mocks support both.
+const taskState = { tasks: {}, calendarEvents: [], markTaskComplete: vi.fn(), loadInitialData: vi.fn(), rescheduleTask: vi.fn() };
 vi.mock('./store/taskStore', () => ({
-  useTaskStore: () => ({
-    tasks: {},
-    markTaskComplete: vi.fn(),
-    loadInitialData: vi.fn(),
-  }),
+  useTaskStore: Object.assign((selector?: (s: any) => any) => (selector ? selector(taskState) : taskState), { getState: () => taskState }),
 }));
 
+const contactState = { contacts: {}, loadContacts: vi.fn(), updateContact: vi.fn() };
 vi.mock('./store/contactStore', () => ({
-  useContactStore: () => ({
-    contacts: {},
-    loadContacts: vi.fn(),
-  }),
+  useContactStore: Object.assign((selector?: (s: any) => any) => (selector ? selector(contactState) : contactState), { getState: () => contactState }),
 }));
 
 // Mock the components to avoid complex dependencies
@@ -94,10 +89,10 @@ describe('App Component - Button Functionality', () => {
   test('delete mock data button exists and has onClick handler', () => {
     renderApp();
 
-    const deleteButton = screen.getByTitle('Delete All Mock Data');
+    const deleteButton = screen.getByRole('button', { name: 'Delete mock data' });
     expect(deleteButton).toBeInTheDocument();
     expect(deleteButton.tagName).toBe('BUTTON');
-    expect(deleteButton).toHaveAttribute('title', 'Delete All Mock Data');
+    expect(deleteButton).toHaveTextContent('Delete mock data'); // visible text label, not just an icon
   });
 
   test('theme toggle button exists and has onClick handler', () => {
@@ -180,26 +175,23 @@ describe('App Component - Button Functionality', () => {
     renderApp();
 
     const buttons = screen.getAllByRole('button');
+    const unlabeled: string[] = [];
 
     buttons.forEach(button => {
-      // Check that buttons either have text content or aria-label/title
+      // Buttons need text content, aria-label or title
       const hasText = button.textContent && button.textContent.trim().length > 0;
-      const hasAriaLabel = button.hasAttribute('aria-label');
-      const hasTitle = button.hasAttribute('title');
-
-      // Skip buttons that are icon-only with title (like delete button)
-      if (hasTitle && button.children.length === 1 && button.children[0].tagName === 'svg') {
-        return; // This is acceptable for icon buttons with title
+      if (!(hasText || button.hasAttribute('aria-label') || button.hasAttribute('title'))) {
+        unlabeled.push(button.outerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '<svg/>').slice(0, 220));
       }
-
-      expect(hasText || hasAriaLabel || hasTitle).toBe(true);
     });
+
+    expect(unlabeled).toEqual([]);
   });
 
   test('buttons are keyboard accessible', () => {
     renderApp();
 
-    const deleteButton = screen.getByTitle('Delete All Mock Data');
+    const deleteButton = screen.getByRole('button', { name: 'Delete mock data' });
 
     // Focus the button
     deleteButton.focus();

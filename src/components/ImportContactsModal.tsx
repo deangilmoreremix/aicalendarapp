@@ -1,20 +1,8 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
-import { useContactStore } from '../store/contactStore';
 import { contactApi } from '../services/api';
-import { Contact } from '../types';
-import { 
-  X, 
-  Upload, 
-  Download, 
-  FileText, 
-  AlertCircle, 
-  CheckCircle, 
-  Info,
-  Users,
-  Database,
-  FileSpreadsheet
-} from 'lucide-react';
+import { X, Upload, Download, AlertCircle, CheckCircle, Info, Users, Database, FileSpreadsheet } from 'lucide-react';
 
 interface ImportContactsModalProps {
   isOpen: boolean;
@@ -39,6 +27,19 @@ const SAMPLE_CSV_DATA = [
     'sarah.j@startup.io'
   ]
 ];
+
+// Headers are lowercased when parsed; map them back to the Contact field names.
+const CANONICAL_HEADERS: Record<string, string> = {
+  firstname: 'firstName',
+  'first name': 'firstName',
+  first_name: 'firstName',
+  lastname: 'lastName',
+  'last name': 'lastName',
+  last_name: 'lastName',
+  interestlevel: 'interestLevel',
+  interest_level: 'interestLevel',
+  avatarsrc: 'avatarSrc'
+};
 
 const parseCSV = (text: string): string[][] => {
   const lines = text.split('\n').filter(line => line.trim());
@@ -99,7 +100,7 @@ const validateContact = (data: Record<string, string>): string[] => {
 export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen, onClose }) => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [_csvData, setCsvData] = useState<string[][]>([]);
   const [parsedContacts, setParsedContacts] = useState<any[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -108,7 +109,6 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
   const [activeTab, setActiveTab] = useState<'guide' | 'upload' | 'preview'>('guide');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { importContacts } = useContactStore();
 
   const downloadTemplate = () => {
     const csvContent = [
@@ -190,7 +190,6 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
         const parsed = parseCSV(text);
         setCsvData(parsed);
         processCSVData(parsed);
-        setActiveTab('preview');
       } catch (error) {
         setErrors(['Failed to parse CSV file']);
       }
@@ -215,24 +214,22 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
 
       headers.forEach((header, colIndex) => {
         if (row[colIndex]) {
-          contact[header] = row[colIndex].trim();
+          contact[CANONICAL_HEADERS[header] ?? header] = row[colIndex].trim();
         }
       });
 
       // Generate full name if not provided
-      if (!contact.name && contact.firstname && contact.lastname) {
-        contact.name = `${contact.firstname} ${contact.lastname}`;
-      } else if (!contact.name && contact.firstName && contact.lastName) {
+      if (!contact.name && contact.firstName && contact.lastName) {
         contact.name = `${contact.firstName} ${contact.lastName}`;
       }
 
       // Default values
       contact.sources = contact.sources ? contact.sources.split(',').map((s: string) => s.trim()) : ['Manual Import'];
-      contact.interestLevel = contact.interestlevel || 'medium';
+      contact.interestLevel = contact.interestLevel || 'medium';
       contact.status = contact.status || 'lead';
       contact.company = contact.company || 'Unknown Company';
       contact.title = contact.title || 'Professional';
-      contact.avatarSrc = `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2`;
+      contact.avatarSrc = initialsAvatar(contact.name || `${contact.firstName ?? ''} ${contact.lastName ?? ''}`);
       contact.tags = contact.tags ? contact.tags.split(',').map((t: string) => t.trim()) : [];
 
       // Check for duplicate emails within the CSV
@@ -255,6 +252,8 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
 
     setErrors(newErrors);
     setParsedContacts(contacts);
+    // Errors are listed on the Upload tab, so only move on to Preview when the file is clean
+    setActiveTab(newErrors.length === 0 && contacts.length > 0 ? 'preview' : 'upload');
   };
 
   const handleImport = async () => {

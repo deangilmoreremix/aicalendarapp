@@ -5,7 +5,24 @@ All notable changes to the AI Calendar App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-04-27
+## [Unreleased]
+
+### OpenAI Responses API migration
+- All AI runs through the OpenAI Responses API (`gpt-6-astra`) via a shared Supabase Edge Function helper: strict JSON schemas, `web_search` for contact enrichment and research (with sources), real SSE streaming (`ai_stream`), GPT Image 2.6 avatars stored in Supabase Storage.
+- Removed non-stack services (Gemini copy, `googleapis`, Pexels/ui-avatars hotlinks, mock Google/Microsoft OAuth).
+- Replaced mocked AI screens with real data (insights, deals, scoring, interaction timeline, email composer saves to activity log).
+- Fixed: `useHostDataSync` store writes, CSV import header mapping and error display, contact interest level `warm`, kanban selected task, activity feed/contact profile record handling, missing `calendar_events` migration.
+- Calendar: ported Twenty's calendar timeline (utils/tests verbatim, UI logic in our design), event composer, per-event visibility, Calendar tab on contacts, Supabase timeline RPC.
+- Unified CRM calendar: tasks, deals, contacts (new follow-up date) and events on `BigTaskCalendar`; drag-and-drop date changes persisted through the existing services; filters, saved views (`calendar_views`), right-click menu (edit / duplicate / reschedule / delete), record selection, embedded task widgets in contacts and deals, task-to-record linking. Upstream Twenty `record-calendar` / `record-drag` utilities are used for ranges, week titles and date shifting.
+- Fixed: `tasks.start_time/end_time` had no columns (time-blocked tasks were dropped / updates failed), calendar events had no read API, calendar toolbar navigation (Today, per-view Prev/Next), linked-event lookup in `TaskDetailsModal`.
+- Twenty-style CRM features (no design change): task rows with due chips, favorites, calendar polish (empty-day chooser, preview, week numbers), notes, typed timeline, command menu (Ctrl/Cmd+K), advanced filter rules, table view with saved views and bulk actions, file attachments, compact/full detail layouts, within-day position reordering, calendar event editing, "Delete mock data" for sample-flagged rows.
+- Home screen now uses real data (trends, recent activity, schedule, funnel, latest deals); leftover fake AI paths replaced by real calls.
+- Accessibility: every select/checkbox/icon button named, nested interactives removed, `<main>` landmark; axe sweep in `scripts/axe-audit.cjs`.
+- Lint: 0 errors (`no-explicit-any` is a warning, off in tests). Removed unused `react-router-dom` (prod `npm audit`: 0).
+- Migrations added: `20251231` calendar access, `20260101` is_sample, `20260102` record position, `20260103` favorites, `20260104` record_views, `20260105` attachments (+ private `attachments` bucket).
+- See `DEPLOY.md` for deployment.
+
+## [Earlier] - 2026-04-27
 
 ### 🚀 Major Enhancements
 
@@ -17,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calendar Settings**: Added comprehensive settings UI for external calendar integrations
 
 #### AI Intelligence Upgrade
-- **LLM-Powered Task Suggestions**: Upgraded from rule-based to OpenAI GPT-4o-mini for intelligent task analysis
+- **LLM-Powered Task Suggestions**: Upgraded from rule-based to the OpenAI Responses API for intelligent task analysis
 - **Smart Task Breakdown**: Enhanced task suggestions with automatic subtasks, priority assessment, and due date recommendations
 - **Contextual Reasoning**: Improved AI responses with sophisticated analysis of task prompts and requirements
 
@@ -69,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Calendar synchronization preparation (Google/Microsoft)
 
 ### AI Features Enhanced:
-- ✅ GPT-4 powered task suggestions
+- ✅ OpenAI Responses API powered task suggestions
 - ✅ Intelligent priority and category detection
 - ✅ Automatic subtask generation
 - ✅ Context-aware due date recommendations
@@ -104,7 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies Added
 - `@floating-ui/react`, `@nivo/calendar`, `framer-motion`
-- `@radix-ui/colors`, `@tabler/icons-react`, `googleapis`
+- `@radix-ui/colors`, `@tabler/icons-react`
 - `deep-equal`, `type-fest`, `react-responsive`
 
 ---

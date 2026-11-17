@@ -1,9 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Calendar, momentLocalizer, View, Event, NavigateAction, ToolbarProps } from 'react-big-calendar';
 import moment from 'moment';
+import withDragAndDrop, { type EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { type TimelineCalendarEvent } from '../adapters/twenty/calendar/types';
-import { toTimelineCalendarEvent, getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+import { Temporal } from 'temporal-polyfill';
+import { enUS } from 'date-fns/locale';
+import { startOfDay } from 'date-fns';
+import { DayRecordsDialog } from './calendar/DayRecordsDialog';
+import { LayoutToggle } from './ui/LayoutToggle';
+import { toggleFavorite } from './calendar/favorites';
+import { SlotChooser } from './calendar/SlotChooser';
+import { getISOWeek } from 'date-fns';
+import { useDetailLayout } from '../store/detailLayoutStore';
+import { compareWithinDay, getDayRecords } from './calendar/dayOrder';
+import { getConferenceProviderIcon, getVisibilityLabel } from '../adapters/twenty/calendar/transformers';
 import {
   Dialog,
   DialogContent,
@@ -30,14 +41,65 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
+import { useDealStore } from '../store/dealStore';
+import { useContactStore } from '../store/contactStore';
+import { useCalendarSelectionStore } from '../store/calendarSelectionStore';
+import { DealDetailsModal } from './ui/DealDetailsModal';
+import { ContactDetailView } from './ContactDetailView';
+import { getRecordCalendarDaysRange } from '../vendor/twenty/record-calendar/utils/getRecordCalendarDaysRange';
+import { formatRecordCalendarWeekRange } from '../vendor/twenty/record-calendar/utils/formatRecordCalendarWeekRange';
+import { ViewCalendarLayout } from '../vendor/twenty/record-calendar/shared/ViewCalendarLayout';
+import {
+  ALL_RECORD_TYPES,
+  buildUnifiedRecords,
+  getDropUpdates,
+  canRescheduleRecord,
+  userTimeZone,
+  type UnifiedCalendarRecord,
+  type UnifiedRecordType
+} from './calendar/unifiedCalendarRecords';
+import { applyRescheduleUpdates, deleteRecord, duplicateRecord, rescheduleRecordByDays, rescheduleRecordToDay } from './calendar/recordCalendarActions';
+import { RecordCalendarEventCard } from './calendar/RecordCalendarEventCard';
+import { RecordContextMenu, type RecordMenuAction } from './calendar/RecordContextMenu';
+import { CalendarFiltersMenu } from './calendar/CalendarFiltersMenu';
+import { CalendarViewsMenu } from './calendar/CalendarViewsMenu';
+import type { CalendarView, CalendarViewFilters } from '../services/api';
 import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
+import { CalendarEventComposerModal } from './calendar/CalendarEventComposerModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
+
+import { CALENDAR_PREFERENCES_CHANGED } from '../lib/calendarPreferences';
 
 const localizer = momentLocalizer(moment);
 
+const DnDCalendar = withDragAndDrop<TaskEvent>(Calendar);
+
+// Week start from Calendar Settings (0 = Sunday, 1 = Monday)
+const readWeekStartsOn = (): number => {
+  try {
+    const raw = localStorage.getItem('calendar-preferences');
+    const value = raw ? JSON.parse(raw).weekStartsOn : undefined;
+    return value === 0 || value === 1 ? value : 1;
+  } catch {
+    return 1;
+  }
+};
+
+const AGENDA_LENGTH_DAYS = 30;
+
+const LAYOUT_BY_VIEW: Record<string, ViewCalendarLayout> = {
+  month: ViewCalendarLayout.MONTH,
+  agenda: ViewCalendarLayout.MONTH,
+  week: ViewCalendarLayout.WEEK,
+  day: ViewCalendarLayout.DAY
+};
+
 interface TaskEvent extends Event {
+  id?: string;
   resource: {
-    type: 'task' | 'calendar-event';
+    type: 'task' | 'calendar-event' | 'deal' | 'contact';
+    /** the unified record this calendar entry was built from */
+    record: UnifiedCalendarRecord;
     data: Task | any;
     priority?: Task['priority'];
     status?: Task['status'];
@@ -56,6 +118,10 @@ interface EventModalProps {
 }
 
 const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit }) => {
+  // hook first: the early return below must not skip it
+  const layoutKind = event?.resource.type === 'calendar-event' ? 'event' : event?.resource.type ?? 'task';
+  const [detailLayout] = useDetailLayout(layoutKind);
+  const isCompact = detailLayout === 'compact';
   if (!event) return null;
 
   const { resource } = event;
@@ -87,7 +153,10 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{event.title}</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>{event.title}</DialogTitle>
+            <LayoutToggle kind={layoutKind} onDark />
+          </div>
         </DialogHeader>
 
         <div className="space-y-4 px-6 pb-6">
@@ -121,13 +190,13 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                   </div>
                 )}
 
-                {data.description && (
+                {!isCompact && data.description && (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
-                {data.estimatedDuration && (
+                {!isCompact && data.estimatedDuration && (
                   <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <Clock className="h-4 w-4" />
                     <span>{data.estimatedDuration} minutes</span>
@@ -136,8 +205,17 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
               </>
             )}
 
+            {/* Deal / contact details */}
+            {(resource.type === 'deal' || resource.type === 'contact') && (
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                {resource.record.subtitle && <p>{resource.record.subtitle}</p>}
+                {resource.type === 'contact' && data.email && <p>{data.email}</p>}
+                {!isCompact && resource.type === 'deal' && data.description && <p>{data.description}</p>}
+              </div>
+            )}
+
             {/* Calendar event details */}
-            {!isTask && (
+            {resource.type === 'calendar-event' && (
               <>
                 {data.location && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
@@ -146,13 +224,13 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                   </div>
                 )}
 
-                {data.description && (
+                {!isCompact && data.description && (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p>{data.description}</p>
                   </div>
                 )}
 
-{data.attendees && data.attendees.length > 0 && (
+{!isCompact && data.attendees && data.attendees.length > 0 && (
                    <div className="text-sm text-gray-600 dark:text-gray-400">
                      <span className="font-medium text-gray-900 dark:text-gray-100">Attendees:</span>
                      <div className="mt-1 space-y-1">
@@ -167,7 +245,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                  )}
 
                  {/* Enhanced: Rich participants from Twenty model */}
-                 {resource.participants && resource.participants.length > 0 && (
+                 {!isCompact && resource.participants && resource.participants.length > 0 && (
                    <div className="text-sm text-gray-600 dark:text-gray-400">
                      <span className="font-medium text-gray-900 dark:text-gray-100">Participants:</span>
                      <div className="mt-1 flex flex-wrap gap-2">
@@ -216,7 +294,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
                  )}
 
                  {/* Enhanced: Visibility badge from Twenty model */}
-                 {resource.visibility && (
+                 {!isCompact && resource.visibility && (
                    <div className="flex items-center space-x-2 text-sm">
                      <span className="text-gray-600 dark:text-gray-400">Visibility:</span>
                      <Badge variant={resource.visibility === 'METADATA' ? 'secondary' : 'default'}>
@@ -234,7 +312,7 @@ const EventModal: React.FC<EventModalProps> = ({ event, isOpen, onClose, onEdit 
               Close
             </Button>
             <Button onClick={onEdit}>
-              Edit {isTask ? 'Task' : 'Event'}
+              Edit {{ task: 'Task', deal: 'Deal', contact: 'Contact', 'calendar-event': 'Event' }[resource.type]}
             </Button>
           </div>
         </div>
@@ -247,14 +325,47 @@ export const BigTaskCalendar: React.FC = () => {
   const { 
     tasks, 
     calendarEvents,
+    loadInitialData,
+    loadCalendarEvents,
   } = useTaskStore();
+  const { deals, loadDeals } = useDealStore();
+  const { contacts, loadContacts, updateContact } = useContactStore();
+  const { selectedKeys, select, clear: clearSelection } = useCalendarSelectionStore();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<View>('month');
   const [selectedEvent, setSelectedEvent] = useState<TaskEvent | null>(null);
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [dayListDate, setDayListDate] = useState<Date | null>(null);
+  const [slot, setSlot] = useState<{ day: Date; x: number; y: number } | null>(null);
+  const [newTaskDate, setNewTaskDate] = useState<Date | null>(null);
+  const [newEventDate, setNewEventDate] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [visibleTypes, setVisibleTypes] = useState<UnifiedRecordType[]>(ALL_RECORD_TYPES);
+  const [filters, setFilters] = useState<CalendarViewFilters>({});
+  const [fieldByType, setFieldByType] = useState<Partial<Record<UnifiedRecordType, string>>>({});
+  const [contextMenu, setContextMenu] = useState<{ record: UnifiedCalendarRecord; x: number; y: number } | null>(null);
+  const [editDealId, setEditDealId] = useState<string | null>(null);
+  const [editContactId, setEditContactId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // follows Calendar Settings while the calendar is open (same tab: our event; other tabs: the storage event)
+  const [weekStartsOn, setWeekStartsOn] = useState(readWeekStartsOn);
+  useEffect(() => {
+    const refresh = () => setWeekStartsOn(readWeekStartsOn());
+    window.addEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  // Week start from Calendar Settings applies to the week grid
+  useEffect(() => {
+    moment.updateLocale(moment.locale(), { week: { dow: weekStartsOn, doy: weekStartsOn === 0 ? 6 : 4 } });
+  }, [weekStartsOn]);
 
   // Mock calendars data for now
   const calendars = [
@@ -267,68 +378,110 @@ export const BigTaskCalendar: React.FC = () => {
     calendars.filter(cal => cal.isVisible).map(cal => cal.id)
   );
 
-  // Convert tasks and calendar events to calendar events
-  const events: TaskEvent[] = useMemo(() => {
-const taskEvents: TaskEvent[] = Object.values(tasks)
-       .filter(task => task.dueDate || task.startTime)
-       .map(task => ({
-         id: task.id,
-         title: task.title,
-         start: task.startTime || task.dueDate!,
-         end: task.endTime || task.dueDate!,
-         allDay: !task.startTime || !task.endTime,
-         resource: {
-           type: 'task' as const,
-           data: task,
-           priority: task.priority,
-           status: task.status,
-         },
-       }));
+  // Records load once; events load for the visible window (range from upstream getRecordCalendarDaysRange)
+  useEffect(() => {
+    void loadInitialData();
+    if (Object.keys(useDealStore.getState().deals).length === 0) void loadDeals();
+    if (Object.keys(useContactStore.getState().contacts).length === 0) void loadContacts();
+  }, [loadInitialData, loadDeals, loadContacts]);
 
-const calendarEventItems: TaskEvent[] = calendarEvents
-       .filter(event => visibleCalendars.includes(event.calendarId))
-       .map(event => ({
-         id: event.id,
-         title: event.title,
-         start: event.startDate,
-         end: event.endDate,
-         allDay: event.isAllDay,
-         resource: {
-           type: 'calendar-event' as const,
-           data: event,
-           conferenceSolution: event.conferenceSolution,
-           conferenceLink: event.conferenceLink,
-           visibility: event.visibility,
-           participants: event.participants,
-         },
-       }));
+  const visibleRange = useMemo(() => {
+    const { firstDay, lastDay } = getRecordCalendarDaysRange({
+      selectedDate: Temporal.PlainDate.from({
+        year: currentDate.getFullYear(),
+        month: currentDate.getMonth() + 1,
+        day: currentDate.getDate(),
+      }),
+      calendarLayout: LAYOUT_BY_VIEW[currentView] ?? ViewCalendarLayout.MONTH,
+      weekStartsOnDayIndex: weekStartsOn,
+    });
+    if (currentView === 'agenda') {
+      // the agenda lists AGENDA_LENGTH_DAYS days from the current date, not the month grid
+      const from = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + AGENDA_LENGTH_DAYS, 0, 0, -1);
+      return { firstDay, lastDay, from, to };
+    }
+    return {
+      firstDay,
+      lastDay,
+      from: new Date(firstDay.year, firstDay.month - 1, firstDay.day),
+      to: new Date(lastDay.year, lastDay.month - 1, lastDay.day, 23, 59, 59),
+    };
+  }, [currentDate, currentView, weekStartsOn]);
 
-    return [...taskEvents, ...calendarEventItems];
-  }, [tasks, calendarEvents, visibleCalendars]);
+  useEffect(() => {
+    void loadCalendarEvents(visibleRange.from, visibleRange.to);
+  }, [loadCalendarEvents, visibleRange.from.getTime(), visibleRange.to.getTime()]);
 
-// Convert to Twenty format for enhanced modal display
-   const twentyEvents: TimelineCalendarEvent[] = useMemo(() => {
-     return events.map(event => {
-       if (event.resource.type === 'calendar-event') {
-         const calendarEventData = event.resource.data as CalendarEvent;
-         return toTimelineCalendarEvent({
-           ...calendarEventData,
-           participants: calendarEventData.participants || [],
-         });
-       }
-       return {
-         id: event.id,
-         title: event.title,
-         isFullDay: event.allDay,
-         startsAt: event.start.toISOString(),
-         endsAt: event.end?.toISOString(),
-         visibility: 'SHARE_EVERYTHING' as const,
-         participants: [],
-       };
-     });
-   }, [events]);
+  // Unified records: tasks, deals, contacts and events on one calendar
+  const records: UnifiedCalendarRecord[] = useMemo(
+    () =>
+      buildUnifiedRecords({
+        tasks: Object.values(tasks),
+        deals: Object.values(deals),
+        contacts: Object.values(contacts),
+        events: calendarEvents,
+        fieldByType,
+        visibleTypes,
+        filters,
+        visibleCalendars,
+      }),
+    [tasks, deals, contacts, calendarEvents, fieldByType, visibleTypes, filters, visibleCalendars]
+  );
+
+  // react-big-calendar orders a day's cards by start/end and keeps input order for ties, and gives no hook to sort by
+  // anything else. So all-day cards (deals, contacts, untimed tasks/events) are placed at the start of their day, which
+  // makes them tie, and are handed over sorted by saved position. Timed cards stay in time order. (Drops compute day
+  // offsets from the record itself, so the time part of an all-day card's start is not needed.)
+  const events: TaskEvent[] = useMemo(
+    () =>
+      [...records].sort((a, b) => compareWithinDay(a, b)).map((record) => ({
+        id: record.key,
+        title: record.title,
+        start: record.allDay ? startOfDay(record.start) : record.start,
+        end: record.allDay ? startOfDay(record.end) : record.end,
+        allDay: record.allDay,
+        resource: {
+          type: record.type === 'event' ? ('calendar-event' as const) : record.type,
+          record,
+          data: record.raw,
+          ...(record.type === 'task' && {
+            priority: (record.raw as Task).priority,
+            status: (record.raw as Task).status,
+          }),
+          ...(record.type === 'event' && {
+            conferenceSolution: (record.raw as CalendarEvent).conferenceSolution,
+            conferenceLink: (record.raw as CalendarEvent).conferenceLink,
+            visibility: (record.raw as CalendarEvent).visibility,
+            participants: (record.raw as CalendarEvent).participants,
+          }),
+        },
+      })),
+    [records]
+  );
+
+  // filter choices come from the records of the visible types/calendars before the status/assignee filters apply,
+  // so picking one status doesn't hide the others and hidden types don't contribute options
+  const statusOptions = useMemo(() => {
+    const all = buildUnifiedRecords({
+      tasks: Object.values(tasks),
+      deals: Object.values(deals),
+      contacts: Object.values(contacts),
+      events: calendarEvents,
+      fieldByType,
+      visibleTypes,
+      visibleCalendars
+    });
+    return Array.from(new Set(all.map((r) => r.status).filter((v): v is string => !!v))).sort();
+  }, [tasks, deals, contacts, calendarEvents, fieldByType, visibleTypes, visibleCalendars]);
+  const assigneeOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    Object.values(tasks).forEach((t) => t.assignedUserId && byId.set(t.assignedUserId, t.assignedUserName || t.assignedUserId));
+    return Array.from(byId, ([id, name]) => ({ id, name }));
+  }, [tasks]);
 
    const handleSelectEvent = (event: TaskEvent) => {
+     select(event.resource.record.key);
      setSelectedEvent(event);
      setShowEventModal(true);
    };
@@ -341,9 +494,12 @@ const calendarEventItems: TaskEvent[] = calendarEvents
     if (selectedEvent.resource.type === 'task') {
       setSelectedTask(selectedEvent.resource.data);
       setShowTaskModal(true);
+    } else if (selectedEvent.resource.type === 'deal') {
+      setEditDealId(selectedEvent.resource.record.id);
+    } else if (selectedEvent.resource.type === 'contact') {
+      setEditContactId(selectedEvent.resource.record.id);
     } else {
-      // Handle calendar event editing
-      console.log('Edit calendar event:', selectedEvent.resource.data);
+      setEditingCalendarEvent(selectedEvent.resource.record.raw as CalendarEvent);
     }
   };
 
@@ -361,6 +517,104 @@ const calendarEventItems: TaskEvent[] = calendarEvents
         ? prev.filter(id => id !== calendarId)
         : [...prev, calendarId]
     );
+  };
+
+  // Toolbar navigation moves by the current view's unit (TODAY jumps to today)
+  const handleToolbarNavigate = (action: NavigateAction) => {
+    if (action === 'TODAY') return setCurrentDate(new Date());
+    if (action === 'DATE') return;
+    const unit = currentView === 'week' ? 'week' : currentView === 'day' ? 'day' : 'month';
+    setCurrentDate(moment(currentDate).add(action === 'NEXT' ? 1 : -1, unit).toDate());
+  };
+
+  const toolbarTitle =
+    currentView === 'week'
+      ? formatRecordCalendarWeekRange({ firstDayOfWeek: visibleRange.firstDay, lastDayOfWeek: visibleRange.lastDay, locale: enUS })
+      : currentView === 'day'
+        ? moment(currentDate).format('dddd, MMMM D, YYYY')
+        : moment(currentDate).format('MMMM YYYY');
+
+  // Drag a card to another day/time: persisted through the existing stores/services
+  const handleEventDrop = async ({ event, start, end, isAllDay }: EventInteractionArgs<TaskEvent>) => {
+    setActionError(null);
+    const record = event.resource.record;
+    const updates = getDropUpdates(record, { start: new Date(start), end: new Date(end), isAllDay }, userTimeZone());
+    if (!(await applyRescheduleUpdates(record, updates))) setActionError(`Could not move "${record.title}".`);
+  };
+
+  const handleEventResize = async ({ event, start, end }: EventInteractionArgs<TaskEvent>) => {
+    setActionError(null);
+    const record = event.resource.record;
+    const updates = getDropUpdates(record, { start: new Date(start), end: new Date(end), isAllDay: false }, userTimeZone());
+    if (!(await applyRescheduleUpdates(record, updates))) setActionError(`Could not resize "${record.title}".`);
+  };
+
+  const isTimed = (event: TaskEvent) => !event.allDay && (event.resource.type === 'task' || event.resource.type === 'calendar-event');
+
+  // Right-click: select the record, then open its menu at the cursor (upstream useOpenRecordContextMenu behaviour)
+  const openContextMenu = useCallback(
+    (e: React.MouseEvent, record: UnifiedCalendarRecord) => {
+      e.preventDefault();
+      select(record.key);
+      setContextMenu({ record, x: e.clientX, y: e.clientY });
+    },
+    [select]
+  );
+
+  const handleMenuAction = async (action: RecordMenuAction, record: UnifiedCalendarRecord) => {
+    setActionError(null);
+    let ok = true;
+    if (action === 'edit') {
+      if (record.type === 'task') {
+        setSelectedTask(record.raw as Task);
+        setShowTaskModal(true);
+      } else if (record.type === 'deal') setEditDealId(record.id);
+      else if (record.type === 'contact') setEditContactId(record.id);
+      else if (record.type === 'event') setEditingCalendarEvent(record.raw as CalendarEvent);
+    } else if (action === 'favorite') {
+      ok = await toggleFavorite(record);
+    } else if (action === 'day') {
+      setDayListDate(record.start);
+    } else if (action === 'duplicate') {
+      ok = await duplicateRecord(record);
+      // events live in their own range-loaded list, so reload it to show the copy straight away
+      if (ok && record.type === 'event') void loadCalendarEvents(visibleRange.from, visibleRange.to);
+    }
+    else if (action === 'tomorrow') ok = await rescheduleRecordToDay(record, moment().add(1, 'day').toDate());
+    else if (action === 'nextWeek') ok = await rescheduleRecordByDays(record, 7);
+    else if (action === 'delete') {
+      const label = record.type === 'contact' ? 'Clear the follow-up date for' : 'Delete';
+      if (!window.confirm(`${label} "${record.title}"?`)) return;
+      ok = await deleteRecord(record);
+    }
+    if (!ok) setActionError('That action could not be completed.');
+  };
+
+  // Escape clears the selection (upstream: RecordSelectionEscapeHotkeyEffect)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && clearSelection();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [clearSelection]);
+
+  const eventComponent = useMemo(
+    () =>
+      ({ event }: { event: TaskEvent }) => (
+        <RecordCalendarEventCard
+          record={event.resource.record}
+          isSelected={selectedKeys.includes(event.resource.record.key)}
+          compact={currentView === 'month'}
+          onContextMenu={openContextMenu}
+        />
+      ),
+    [selectedKeys, currentView, openContextMenu]
+  );
+
+  const applySavedView = (view: CalendarView) => {
+    setCurrentView(view.layout.toLowerCase() as View);
+    setFieldByType(view.fieldByType);
+    setFilters(view.filters);
+    setVisibleTypes(view.visibleTypes);
   };
 
   // Custom event style getter
@@ -390,7 +644,17 @@ const calendarEventItems: TaskEvent[] = calendarEvents
           backgroundColor,
           borderColor,
           color: 'white',
-          border: 'none',
+          borderRadius: '4px',
+          fontSize: '12px',
+        }
+      };
+    } else if (event.resource.type === 'deal' || event.resource.type === 'contact') {
+      const color = event.resource.type === 'deal' ? '#8b5cf6' : '#0d9488';
+      return {
+        style: {
+          backgroundColor: color,
+          borderColor: color,
+          color: 'white',
           borderRadius: '4px',
           fontSize: '12px',
         }
@@ -403,7 +667,6 @@ const calendarEventItems: TaskEvent[] = calendarEvents
           backgroundColor: calendar?.color || '#6b7280',
           borderColor: calendar?.color || '#6b7280',
           color: 'white',
-          border: 'none',
           borderRadius: '4px',
           fontSize: '12px',
         }
@@ -412,18 +675,19 @@ const calendarEventItems: TaskEvent[] = calendarEvents
   };
 
   // Custom toolbar
-  const CustomToolbar = ({ date, view, onNavigate, onView }: ToolbarProps<TaskEvent, object>) => {
+  const CustomToolbar = ({ view, onNavigate, onView }: Pick<ToolbarProps<TaskEvent, object>, 'date' | 'view' | 'onNavigate' | 'onView'>) => {
     const navigate = (action: NavigateAction) => {
       onNavigate(action);
     };
 
     return (
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
+              aria-label="Previous"
               onClick={() => navigate('PREV')}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -438,6 +702,7 @@ const calendarEventItems: TaskEvent[] = calendarEvents
             <Button
               variant="outline"
               size="sm"
+              aria-label="Next"
               onClick={() => navigate('NEXT')}
             >
               <ChevronRight className="h-4 w-4" />
@@ -445,11 +710,26 @@ const calendarEventItems: TaskEvent[] = calendarEvents
           </div>
 
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {moment(date).format('MMMM YYYY')}
+            {toolbarTitle}
           </h2>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <CalendarFiltersMenu
+            filters={filters}
+            onFiltersChange={setFilters}
+            visibleTypes={visibleTypes}
+            onVisibleTypesChange={setVisibleTypes}
+            statusOptions={statusOptions}
+            assigneeOptions={assigneeOptions}
+            fieldByType={fieldByType}
+            onFieldByTypeChange={setFieldByType}
+          />
+          <CalendarViewsMenu
+            current={{ layout: currentView.toUpperCase() as CalendarView['layout'], fieldByType, filters, visibleTypes }}
+            onApply={applySavedView}
+          />
+
           {/* Calendar visibility toggle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -508,26 +788,68 @@ const calendarEventItems: TaskEvent[] = calendarEvents
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      <CustomToolbar
-        date={currentDate}
-        view={currentView}
-        onNavigate={(action) => handleNavigate(action === 'DATE' ? currentDate : action === 'PREV' ? new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1) : new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-        onView={handleViewChange}
-      />
-      <div className="flex-1 relative">
-        <Calendar
+      {/* Called as a function (no hooks inside) so the toolbar and its dropdowns keep their state across renders */}
+      {CustomToolbar({
+        date: currentDate,
+        view: currentView,
+        onNavigate: handleToolbarNavigate,
+        onView: handleViewChange,
+      })}
+      {actionError && (
+        <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
+      <div
+        className="flex-1 relative"
+        onClick={(e) => {
+          // clicking outside any card resets the selection (upstream: click-outside listener)
+          if (!(e.target as HTMLElement).closest('.rbc-event')) clearSelection();
+        }}
+      >
+        <DnDCalendar
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
           view={currentView}
+          length={AGENDA_LENGTH_DAYS}
           onView={handleViewChange}
           date={currentDate}
           onNavigate={handleNavigate}
           onSelectEvent={handleSelectEvent}
           eventPropGetter={eventStyleGetter}
+          draggableAccessor={(event) => canRescheduleRecord(event.resource.record, fieldByType)}
+          selectable
+          onSelectSlot={(info) => {
+            // a click or double click on an empty day offers to create something there (drag-select is ignored)
+            if (info.action === 'select') return;
+            const box = (info as { box?: { x: number; y: number } }).box;
+            setSlot({ day: new Date(info.start), x: box?.x ?? window.innerWidth / 2, y: box?.y ?? window.innerHeight / 2 });
+          }}
+          onShowMore={(_events, date) => setDayListDate(date)}
+          onEventDrop={handleEventDrop}
+          onEventResize={handleEventResize}
+          resizableAccessor={(event) => isTimed(event) && canRescheduleRecord(event.resource.record, fieldByType)}
+          popup
           components={{
             toolbar: () => null, // We use custom toolbar
+            month: {
+              // ISO week number on each Monday (Twenty's record calendar shows week numbers)
+              dateHeader: ({ label, date, drilldownView, onDrillDown }: { label: string; date: Date; drilldownView?: string | null; onDrillDown?: (e: React.MouseEvent) => void }) => (
+                <>
+                  {date.getDay() === 1 && <span className="mr-1 text-[10px] text-gray-600" title="Week number">W{getISOWeek(date)}</span>}
+                  {drilldownView ? (
+                    <button type="button" className="rbc-button-link" onClick={onDrillDown}>
+                      {label}
+                    </button>
+                  ) : (
+                    <span>{label}</span>
+                  )}
+                </>
+              ),
+            },
+            event: eventComponent,
           }}
           className="h-full bg-white dark:bg-gray-900"
         />
@@ -544,10 +866,93 @@ const calendarEventItems: TaskEvent[] = calendarEvents
         onEdit={handleEditEvent}
       />
 
+      {contextMenu && (
+        <RecordContextMenu
+          record={contextMenu.record}
+          canReschedule={canRescheduleRecord(contextMenu.record, fieldByType)}
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onAction={handleMenuAction}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {editDealId && <DealDetailsModal isOpen dealId={editDealId} onClose={() => setEditDealId(null)} />}
+      {editContactId && contacts[editContactId] && (
+        <ContactDetailView
+          contact={contacts[editContactId]}
+          isOpen
+          onClose={() => setEditContactId(null)}
+          onUpdate={async (id, updates) => {
+            await updateContact(id, updates);
+            return useContactStore.getState().contacts[id] ?? contacts[id];
+          }}
+        />
+      )}
+
+      {slot && (
+        <SlotChooser
+          day={slot.day}
+          position={{ x: slot.x, y: slot.y }}
+          contacts={Object.values(contacts)}
+          onClose={() => setSlot(null)}
+          onChoose={(choice) => {
+            if (choice === 'task') {
+              setSelectedTask(null);
+              setNewTaskDate(slot.day);
+            } else setNewEventDate(slot.day);
+            setSlot(null);
+          }}
+          onFollowUp={async (contactId) => {
+            const d = slot.day;
+            await updateContact(contactId, { nextFollowUp: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
+            setSlot(null);
+          }}
+        />
+      )}
+      {newTaskDate && (
+        <TaskDetailsModal task={null} isOpen defaultDueDate={new Date(newTaskDate.getFullYear(), newTaskDate.getMonth(), newTaskDate.getDate(), 9)} onClose={() => setNewTaskDate(null)} />
+      )}
+      {newEventDate && (
+        <CalendarEventComposerModal
+          isOpen
+          initialDate={newEventDate}
+          context={{ targets: [] }}
+          onClose={() => setNewEventDate(null)}
+          onCreated={() => void loadCalendarEvents(visibleRange.from, visibleRange.to)}
+        />
+      )}
+
+      {/* One day's records, reorderable */}
+      {dayListDate && (
+        <DayRecordsDialog
+          day={dayListDate}
+          records={getDayRecords(records, dayListDate)}
+          onClose={() => setDayListDate(null)}
+          onOpenRecord={(record) => {
+            setDayListDate(null);
+            void handleMenuAction('edit', record);
+          }}
+        />
+      )}
+
+      {/* Calendar event editor */}
+      {editingCalendarEvent && (
+        <CalendarEventComposerModal
+          isOpen
+          editing={editingCalendarEvent}
+          context={{ targets: [] }}
+          onClose={() => setEditingCalendarEvent(null)}
+          onCreated={() => void loadCalendarEvents(visibleRange.from, visibleRange.to)}
+        />
+      )}
+
       {/* Task Details Modal */}
       {showTaskModal && (
         <TaskDetailsModal
           task={selectedTask}
+          // Every route to an existing task here is an "Edit" action (event details "Edit Task", context menu "Edit"),
+          // so open in edit mode instead of making the user press Edit a second time.
+          startInEditMode
           isOpen={showTaskModal}
           onClose={() => {
             setShowTaskModal(false);

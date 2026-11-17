@@ -1,81 +1,44 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { useAI } from '../contexts/AIContext';
+import { useTaskStore } from '../store/taskStore';
+import { useDealStore } from '../store/dealStore';
+import { useContactStore } from '../store/contactStore';
+import { formatMoney, funnelFromDeals, monthAssignees, weekSchedule } from '../lib/home/homeData';
 import { ModernButton } from './ui/ModernButton';
 import { AddUserModal } from './ui/AddUserModal';
 import { MoreOptionsModal } from './ui/MoreOptionsModal';
 import { NavigationModal } from './ui/NavigationModal';
 import { AddTaskModal } from './ui/AddTaskModal';
-import { MoreHorizontal, ArrowRight, Calendar, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2, TrendingUp } from 'lucide-react';
+import { MoreHorizontal, ArrowRight, UserPlus, Users, Plus, Brain, Clock, Sparkles, Target, Loader2, TrendingUp } from 'lucide-react';
 
-const taskData = [
-  {
-    day: 'Mon',
-    tasks: 2,
-    assignees: [
-      { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'inactive' }
-    ]
-  },
-  {
-    day: 'Tue',
-    tasks: 0,
-    assignees: []
-  },
-  {
-    day: 'Wed',
-    tasks: 3,
-    assignees: [
-      { id: '3', name: 'Darlene Robertson', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'pending' }
-    ]
-  },
-  {
-    day: 'Thu',
-    tasks: 1,
-    assignees: [
-      { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
-    ]
-  },
-  {
-    day: 'Fri',
-    tasks: 4,
-    assignees: [
-      { id: '1', name: 'Jane Doe', avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '3', name: 'Darlene Robertson', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '4', name: 'Eva Robinson', avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
-    ]
-  },
-  {
-    day: 'Sat',
-    tasks: 2,
-    assignees: [
-      { id: '5', name: 'Wade Warren', avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' },
-      { id: '6', name: 'Jonah Jude', avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
-    ]
-  },
-  {
-    day: 'Sun',
-    tasks: 1,
-    assignees: [
-      { id: '2', name: 'John Smith', avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&dpr=2', status: 'active' }
-    ]
-  },
-];
-
-const funnelData = [
-  { stage: 'Total in Pipeline', value: '350,500', color: 'bg-gray-600' },
-  { stage: 'Qualification', value: '92,350$', color: 'bg-gray-500' },
-  { stage: 'Royal Package Opportunity', value: '67,120$', color: 'bg-gray-400' },
-  { stage: 'Value Proposition', value: '28,980$', color: 'bg-gray-300' },
-];
+const FUNNEL_COLORS = ['bg-gray-600', 'bg-gray-500', 'bg-gray-400', 'bg-gray-300', 'bg-gray-300'];
 
 export const TasksAndFunnel: React.FC = () => {
+  const tasksById = useTaskStore((st) => st.tasks);
+  const deals = useDealStore((st) => st.deals);
+  const contacts = useContactStore((st) => st.contacts);
+  useEffect(() => {
+    if (Object.keys(useDealStore.getState().deals).length === 0) void useDealStore.getState().loadDeals();
+  }, []);
+  const taskList = Object.values(tasksById);
+  const withAvatar = (a: { id: string; name: string }) => ({ id: a.id, name: a.name, avatar: initialsAvatar(a.name), status: 'active' });
+  // this week, from real tasks (due dates and assignees)
+  const taskData = weekSchedule(taskList).map((w) => ({ day: w.day, tasks: w.tasks, assignees: w.assignees.map(withAvatar) }));
+  const monthName = new Date().toLocaleString('en-US', { month: 'long' });
+  // open pipeline by stage, from real deals
+  const funnel = funnelFromDeals(Object.values(deals));
+  const funnelMax = Math.max(1, funnel.openTotal, ...funnel.rows.map((r) => r.value));
+  const funnelData = [
+    { stage: 'Open pipeline', value: formatMoney(funnel.openTotal), color: FUNNEL_COLORS[0], width: funnel.openTotal ? 100 : 0 },
+    ...funnel.rows
+      .filter((r) => r.stage !== 'closed-won')
+      .map((r, i) => ({ stage: `${r.label} (${r.count})`, value: formatMoney(r.value), color: FUNNEL_COLORS[Math.min(i + 1, 4)], width: Math.max(r.value ? 4 : 0, Math.round((r.value / funnelMax) * 100)) }))
+  ];
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const { optimizeMeetingTime, generateMeetingAgenda, isProcessing } = useAI();
+  const { optimizeMeetingTime, generateMeetingAgenda, generateInsights } = useAI();
   const [meetingSuggestions, setMeetingSuggestions] = useState<Date[]>([]);
   const [suggestedAgenda, setSuggestedAgenda] = useState<string[]>([]);
   const [isLoadingMeetingAI, setIsLoadingMeetingAI] = useState(false);
@@ -89,16 +52,12 @@ export const TasksAndFunnel: React.FC = () => {
   const [showNavigationModal, setShowNavigationModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
-  // Load AI insights function
+  // AI pipeline insights: the real insights call over your contacts (no canned alerts)
   const loadAIInsights = async () => {
     setIsLoadingAI(true);
     try {
-      // Simulate loading AI insights
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setAiAlerts([
-        { type: 'opportunity', description: 'High-value lead identified with 85% conversion probability' },
-        { type: 'opportunity', description: 'Upsell potential detected for enterprise package' }
-      ]);
+      const insights = await generateInsights(Object.values(contacts));
+      setAiAlerts(insights.filter((i) => i.type === 'opportunity').map((i) => ({ type: i.type, description: i.description })));
     } catch (error) {
       console.error('Failed to load AI insights:', error);
     } finally {
@@ -129,7 +88,7 @@ export const TasksAndFunnel: React.FC = () => {
 
         // Generate meeting agenda
         const agenda = await generateMeetingAgenda(
-          `Team Sync - October ${selectedDay}`,
+          `Team Sync - ${monthName} ${selectedDay}`,
           dayData.assignees.map(a => a.name)
         );
         setSuggestedAgenda(agenda);
@@ -141,35 +100,15 @@ export const TasksAndFunnel: React.FC = () => {
     }
   };
 
-  // Mock calendar data - for each day, randomly assign avatars based on our contacts
-  const calendarData = Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-    // Randomly determine if this day has assignees
-    const hasAssignees = Math.random() > 0.65;
-    if (!hasAssignees) return { day, assignees: [] };
+  // who has tasks due on each day of this month (real tasks)
+  const calendarData = monthAssignees(taskList).map(({ day, assignees }) => ({ day, assignees: assignees.map(withAvatar) }));
 
-    // Get 1-4 random assignees from our task data
-    const allAssignees = taskData.flatMap(t => t.assignees);
-    const uniqueAssignees = [...new Map(allAssignees.map(a => [a.id, a])).values()];
-    const shuffled = [...uniqueAssignees].sort(() => 0.5 - Math.random());
-    const count = Math.floor(Math.random() * 4) + 1;
-
-    return {
-      day,
-      assignees: shuffled.slice(0, count)
-    };
-  });
-
-  const handleAssigneeClick = (id: string) => {
-    console.log(`Clicked on assignee: ${id}`);
-    // In a real implementation, this would open the contact details modal
-    alert(`Contact details for ${id} would open here`);
+  const handleAssigneeClick = (_id: string) => {
+    // assignees are team members (names only), so there is no record to open
   };
 
   const handleDayClick = (day: number) => {
     setSelectedDay(day);
-    console.log(`Clicked on day: ${day}`);
-    // In a real implementation, this might open a modal to create/view tasks for this day
-    alert(`Task management for day ${day} would open here`);
   };
 
   const handleAddUser = () => {
@@ -349,8 +288,8 @@ export const TasksAndFunnel: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${funnelData.map((stage, index) => {
-                          const percentage = (4 - index) * 25;
+                        ${funnelData.map((stage) => {
+                          const percentage = stage.width;
                           return `
                             <tr>
                                 <td>${stage.stage}</td>
@@ -433,7 +372,7 @@ export const TasksAndFunnel: React.FC = () => {
 
       // Add funnel data
       funnelData.forEach(stage => {
-        const percentage = Math.round((4 - funnelData.indexOf(stage)) * 25);
+        const percentage = stage.width;
         csvData.push([stage.stage, stage.value, `${percentage}%`]);
       });
 
@@ -547,7 +486,7 @@ export const TasksAndFunnel: React.FC = () => {
         </div>
 
         <div className="mb-4">
-          <h4 className="text-2xl font-bold text-gray-900 mb-2">October</h4>
+          <h4 className="text-2xl font-bold text-gray-900 mb-2">{monthName}</h4>
           <div className="grid grid-cols-7 gap-1 text-center text-sm mb-2">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
               <div key={i} className="font-medium text-gray-500">{day}</div>
@@ -595,7 +534,7 @@ export const TasksAndFunnel: React.FC = () => {
           <div className="mt-4 space-y-3">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <h5 className="font-semibold text-blue-800">October {selectedDay}</h5>
+                <h5 className="font-semibold text-blue-800">{monthName} {selectedDay}</h5>
                 <button
                   className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                   onClick={handleAddTask}
@@ -745,7 +684,7 @@ export const TasksAndFunnel: React.FC = () => {
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className={`${stage.color} h-2 rounded-full transition-all duration-300`}
-                  style={{ width: `${(4 - index) * 25}%` }}
+                  style={{ width: `${stage.width}%` }}
                 />
               </div>
             </div>
@@ -754,8 +693,8 @@ export const TasksAndFunnel: React.FC = () => {
 
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Weighted</span>
-            <span className="text-sm font-medium text-gray-700">Total</span>
+            <span className="text-sm font-medium text-gray-700">Weighted: {formatMoney(funnel.weighted)}</span>
+            <span className="text-sm font-medium text-gray-700">Total: {formatMoney(funnel.openTotal)}</span>
           </div>
         </div>
 

@@ -54,7 +54,8 @@ import CustomerProfile from 'CalendarApp/CustomerProfile';
 The following packages are configured as singletons:
 - `react` (^18.0.0)
 - `react-dom` (^18.0.0)
-- `react-router-dom` (^6.26.0)
+
+The app has no router, so `react-router-dom` is no longer shared (it was removed along with its advisories).
 
 ## Host Application Setup
 
@@ -83,10 +84,6 @@ export default defineConfig({
         'react-dom': {
           singleton: true,
           requiredVersion: '^18.0.0'
-        },
-        'react-router-dom': {
-          singleton: true,
-          requiredVersion: '^6.26.0'
         }
       }
     })
@@ -143,8 +140,7 @@ Make sure the following environment variables are set:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_OPENAI_API_KEY=your_openai_key (optional)
-VITE_GEMINI_API_KEY=your_gemini_key (optional)
+# OpenAI is server-side only: set OPENAI_API_KEY (optionally OPENAI_MODEL, default gpt-6-astra, and OPENAI_IMAGE_MODEL, default gpt-image-2.6-flare) as Supabase Edge Function secrets.
 ```
 
 ## Features Included

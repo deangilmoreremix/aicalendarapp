@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckSquare, Calendar, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useTaskStore } from '../store/taskStore';
+import { weekOverWeek, type Trend } from '../lib/home/homeData';
 
 const TaskStats: React.FC = React.memo(() => {
   const { tasks } = useTaskStore();
@@ -21,6 +22,14 @@ const TaskStats: React.FC = React.memo(() => {
       return task.dueDate >= today && task.dueDate < tomorrow;
     }).length,
   };
+
+  // week-over-week change, from real dates: tasks created and tasks completed this week vs last
+  const trends: (Trend | null)[] = [
+    weekOverWeek(taskList.map((t) => t.createdAt)),
+    weekOverWeek(taskList.map((t) => t.completedAt)),
+    null,
+    null,
+  ];
 
   const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
@@ -70,12 +79,17 @@ const TaskStats: React.FC = React.memo(() => {
               <div className={`${stat.bgColor} dark:bg-opacity-20 p-3 rounded-xl`}>
                 <Icon className={`w-6 h-6 ${stat.textColor}`} />
               </div>
-              <div className="flex items-center space-x-1">
-                <TrendingUp className="w-4 h-4 text-green-500" />
-                <span className="text-xs font-medium text-green-500">
-                  {index === 1 ? '+12%' : '+5%'}
-                </span>
-              </div>
+              {trends[index] && trends[index]!.pct !== null && (
+                <div
+                  className="flex items-center space-x-1"
+                  title={`${trends[index]!.current} this week, ${trends[index]!.previous} last week`}
+                >
+                  <TrendingUp className={`w-4 h-4 ${trends[index]!.pct! < 0 ? 'text-red-700 rotate-180' : 'text-green-700'}`} />
+                  <span className={`text-xs font-medium ${trends[index]!.pct! < 0 ? 'text-red-700' : 'text-green-700'}`}>
+                    {trends[index]!.pct! > 0 ? '+' : ''}{trends[index]!.pct}%
+                  </span>
+                </div>
+              )}
             </div>
             
             <div>

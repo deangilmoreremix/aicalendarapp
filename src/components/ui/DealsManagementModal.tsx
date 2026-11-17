@@ -1,52 +1,22 @@
+import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
+import { useDealViews } from '../../hooks/useDealViews';
 import { useContactStore } from '../../store/contactStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
-import {
-  X,
-  Search,
-  Filter,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  User,
-  Brain,
-  Loader2,
-  Plus,
-  Download,
-  Upload,
-  BarChart3,
-  Target,
-  AlertTriangle,
-  CheckCircle
-} from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Calendar, Brain, Loader2, Plus, Download, Upload, Target, AlertTriangle } from 'lucide-react';
 
 interface DealsManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDealClick?: (dealId: number) => void;
+  onDealClick?: (dealId: string) => void;
   onNewDeal?: () => void;
 }
 
-interface Deal {
-  id: number;
-  company: string;
-  value: string;
-  probability: string;
-  dueDate: string;
-  contactId: string;
-  status: 'online' | 'offline';
-  stage: 'prospecting' | 'qualification' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost';
-  priority: 'low' | 'medium' | 'high';
-  aiPrediction?: number;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   isOpen,
@@ -55,7 +25,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   onNewDeal
 }) => {
   const { contacts } = useContactStore();
-  const { predictDealSuccess, isProcessing } = useAI();
+  const { predictDealSuccess } = useAI();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
@@ -63,85 +33,14 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   const [sortBy, setSortBy] = useState<'value' | 'probability' | 'dueDate' | 'company'>('probability');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [aiPredictions, setAiPredictions] = useState<Record<number, number>>({});
+  const [aiPredictions, setAiPredictions] = useState<Record<string, number>>({});
 
-  // Mock deals data - in a real app, this would come from an API
-  const mockDeals: Deal[] = [
-    {
-      id: 1,
-      company: 'TechCorp Solutions',
-      value: '$85,000',
-      probability: '85%',
-      dueDate: 'Tomorrow',
-      contactId: '1',
-      status: 'online',
-      stage: 'negotiation',
-      priority: 'high',
-      aiPrediction: 87,
-      createdAt: '2024-01-15',
-      updatedAt: '2024-12-20'
-    },
-    {
-      id: 2,
-      company: 'Innovation Labs',
-      value: '$120,000',
-      probability: '60%',
-      dueDate: 'Friday',
-      contactId: '2',
-      status: 'offline',
-      stage: 'proposal',
-      priority: 'medium',
-      aiPrediction: 72,
-      createdAt: '2024-02-10',
-      updatedAt: '2024-12-18'
-    },
-    {
-      id: 3,
-      company: 'Global Dynamics',
-      value: '$95,500',
-      probability: '75%',
-      dueDate: 'Next Week',
-      contactId: '3',
-      status: 'online',
-      stage: 'qualification',
-      priority: 'high',
-      aiPrediction: 81,
-      createdAt: '2024-03-05',
-      updatedAt: '2024-12-19'
-    },
-    {
-      id: 4,
-      company: 'StartupXYZ',
-      value: '$45,000',
-      probability: '30%',
-      dueDate: 'Next Month',
-      contactId: '4',
-      status: 'online',
-      stage: 'prospecting',
-      priority: 'low',
-      aiPrediction: 35,
-      createdAt: '2024-04-12',
-      updatedAt: '2024-12-15'
-    },
-    {
-      id: 5,
-      company: 'Enterprise Corp',
-      value: '$250,000',
-      probability: '90%',
-      dueDate: 'This Week',
-      contactId: '5',
-      status: 'online',
-      stage: 'negotiation',
-      priority: 'high',
-      aiPrediction: 94,
-      createdAt: '2024-05-20',
-      updatedAt: '2024-12-22'
-    }
-  ];
+  const { deals: dealList } = useDealViews(isOpen);
+  const mockDeals = dealList;
 
   // Filter and sort deals
   const filteredDeals = useMemo(() => {
-    let filtered = mockDeals.filter(deal => {
+    const filtered = mockDeals.filter(deal => {
       const contact = contacts[deal.contactId];
       const matchesSearch = deal.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (contact && contact.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -164,11 +63,12 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
           aValue = parseInt(a.probability);
           bValue = parseInt(b.probability);
           break;
-        case 'dueDate':
+        case 'dueDate': {
           const dateOrder = { 'Tomorrow': 1, 'This Week': 2, 'Next Week': 3, 'Next Month': 4 };
           aValue = dateOrder[a.dueDate as keyof typeof dateOrder] || 5;
           bValue = dateOrder[b.dueDate as keyof typeof dateOrder] || 5;
           break;
+        }
         case 'company':
           aValue = a.company.toLowerCase();
           bValue = b.company.toLowerCase();
@@ -188,7 +88,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
   const handleAIPredictions = async () => {
     setIsLoadingAI(true);
     try {
-      const predictions: Record<number, number> = {};
+      const predictions: Record<string, number> = {};
 
       for (const deal of filteredDeals) {
         if (!deal.aiPrediction) {
@@ -254,6 +154,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
             </div>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <X size={20} />
@@ -434,7 +335,7 @@ export const DealsManagementModal: React.FC<DealsManagementModalProps> = ({
                         <div className="flex items-center space-x-2">
                           {contact && (
                             <img
-                              src={contact.avatarSrc || contact.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+                              src={contact.avatarSrc || contact.avatar || initialsAvatar(contact.name)}
                               alt={contact.name}
                               className="w-6 h-6 rounded-full object-cover"
                             />

@@ -1,30 +1,11 @@
+import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { AvatarWithStatus } from './ui/AvatarWithStatus';
 import { ModernButton } from './ui/ModernButton';
 import { useAI } from '../contexts/AIContext';
 import { useContactStore } from '../store/contactStore';
-import { 
-  Edit, 
-  Mail, 
-  Phone, 
-  Plus, 
-  MessageSquare,
-  FileText,
-  Calendar,
-  MoreHorizontal,
-  User,
-  Globe,
-  Clock,
-  Brain,
-  Target,
-  TrendingUp,
-  Zap,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+import { Edit, Mail, Phone, Plus, MessageSquare, FileText, Calendar, MoreHorizontal, User, Globe, Clock, Brain, Target, Sparkles, Loader2 } from 'lucide-react';
 
 const socialPlatforms = [
   { icon: MessageSquare, color: 'bg-green-500', name: 'WhatsApp' },
@@ -34,13 +15,14 @@ const socialPlatforms = [
 ];
 
 export const CustomerProfile: React.FC = () => {
-  const { predictNextBestAction, analyzeInteractionHistory, isProcessing } = useAI();
-  const { contacts } = useContactStore();
+  const { predictNextBestAction, analyzeInteractionHistory } = useAI();
+  const { contacts: contactsById } = useContactStore();
+  const contacts = React.useMemo(() => Object.values(contactsById), [contactsById]);
   const [selectedContact, setSelectedContact] = useState(contacts[0] || null);
   const [nextBestAction, setNextBestAction] = useState<string | null>(null);
   const [interactionData, setInteractionData] = useState<any>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
+  const [_aiInsights, _setAiInsights] = useState<any[]>([]);
 
   // Load AI insights for the selected contact
   useEffect(() => {
@@ -55,7 +37,7 @@ export const CustomerProfile: React.FC = () => {
     setIsLoadingInsights(true);
     try {
       const [nextAction, interactionHistory] = await Promise.all([
-        predictNextBestAction(selectedContact.id),
+        predictNextBestAction(selectedContact.id, selectedContact),
         analyzeInteractionHistory(selectedContact.id)
       ]);
       
@@ -121,7 +103,7 @@ export const CustomerProfile: React.FC = () => {
       <div className="text-center mb-6">
         <div className="relative inline-block mb-4">
           <AvatarWithStatus
-            src={selectedContact.avatarSrc || selectedContact.avatar || "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2"}
+            src={selectedContact.avatarSrc || selectedContact.avatar || initialsAvatar(selectedContact.name)}
             alt={selectedContact.name}
             size="xl"
             status="active"

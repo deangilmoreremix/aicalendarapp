@@ -1,17 +1,9 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Contact } from '../types';
-import { aiApi } from '../services/api';
+import { Contact, Deal, Task } from '../types';
+import { aiApi, activityApi } from '../services/api';
 
-export interface AIInsight {
-  id: string;
-  type: 'engagement' | 'conversion' | 'risk' | 'opportunity';
-  title: string;
-  description: string;
-  confidence: number;
-  actionable: boolean;
-  suggestedActions: string[];
-  createdAt: Date;
-}
+export type { AIInsight } from '../types';
+import type { AIInsight } from '../types';
 
 export interface ContactEnrichmentData {
   firstName?: string;
@@ -92,9 +84,9 @@ interface AIContextType {
   insights: AIInsight[];
   scoreContact: (contact: Contact) => Promise<number>;
   enrichContact: (contactData: Partial<Contact>) => Promise<ContactEnrichmentData>;
-  generateInsights: (contacts: Contact[]) => Promise<AIInsight[]>;
+  generateInsights: (contacts: Contact[], extra?: { deals?: Deal[]; tasks?: Task[] }) => Promise<AIInsight[]>;
   analyzeInteractionHistory: (contactId: string) => Promise<any>;
-  predictNextBestAction: (contactId: string) => Promise<string>;
+  predictNextBestAction: (contactId: string, contact?: Partial<Contact>) => Promise<string>;
   scoreBulkContacts: (contacts: Contact[]) => Promise<void>;
   generateBulkInsights: (contacts: Contact[]) => Promise<void>;
   optimizeMeetingTime: (attendeeIds: string[], duration: number) => Promise<Date[]>;
@@ -119,9 +111,14 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const scoreContact = useCallback(async (contact: Contact): Promise<number> => {
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-      
-      // Advanced AI scoring algorithm simulation
+      try {
+        const result = await aiApi.scoreContact(contact);
+        return result.score;
+      } catch (error) {
+        console.error('AI scoring failed, using heuristic fallback:', error);
+      }
+
+      // Heuristic fallback (used only when the AI call fails)
       let score = 50; // Base score
       
       // Title-based scoring
@@ -161,9 +158,6 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       if (contact.socialProfiles?.linkedin) score += 8;
       if (contact.socialProfiles?.website) score += 5;
       
-      // Random AI confidence factor
-      score += (Math.random() - 0.5) * 10;
-      
       return Math.max(0, Math.min(100, Math.round(score)));
     } finally {
       setIsProcessing(false);
@@ -173,11 +167,15 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const enrichContact = useCallback(async (contactData: Partial<Contact>): Promise<ContactEnrichmentData> => {
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate AI enrichment with realistic data
+      try {
+        return await aiApi.enrichContact(contactData);
+      } catch (error) {
+        console.error('AI enrichment failed, using heuristic fallback:', error);
+      }
+
+      // Heuristic fallback (used only when the AI call fails): low confidence, no invented data
       const enrichmentData: ContactEnrichmentData = {
-        confidence: 75 + Math.random() * 20,
+        confidence: 10,
       };
 
       // Enrich based on email domain
@@ -195,30 +193,16 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         };
       }
 
-      // Add professional avatar
-      if (!contactData.avatarSrc) {
-        const avatars = [
-          'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-          'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'
-        ];
-        enrichmentData.avatar = avatars[Math.floor(Math.random() * avatars.length)];
-      }
-
-      // Generate professional bio
-      enrichmentData.bio = `${contactData.firstName} ${contactData.lastName} is a ${contactData.title || 'professional'} at ${contactData.company || 'their company'}. ${contactData.firstName} has extensive experience in their field and is known for driving results and innovation.`;
-      
       return enrichmentData;
     } finally {
       setIsProcessing(false);
     }
   }, []);
 
-  const generateInsights = useCallback(async (contacts: Contact[]): Promise<AIInsight[]> => {
+  const generateInsights = useCallback(async (contacts: Contact[], extra: { deals?: Deal[]; tasks?: Task[] } = {}): Promise<AIInsight[]> => {
     setIsProcessing(true);
     try {
-      const newInsights = await aiApi.generateInsights(contacts);
+      const newInsights = await aiApi.generateInsights(contacts, extra);
       setInsights(prev => [...newInsights, ...prev]);
       return newInsights;
     } catch (error) {
@@ -244,28 +228,29 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   const analyzeInteractionHistory = useCallback(async (contactId: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Derived from real activity records (Supabase `activities` table).
+    const all = await activityApi.getAll();
+    const mine = all.filter(a => a.entityId === contactId);
+    const meetings = mine.filter(a => /meeting|call/i.test(a.type));
+    const sorted = [...mine].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const recent = mine.filter(a => Date.now() - a.createdAt.getTime() < 30 * 86400000).length;
+    const older = mine.length - recent;
     return {
-      totalInteractions: Math.floor(Math.random() * 20) + 5,
-      lastInteraction: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-      averageResponseTime: '4.2 hours',
-      preferredChannel: 'email',
-      engagementTrend: 'increasing',
-      meetingCount: Math.floor(Math.random() * 10) + 1,
-      dealStage: 'qualification'
+      totalInteractions: mine.length,
+      lastInteraction: sorted[0]?.createdAt ?? null,
+      meetingCount: meetings.length,
+      engagementTrend: recent > older ? 'increasing' : recent < older ? 'decreasing' : 'stable'
     };
   }, []);
 
-  const predictNextBestAction = useCallback(async (contactId: string): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const actions = [
-      'Schedule discovery call within 48 hours',
-      'Send personalized case study',
-      'Invite to product demo',
-      'Connect on LinkedIn with personal note',
-      'Follow up with pricing information'
-    ];
-    return actions[Math.floor(Math.random() * actions.length)];
+  const predictNextBestAction = useCallback(async (contactId: string, contact?: Partial<Contact>): Promise<string> => {
+    try {
+      const result = await aiApi.scoreContact(contact ?? { id: contactId });
+      if (result.nextBestAction) return result.nextBestAction;
+    } catch (error) {
+      console.error('Next best action failed:', error);
+    }
+    return 'Schedule a follow-up call';
   }, []);
 
   const scoreBulkContacts = useCallback(async (contacts: Contact[]): Promise<void> => {
@@ -274,7 +259,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       // Simulate bulk processing
       for (let i = 0; i < contacts.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
-        const score = await scoreContact(contacts[i]);
+        const _score = await scoreContact(contacts[i]);
         // In real implementation, this would update the contact store
       }
     } finally {
@@ -323,17 +308,10 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   const analyzeContactNetwork = useCallback(async (contactId: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    return {
-      networkSize: Math.floor(Math.random() * 500) + 100,
-      mutualConnections: Math.floor(Math.random() * 50) + 10,
-      influenceScore: Math.floor(Math.random() * 40) + 60,
-      keyConnectors: [
-        { name: 'John Smith', title: 'VP Sales', mutual: true },
-        { name: 'Sarah Johnson', title: 'Marketing Director', mutual: false }
-      ]
-    };
+    // No network graph data source exists in this stack; report only what we can derive.
+    const all = await activityApi.getAll();
+    const related = all.filter(a => a.entityId === contactId);
+    return { networkSize: null, mutualConnections: null, influenceScore: null, keyConnectors: [], touchpoints: related.length };
   }, []);
 
   const predictDealSuccess = useCallback(async (contactId: string, dealValue: number): Promise<number> => {
@@ -354,190 +332,35 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const searchSocialMediaProfiles = useCallback(async (contactData: Partial<Contact>): Promise<ContactEnrichmentData> => {
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate AI processing
-
-      const enrichmentData: ContactEnrichmentData = {
-        confidence: 85 + Math.random() * 10,
-        aiSearchResults: []
-      };
-
-      const fullName = `${contactData.firstName || ''} ${contactData.lastName || ''}`.trim();
-      const company = contactData.company || '';
-
-      // AI-powered social media search simulation
-      const platforms = [
-        'linkedin', 'twitter', 'facebook', 'instagram', 'youtube', 'tiktok',
-        'github', 'medium', 'behance', 'dribbble', 'twitch', 'discord'
-      ];
-
-      for (const platform of platforms) {
-        // Simulate AI finding profiles with varying confidence
-        const found = Math.random() > 0.4; // 60% chance of finding profile
-        if (found) {
-          const confidence = 70 + Math.random() * 25;
-          const followers = Math.floor(Math.random() * 50000) + 100;
-
-          enrichmentData.aiSearchResults!.push({
-            platform,
-            username: `${contactData.firstName?.toLowerCase()}${contactData.lastName?.toLowerCase()}`,
-            verified: Math.random() > 0.7,
-            followers,
-            posts: Math.floor(Math.random() * 1000) + 10,
-            lastActive: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-            confidence: Math.round(confidence)
-          });
-
-          // Add to social profiles if confidence is high enough
-          if (confidence > 80) {
-            if (!enrichmentData.socialProfiles) enrichmentData.socialProfiles = {};
-
-            switch (platform) {
-              case 'linkedin':
-                enrichmentData.socialProfiles.linkedin = `https://linkedin.com/in/${contactData.firstName?.toLowerCase()}-${contactData.lastName?.toLowerCase()}`;
-                break;
-              case 'twitter':
-                enrichmentData.socialProfiles.twitter = `https://twitter.com/${contactData.firstName?.toLowerCase()}${contactData.lastName?.toLowerCase()}`;
-                break;
-              case 'github':
-                enrichmentData.socialProfiles.github = `https://github.com/${contactData.firstName?.toLowerCase()}${contactData.lastName?.toLowerCase()}`;
-                break;
-              case 'medium':
-                enrichmentData.socialProfiles.medium = `https://medium.com/@${contactData.firstName?.toLowerCase()}${contactData.lastName?.toLowerCase()}`;
-                break;
-            }
-          }
-        }
-      }
-
-      return enrichmentData;
+      // Real lookup: OpenAI Responses API with web search via the contacts_enrich edge function.
+      const result = await aiApi.enrichContact(contactData);
+      return { ...result, aiSearchResults: [] };
     } finally {
       setIsProcessing(false);
     }
   }, []);
 
   const searchAllPlatforms = useCallback(async (contactData: Partial<Contact>): Promise<ContactEnrichmentData> => {
-    setIsProcessing(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Longer processing for comprehensive search
-
-      const enrichmentData: ContactEnrichmentData = {
-        confidence: 90 + Math.random() * 8,
-        aiSearchResults: []
-      };
-
-      const fullName = `${contactData.firstName || ''} ${contactData.lastName || ''}`.trim();
-      const company = contactData.company || '';
-
-      // Comprehensive AI search across all platforms
-      const allPlatforms = [
-        'linkedin', 'twitter', 'facebook', 'instagram', 'youtube', 'tiktok',
-        'snapchat', 'pinterest', 'github', 'medium', 'behance', 'dribbble',
-        'vimeo', 'twitch', 'discord', 'telegram', 'whatsapp', 'signal',
-        'skype', 'zoom', 'clubhouse', 'mastodon', 'threads', 'bluesky'
-      ];
-
-      for (const platform of allPlatforms) {
-        const found = Math.random() > 0.3; // 70% chance of finding profile
-        if (found) {
-          const confidence = 75 + Math.random() * 20;
-          const followers = Math.floor(Math.random() * 100000) + 50;
-
-          enrichmentData.aiSearchResults!.push({
-            platform,
-            username: `${contactData.firstName?.toLowerCase()}${contactData.lastName?.toLowerCase()}${platform === 'linkedin' ? '' : Math.floor(Math.random() * 1000)}`,
-            verified: Math.random() > 0.6,
-            followers,
-            posts: Math.floor(Math.random() * 2000) + 5,
-            lastActive: new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000),
-            confidence: Math.round(confidence)
-          });
-
-          // Add to social profiles for high-confidence results
-          if (confidence > 85) {
-            if (!enrichmentData.socialProfiles) enrichmentData.socialProfiles = {};
-
-            const baseUsername = `${contactData.firstName?.toLowerCase()}-${contactData.lastName?.toLowerCase()}`;
-
-            switch (platform) {
-              case 'linkedin':
-                enrichmentData.socialProfiles.linkedin = `https://linkedin.com/in/${baseUsername}`;
-                break;
-              case 'twitter':
-                enrichmentData.socialProfiles.twitter = `https://twitter.com/${baseUsername.replace('-', '')}`;
-                break;
-              case 'instagram':
-                enrichmentData.socialProfiles.instagram = `https://instagram.com/${baseUsername.replace('-', '_')}`;
-                break;
-              case 'github':
-                enrichmentData.socialProfiles.github = `https://github.com/${baseUsername}`;
-                break;
-              case 'medium':
-                enrichmentData.socialProfiles.medium = `https://medium.com/@${baseUsername}`;
-                break;
-              case 'youtube':
-                enrichmentData.socialProfiles.youtube = `https://youtube.com/@${baseUsername}`;
-                break;
-              case 'tiktok':
-                enrichmentData.socialProfiles.tiktok = `https://tiktok.com/@${baseUsername.replace('-', '_')}`;
-                break;
-            }
-          }
-        }
-      }
-
-      // Generate comprehensive bio using AI
-      enrichmentData.bio = `${contactData.firstName} ${contactData.lastName} is a ${contactData.title || 'professional'} ${company ? `at ${company}` : 'in their field'}. They are active across multiple social media platforms and have built a strong professional network. Their diverse online presence suggests they are engaged in industry discussions and thought leadership.`;
-
-      return enrichmentData;
-    } finally {
-      setIsProcessing(false);
-    }
+    return searchSocialMediaProfiles(contactData);
   }, [searchSocialMediaProfiles]);
 
   const verifySocialProfiles = useCallback(async (profiles: Record<string, string>): Promise<Record<string, boolean>> => {
-    setIsProcessing(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const verificationResults: Record<string, boolean> = {};
-
-      for (const [platform, url] of Object.entries(profiles)) {
-        // Simulate AI verification with realistic accuracy
-        const isValid = Math.random() > 0.15; // 85% accuracy
-        verificationResults[platform] = isValid;
+    // Format check only (no network requests to third-party sites).
+    const results: Record<string, boolean> = {};
+    for (const [platform, url] of Object.entries(profiles)) {
+      try {
+        const parsed = new URL(url);
+        results[platform] = parsed.protocol === 'https:' && parsed.hostname.includes('.');
+      } catch {
+        results[platform] = false;
       }
-
-      return verificationResults;
-    } finally {
-      setIsProcessing(false);
     }
+    return results;
   }, []);
 
   const getSocialMediaInsights = useCallback(async (contactId: string) => {
-    setIsProcessing(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
-
-      return {
-        totalPlatforms: Math.floor(Math.random() * 8) + 3,
-        activePlatforms: Math.floor(Math.random() * 6) + 2,
-        totalFollowers: Math.floor(Math.random() * 50000) + 1000,
-        engagementRate: Math.round((Math.random() * 5 + 1) * 100) / 100,
-        postingFrequency: `${Math.floor(Math.random() * 10) + 1} posts/week`,
-        topPlatform: ['LinkedIn', 'Twitter', 'Instagram', 'YouTube'][Math.floor(Math.random() * 4)],
-        contentThemes: ['Technology', 'Business', 'Industry Insights', 'Personal Branding', 'Networking'],
-        lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-        influenceScore: Math.floor(Math.random() * 40) + 60,
-        recommendations: [
-          'Increase LinkedIn posting frequency',
-          'Engage more with industry content',
-          'Consider starting a YouTube channel',
-          'Build stronger Twitter presence'
-        ]
-      };
-    } finally {
-      setIsProcessing(false);
-    }
+    const result = await aiApi.scoreContact({ id: contactId });
+    return { recommendations: [result.nextBestAction], summary: result.reasoning };
   }, []);
 
   // New task-related functions

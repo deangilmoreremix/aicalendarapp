@@ -2,23 +2,12 @@ import React, { useState } from 'react';
 import { GlassCard } from './ui/GlassCard';
 import { ModernButton } from './ui/ModernButton';
 import { useAI } from '../contexts/AIContext';
-import {
-  Brain,
-  Sparkles,
-  User,
-  Building,
-  Mail,
-  TrendingUp,
-  Target,
-  CheckCircle,
-  Loader2,
-  Award,
-  AlertCircle
-} from 'lucide-react';
-import { SkeletonText, SkeletonButton } from './ui/Skeleton';
+import { aiApi } from '../services/api';
+import { Brain, Sparkles, TrendingUp, CheckCircle, Loader2, Award, AlertCircle } from 'lucide-react';
+import { SkeletonText } from './ui/Skeleton';
 
 export const InteractiveContactScorer: React.FC = React.memo(() => {
-  const { scoreContact, generateInsights, isProcessing } = useAI();
+  const { generateInsights, isProcessing } = useAI();
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -51,8 +40,8 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
     setError(null);
     
     try {
-      // Create a mock contact object for AI analysis
-      const mockContact = {
+      // Contact built from the form for AI analysis
+      const contactInput = {
         id: 'temp-' + Date.now(),
         firstName: formData.name.split(' ')[0] || '',
         lastName: formData.name.split(' ').slice(1).join(' ') || '',
@@ -79,20 +68,20 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
         avatarSrc: ''
       };
 
-      // Use real AI scoring
-      const calculatedScore = await scoreContact(mockContact);
-      
+      // Real AI scoring (OpenAI via the contacts_score edge function)
+      const result = await aiApi.scoreContact(contactInput);
+      const calculatedScore = result.score;
+
       // Generate AI insights
-      const generatedInsights = await generateInsights([mockContact]);
-      
-      // Generate breakdown scores (simulate different aspects)
+      const generatedInsights = await generateInsights([contactInput]);
+
       const generatedBreakdown = {
-        fitScore: Math.max(0, Math.min(100, calculatedScore + Math.random() * 20 - 10)),
-        engagementScore: Math.max(0, Math.min(100, calculatedScore + Math.random() * 30 - 15)),
-        conversionProbability: Math.max(0, Math.min(100, calculatedScore + Math.random() * 25 - 12)),
-        urgencyScore: Math.max(0, Math.min(100, calculatedScore + Math.random() * 35 - 17))
+        fitScore: result.fitScore,
+        engagementScore: result.engagementScore,
+        conversionProbability: result.conversionProbability,
+        urgencyScore: result.urgencyScore
       };
-      
+
       // Convert AI insights to display format
       const displayInsights = generatedInsights.map(insight => insight.description);
       
@@ -187,7 +176,7 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Industry
             </label>
-            <select
+            <select aria-label="Industry"
               value={formData.industry}
               onChange={(e) => handleInputChange('industry', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -271,7 +260,7 @@ export const InteractiveContactScorer: React.FC = React.memo(() => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Interest Level
             </label>
-            <select
+            <select aria-label="Interest level"
               value={formData.interestLevel}
               onChange={(e) => handleInputChange('interestLevel', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

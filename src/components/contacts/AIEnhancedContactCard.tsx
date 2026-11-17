@@ -1,24 +1,8 @@
+import { initialsAvatar } from '../../utils/avatars';
 import React, { useState, useEffect } from 'react';
 import { Contact } from '../../types';
 import { useAI } from '../../contexts/AIContext';
-import { 
-  User, 
-  Building, 
-  Mail, 
-  Phone, 
-  Linkedin, 
-  Twitter, 
-  Globe,
-  Brain,
-  Sparkles,
-  TrendingUp,
-  Target,
-  Clock,
-  Star,
-  ChevronRight,
-  Loader2,
-  Zap
-} from 'lucide-react';
+import { Mail, Phone, Linkedin, Twitter, Globe, Brain, Sparkles, Clock, Star, ChevronRight, Loader2, Zap } from 'lucide-react';
 
 interface AIEnhancedContactCardProps {
   contact: Contact;
@@ -53,7 +37,7 @@ export const AIEnhancedContactCard: React.FC<AIEnhancedContactCardProps> = ({
         try {
           const [score, nextAction, interactionData] = await Promise.all([
             scoreContact(contact),
-            predictNextBestAction(contact.id),
+            predictNextBestAction(contact.id, contact),
             analyzeInteractionHistory(contact.id)
           ]);
 
@@ -143,7 +127,7 @@ export const AIEnhancedContactCard: React.FC<AIEnhancedContactCardProps> = ({
         <div className="flex items-center space-x-3">
           <div className="relative">
             <img
-              src={contact.avatarSrc || contact.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'}
+              src={contact.avatarSrc || contact.avatar || initialsAvatar(contact.name)}
               alt={contact.name}
               className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
             />

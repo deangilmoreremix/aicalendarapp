@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogHeader } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Badge } from './badge';
@@ -8,24 +8,13 @@ import { Textarea } from './textarea';
 import { useContactStore } from '../../store/contactStore';
 import { useTaskStore } from '../../store/taskStore';
 import { useAI } from '../../contexts/AIContext';
-import { Contact } from '../../types';
 import { UniversalAIAssistant, AIAssistantConfig } from './UniversalAIAssistant';
 import { Calendar, Brain } from 'lucide-react';
-import {
-  X,
-  Clock,
-  Users,
-  MapPin,
-  Video,
-  Phone,
-  Mail,
-  Sparkles,
-  Loader2,
-  Plus,
-  CheckCircle,
-  AlertCircle,
-  Target
-} from 'lucide-react';
+import { X, Clock, Users, MapPin, Video, Phone, Mail, Sparkles, Loader2, Plus, CheckCircle, Target } from 'lucide-react';
+
+// Module-level default: a fresh `[]` default prop is a new array on every render, and effects that depend on it
+// (to reset the form while the modal is open) would run on every render and wipe the form in a loop.
+const NO_IDS: string[] = [];
 
 interface MeetingSchedulerModalProps {
   isOpen: boolean;
@@ -61,11 +50,11 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
   isOpen,
   onClose,
   onMeetingScheduled,
-  preselectedContacts = []
+  preselectedContacts = NO_IDS
 }) => {
   const { contacts } = useContactStore();
   const { createTask } = useTaskStore();
-  const { optimizeMeetingTime, generateMeetingAgenda, isProcessing } = useAI();
+  const { optimizeMeetingTime, generateMeetingAgenda } = useAI();
 
   const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -141,18 +130,6 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
       setNewAgendaItem('');
     }
   }, [isOpen, preselectedContacts]);
-
-  // Auto-generate meeting link for video calls
-  useEffect(() => {
-    if (formData.type === 'demo' || formData.type === 'presentation') {
-      if (!formData.meetingLink) {
-        setFormData(prev => ({
-          ...prev,
-          meetingLink: `https://meet.example.com/${Math.random().toString(36).substr(2, 9)}`
-        }));
-      }
-    }
-  }, [formData.type]);
 
   // Calculate end time based on start time and duration
   useEffect(() => {
@@ -330,6 +307,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
               </button>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="text-white/70 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -478,7 +456,7 @@ export const MeetingSchedulerModal: React.FC<MeetingSchedulerModalProps> = ({
                 <Input
                   value={formData.meetingLink}
                   onChange={(e) => setFormData(prev => ({ ...prev, meetingLink: e.target.value }))}
-                  placeholder="https://meet.example.com/..."
+                  placeholder="Paste your video call link"
                   className="pl-10"
                 />
               </div>

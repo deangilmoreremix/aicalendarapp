@@ -1,5 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
-import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings } from 'lucide-react';
+import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings, Table2 } from 'lucide-react';
 
 // Lazy load heavy components
 const BigTaskCalendar = lazy(() => import('./components/BigTaskCalendar').then(module => ({ default: module.BigTaskCalendar })));
@@ -12,7 +12,7 @@ import { useAI } from './contexts/AIContext';
 import { Task, TaskFilters } from './types';
 import { useTaskStore } from './store/taskStore';
 import { useContactStore } from './store/contactStore';
-import { formatDate, getPriorityColor, getCategoryColor } from './utils';
+import { getPriorityColor, getCategoryColor } from './utils';
 import { InteractiveContactScorer } from './components/InteractiveContactScorer';
 import { TasksAndFunnel } from './components/TasksAndFunnel';
 import { InteractionHistory } from './components/InteractionHistory';
@@ -23,19 +23,22 @@ import { NewContactModal } from './components/NewContactModal';
 import { NewDealModal } from './components/NewDealModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { DeleteMockDataDialog } from './components/ui/DeleteMockDataDialog';
+import { RecordTable } from './components/table/RecordTable';
+import { CommandMenu, CommandMenuButton } from './components/CommandMenu';
+import { FavoritesPanel } from './components/FavoritesPanel';
+import { OpenRecordHost } from './components/OpenRecordHost';
+import { AssigneeAvatar, InlineDueDate, TaskFavoriteStar } from './components/calendar/TaskRowParts';
 import { CalendarSettings } from './components/CalendarSettings';
 import { SkeletonCard } from './components/ui/Skeleton';
-import ErrorBoundary from './components/ui/ErrorBoundary';
-import Toast from './components/ui/Toast';
 
 const App: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
   const { insights, generateInsights } = useAI();
   const { tasks, markTaskComplete, loadInitialData } = useTaskStore();
   const { contacts, loadContacts } = useContactStore();
-  const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity'>('calendar');
+  const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity' | 'table'>('calendar');
 
-  const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity') => {
+  const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity' | 'table') => {
     setView(newView);
   };
   const [showAIInsights, setShowAIInsights] = useState(false);
@@ -50,6 +53,14 @@ const App: React.FC = () => {
   const [showCalendarSettings, setShowCalendarSettings] = useState(false);
 
   // Load initial data on mount
+  // Escape closes the Calendar Settings modal
+  React.useEffect(() => {
+    if (!showCalendarSettings) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setShowCalendarSettings(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showCalendarSettings]);
+
   React.useEffect(() => {
     const loadData = async () => {
       try {
@@ -103,7 +114,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Filters */}
-              <select
+              <select aria-label="Filter by status"
                 value={filters.statuses?.[0] || 'all'}
                 onChange={(e) => setFilters(prev => ({ ...prev, statuses: e.target.value === 'all' ? undefined : [e.target.value as Task['status']] }))}
                 className={`px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
@@ -120,7 +131,7 @@ const App: React.FC = () => {
                 <option value="cancelled">Cancelled</option>
               </select>
 
-              <select
+              <select aria-label="Filter by priority"
                 value={filters.priorities?.[0] || 'all'}
                 onChange={(e) => setFilters(prev => ({ ...prev, priorities: e.target.value === 'all' ? undefined : [e.target.value as Task['priority']] }))}
                 className={`px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
@@ -155,6 +166,7 @@ const App: React.FC = () => {
                 <div className="flex items-center space-x-4">
                   <input
                     type="checkbox"
+                    aria-label={`Mark ${task.title} complete`}
                     checked={task.completed}
                     onChange={(e) => {
                       e.stopPropagation();
@@ -185,17 +197,11 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {task.dueDate && (
-                  <div className="text-right">
-                    <p className={`text-sm font-medium ${
-                      !task.completed && task.dueDate < new Date()
-                        ? 'text-red-600'
-                        : isDark ? 'text-gray-300' : 'text-gray-600'
-                    }`}>
-                      {formatDate(task.dueDate)}
-                    </p>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  <AssigneeAvatar name={task.assignedUserName} />
+                  <InlineDueDate task={task} />
+                  <TaskFavoriteStar task={task} />
+                </div>
               </div>
             </div>
           ))}
@@ -228,6 +234,8 @@ const App: React.FC = () => {
               return <ActivityFeed />;
             case 'list':
               return <TaskListView />;
+            case 'table':
+              return <RecordTable />;
             default:
               return <BigTaskCalendar />;
           }
@@ -262,15 +270,19 @@ const App: React.FC = () => {
             {/* Delete Mock Data Button */}
             <button
               onClick={() => setShowDeleteMockDataDialog(true)}
-              className={`p-2 rounded-xl transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                 isDark
                   ? 'bg-red-900/20 text-red-400 hover:bg-red-900/30 border border-red-500/20'
-                  : 'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm border border-red-200'
+                  : 'bg-red-50 text-red-700 hover:bg-red-100 shadow-sm border border-red-200'
               }`}
-              title="Delete All Mock Data"
+              title="Delete sample data (your own records are kept)"
+              aria-label="Delete mock data"
             >
               <Trash2 size={18} />
+              <span className="hidden sm:inline">Delete mock data</span>
             </button>
+
+            <CommandMenuButton isDark={isDark} />
 
             {/* Settings Button */}
             <button
@@ -288,6 +300,8 @@ const App: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to light mode (sun)' : 'Switch to dark mode (moon)'}
+              title={isDark ? 'Light mode' : 'Dark mode'}
               className={`p-2 rounded-xl transition-colors ${
                 isDark
                   ? 'bg-white/10 text-white hover:bg-white/20'
@@ -355,10 +369,26 @@ const App: React.FC = () => {
               >
                 <Activity size={18} />
               </button>
+              <button
+                onClick={() => handleViewChange('table')}
+                className={`p-2 rounded-lg transition-colors ${
+                  view === 'table'
+                    ? 'bg-blue-600 text-white'
+                    : isDark
+                      ? 'text-gray-300 hover:bg-white/10'
+                      : 'text-gray-600 hover:bg-gray-100'
+                }`}
+                title="Table View"
+                aria-label="Table view"
+              >
+                <Table2 size={18} />
+              </button>
             </div>
           </div>
         </div>
       </header>
+
+      <main>
 
       {/* Task Statistics */}
       <TaskStats />
@@ -425,6 +455,9 @@ const App: React.FC = () => {
         onNewDeal={() => setShowNewDealModal(true)}
       />
 
+      {/* Favorites */}
+      <FavoritesPanel />
+
       {/* Recent Activity Dashboard */}
       <RecentActivity />
 
@@ -460,6 +493,8 @@ const App: React.FC = () => {
         {renderView()}
       </div>
 
+      </main>
+
       {/* Contact Modals */}
       <ContactsModal
         isOpen={showContactsModal}
@@ -488,6 +523,15 @@ const App: React.FC = () => {
         />
       )}
 
+      <OpenRecordHost />
+      <CommandMenu
+        onNavigate={handleViewChange}
+        onNewContact={() => setShowNewContactModal(true)}
+        onNewDeal={() => setShowNewDealModal(true)}
+        onOpenSettings={() => setShowCalendarSettings(true)}
+        onDeleteMockData={() => setShowDeleteMockDataDialog(true)}
+      />
+
       {/* Delete Mock Data Dialog */}
       <DeleteMockDataDialog
         isOpen={showDeleteMockDataDialog}
@@ -496,7 +540,7 @@ const App: React.FC = () => {
 
       {/* Calendar Settings Modal */}
       {showCalendarSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div role="dialog" aria-modal="true" aria-label="Calendar Settings" className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
             isDark ? 'text-white' : 'text-gray-900'
           }`}>
@@ -505,6 +549,7 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-bold">Calendar Settings</h2>
                 <button
                   onClick={() => setShowCalendarSettings(false)}
+                  aria-label="Close settings"
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 >
                   ×

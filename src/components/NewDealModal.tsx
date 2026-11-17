@@ -1,34 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModernButton } from './ui/ModernButton';
-import { AIAutoFillButton } from './ui/AIAutoFillButton';
-import { AIResearchButton } from './ui/AIResearchButton';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
-import { Deal, Contact } from '../types';
-import {
-  X,
-  DollarSign,
-  Building,
-  Target,
-  Tag,
-  Calendar,
-  TrendingUp,
-  Save,
-  User,
-  AlertCircle,
-  CheckCircle,
-  Heart,
-  Percent,
-  Clock,
-  Star,
-  Briefcase,
-  Brain,
-  Sparkles,
-  Wand2,
-  RefreshCw,
-  Users,
-  Plus
-} from 'lucide-react';
+import { Contact } from '../types';
+import { X, DollarSign, Target, Tag, TrendingUp, Save, User, AlertCircle, CheckCircle, Brain, Sparkles } from 'lucide-react';
 
 interface NewDealModalProps {
   isOpen: boolean;
@@ -174,6 +149,14 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
     onClose();
   };
 
+  // Escape closes the modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   if (isSuccess) {
@@ -291,7 +274,7 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Associated Contact *
                   </label>
-                  <select
+                  <select aria-label="Associated contact"
                     value={formData.contactId}
                     onChange={(e) => handleContactChange(e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
@@ -335,7 +318,7 @@ export const NewDealModal: React.FC<NewDealModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Probability
                   </label>
-                  <select
+                  <select aria-label="Probability"
                     value={formData.probability}
                     onChange={(e) => handleInputChange('probability', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"

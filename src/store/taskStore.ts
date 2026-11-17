@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Task, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
-import { taskApi, activityApi } from '../services/api';
+import { Task, TaskUpdate, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
+import { taskApi, calendarEventApi } from '../services/api';
 import { generateId } from '../utils';
 
 interface TaskState {
@@ -16,7 +16,7 @@ interface TaskState {
 
 interface TaskActions {
   createTask: (taskData: Partial<Task>) => Promise<void>;
-  updateTask: (id: string, taskData: Partial<Task>) => Promise<void>;
+  updateTask: (id: string, taskData: TaskUpdate) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   markTaskComplete: (id: string, completed: boolean) => void;
   selectTask: (id: string | null) => void;
@@ -26,170 +26,32 @@ interface TaskActions {
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => void;
   setSelectedTask: (task: Task | null) => void;
   loadInitialData: () => Promise<void>;
+  /** Optimistic update used by calendar drag/reschedule (no global loading flag, rolls back on failure). */
+  rescheduleTask: (id: string, taskData: TaskUpdate) => Promise<boolean>;
+  loadCalendarEvents: (from: Date, to: Date) => Promise<void>;
+  /** Re-load the range that was last requested (e.g. after an event was created elsewhere). */
+  reloadCalendarEvents: () => Promise<void>;
+  rescheduleCalendarEvent: (id: string, updates: { startDate?: Date; endDate?: Date; position?: number }) => Promise<boolean>;
+  removeCalendarEvent: (id: string) => Promise<boolean>;
+  /** Update one loaded event in place (used after an edit saved elsewhere). */
+  patchCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
 }
 
 type TaskStore = TaskState & TaskActions;
 
-// Sample task data for demonstration
-const sampleTasks: Record<string, Task> = {
-  '1': {
-    id: '1',
-    title: 'Review quarterly reports',
-    description: 'Analyze Q3 performance metrics and prepare presentation for stakeholders.',
-    dueDate: new Date(2024, 11, 25, 14, 30),
-    priority: 'high',
-    status: 'pending',
-    category: 'meeting',
-    type: 'meeting',
-    completed: false,
-    createdAt: new Date(2024, 11, 20),
-    tags: ['quarterly', 'review'],
-    attachments: [],
-    subtasks: [],
-  },
-  '2': {
-    id: '2',
-    title: 'Follow up with client',
-    description: 'Check on implementation progress and gather feedback.',
-    dueDate: new Date(2024, 11, 24, 10, 0),
-    priority: 'medium',
-    status: 'in-progress',
-    category: 'call',
-    type: 'call',
-    completed: false,
-    createdAt: new Date(2024, 11, 22),
-    tags: ['client', 'follow-up'],
-    attachments: [],
-    subtasks: [],
-  },
-  '3': {
-    id: '3',
-    title: 'Send proposal draft',
-    description: 'Complete and send the revised project proposal to the client.',
-    dueDate: new Date(2024, 11, 23, 16, 0),
-    priority: 'high',
-    status: 'completed',
-    category: 'email',
-    type: 'email',
-    completed: true,
-    createdAt: new Date(2024, 11, 21),
-    completedAt: new Date(2024, 11, 23, 15, 30),
-    tags: ['proposal', 'client'],
-    attachments: [],
-    subtasks: [],
-  },
-  '4': {
-    id: '4',
-    title: 'Team standup meeting',
-    description: 'Weekly team sync to discuss progress and blockers.',
-    dueDate: new Date(2024, 11, 26, 9, 0),
-    priority: 'medium',
-    status: 'pending',
-    category: 'meeting',
-    type: 'meeting',
-    completed: false,
-    createdAt: new Date(2024, 11, 19),
-    tags: ['team', 'standup'],
-    attachments: [],
-    subtasks: [],
-  },
-  '5': {
-    id: '5',
-    title: 'Update project documentation',
-    description: 'Refresh README files and API documentation for the latest release.',
-    dueDate: new Date(2024, 11, 27, 11, 0),
-    priority: 'low',
-    status: 'pending',
-    category: 'other',
-    type: 'other',
-    completed: false,
-    createdAt: new Date(2024, 11, 20),
-    tags: ['documentation', 'project'],
-    attachments: [],
-    subtasks: [],
-  },
+
+/** Local copy of a task after a patch; `null` (clear this value) becomes `undefined` on the in-memory task. */
+const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
+  const { completedAt, relatedTo, ...rest } = update;
+  const next: Task = { ...task, ...rest };
+  if (completedAt !== undefined) next.completedAt = completedAt ?? undefined;
+  if (relatedTo !== undefined) next.relatedTo = relatedTo ?? undefined;
+  return next;
 };
 
-// Sample calendar events
-const sampleCalendarEvents: CalendarEvent[] = [
-  {
-    id: '1',
-    title: 'Product Demo',
-    description: 'Demonstrate new features to potential client',
-    startDate: new Date(2024, 11, 26, 14, 0),
-    endDate: new Date(2024, 11, 26, 15, 0),
-    isAllDay: false,
-    location: 'Conference Room A',
-    attendees: ['john@company.com', 'client@example.com'],
-    participants: [
-      {
-        displayName: 'John Smith',
-        firstName: 'John',
-        lastName: 'Smith',
-        handle: 'john.smith',
-        avatarUrl: 'https://ui-avatars.com/api/?name=John+Smith&background=3b82f6&color=fff',
-      },
-      {
-        displayName: 'Client Contact',
-        firstName: 'Client',
-        lastName: 'Contact',
-        handle: 'client.demo',
-        avatarUrl: 'https://ui-avatars.com/api/?name=Client+Contact&background=10b981&color=fff',
-      },
-    ],
-    conferenceSolution: 'Google Meet',
-    conferenceLink: 'https://meet.google.com/demo-123',
-    calendarId: 'work',
-    type: 'meeting',
-    status: 'scheduled',
-    visibility: 'SHARE_EVERYTHING',
-  },
-];
-
-// Sample activities
-const sampleActivities: Activity[] = [
-  {
-    id: '1',
-    type: 'task_created',
-    title: 'Task Created: Review quarterly reports',
-    description: 'New task assigned for quarterly review',
-    userId: 'user1',
-    userName: 'John Doe',
-    entityType: 'task',
-    entityId: '1',
-    createdAt: new Date(2024, 11, 20),
-  },
-  {
-    id: '2',
-    type: 'task_completed',
-    title: 'Task Completed: Send proposal draft',
-    description: 'Proposal draft has been completed and sent',
-    userId: 'user1',
-    userName: 'John Doe',
-    entityType: 'task',
-    entityId: '3',
-    createdAt: new Date(2024, 11, 23, 15, 30),
-  },
-  {
-    id: '3',
-    type: 'meeting_scheduled',
-    title: 'Meeting Scheduled: Product Demo',
-    description: 'Demonstrate new features to potential client',
-    userId: 'user1',
-    userName: 'John Doe',
-    entityType: 'calendar',
-    entityId: '1',
-    createdAt: new Date(2024, 11, 22),
-    metadata: {
-      participants: [
-        { displayName: 'John Smith', handle: 'john.smith' },
-        { displayName: 'Client Contact', handle: 'client.demo' },
-      ],
-      conferenceLink: 'https://meet.google.com/demo-123',
-      location: 'Conference Room A',
-    },
-  },
-];
+// only the latest range request may write the store: navigating quickly must not let an older response win
+let latestCalendarRangeRequest = 0;
+let lastCalendarRange: { from: Date; to: Date } | null = null;
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: {},
@@ -324,6 +186,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       );
     }
 
+    if (filters.assigneeIds?.length) {
+      filteredTasks = filteredTasks.filter(task =>
+        task.assignedUserId !== undefined && filters.assigneeIds!.includes(task.assignedUserId)
+      );
+    }
+
+    if (filters.dueDateRange?.start || filters.dueDateRange?.end) {
+      const { start, end } = filters.dueDateRange;
+      filteredTasks = filteredTasks.filter(task => {
+        const when = task.dueDate ?? task.startTime;
+        if (!when) return false;
+        return (!start || when >= start) && (!end || when <= end);
+      });
+    }
+
     if (filters.isOverdue) {
       filteredTasks = filteredTasks.filter(task =>
         task.dueDate && task.dueDate < new Date() && task.status !== 'completed'
@@ -364,6 +241,67 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   setSelectedTask: (task) => {
     set({ selectedTask: task?.id || null });
+  },
+
+  rescheduleTask: async (id, taskData) => {
+    const previous = get().tasks[id];
+    if (!previous) return false;
+    set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
+    try {
+      const saved = await taskApi.update(id, taskData);
+      set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
+      return true;
+    } catch (error) {
+      console.error('Failed to reschedule task:', error);
+      set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
+      return false;
+    }
+  },
+
+  loadCalendarEvents: async (from, to) => {
+    lastCalendarRange = { from, to };
+    const request = ++latestCalendarRangeRequest;
+    try {
+      const events = await calendarEventApi.getRange(from, to);
+      if (request === latestCalendarRangeRequest) set({ calendarEvents: events });
+    } catch (error) {
+      console.error('Failed to load calendar events:', error);
+      if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
+    }
+  },
+
+  reloadCalendarEvents: async () => {
+    if (lastCalendarRange) await get().loadCalendarEvents(lastCalendarRange.from, lastCalendarRange.to);
+  },
+
+  rescheduleCalendarEvent: async (id, updates) => {
+    const previous = get().calendarEvents;
+    set({ calendarEvents: previous.map(e => (e.id === id ? { ...e, ...updates } : e)) });
+    try {
+      await calendarEventApi.update(id, updates);
+      return true;
+    } catch (error) {
+      console.error('Failed to reschedule event:', error);
+      set({ calendarEvents: previous, error: 'Failed to reschedule event' });
+      return false;
+    }
+  },
+
+  patchCalendarEvent: (id, updates) => {
+    set((state) => ({ calendarEvents: state.calendarEvents.map((e) => (e.id === id ? { ...e, ...updates } : e)) }));
+  },
+
+  removeCalendarEvent: async (id) => {
+    const previous = get().calendarEvents;
+    set({ calendarEvents: previous.filter(e => e.id !== id) });
+    try {
+      await calendarEventApi.delete(id);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      set({ calendarEvents: previous, error: 'Failed to delete event' });
+      return false;
+    }
   },
 
   loadInitialData: async () => {

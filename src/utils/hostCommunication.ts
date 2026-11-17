@@ -30,11 +30,16 @@ export class HostCommunication {
   private isEmbedded: boolean;
 
   constructor(hostOrigin?: string) {
-    this.hostOrigin = hostOrigin || '*';
+    // Set VITE_HOST_ORIGIN (e.g. https://app.example.com) so only the host page can send messages to the embedded app
+    // and receive its messages. Without it every origin is accepted, which is only appropriate for local development.
+    this.hostOrigin = hostOrigin || (import.meta.env?.VITE_HOST_ORIGIN as string | undefined) || '*';
     this.listeners = new Map();
     this.isEmbedded = window.self !== window.top;
 
     if (this.isEmbedded) {
+      if (this.hostOrigin === '*') {
+        console.warn('[CRM Embed] VITE_HOST_ORIGIN is not set: messages from any origin are accepted.');
+      }
       this.initializeListener();
     }
   }

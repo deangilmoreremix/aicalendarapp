@@ -24,10 +24,6 @@ export default defineConfig({
           singleton: true,
           requiredVersion: '^18.0.0',
         },
-        'react-router-dom': {
-          singleton: true,
-          requiredVersion: '^6.26.0',
-        },
       },
     }),
   ],

@@ -1,0 +1,168 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildRequestBody, callResponses, callResponsesJson, extractCitations, extractText } from './openai.ts';
+
+const g = globalThis as any;
+
+const ok = (data: unknown) => ({ ok: true, status: 200, json: async () => data }) as Response;
+
+describe('OpenAI Responses helper', () => {
+  beforeEach(() => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    g.Deno = { env: { get: (k: string) => env[k] } };
+  });
+
+  it('builds a Responses API request (no chat-completions fields)', () => {
+    const body = buildRequestBody(
+      { instructions: 'sys', input: 'hi', maxOutputTokens: 100, schema: { name: 'x', schema: { type: 'object' } }, webSearch: true },
+      'gpt-6-astra',
+    ) as any;
+    expect(body.model).toBe('gpt-6-astra');
+    expect(body.instructions).toBe('sys');
+    expect(body.input).toBe('hi');
+    expect(body.reasoning).toEqual({ effort: 'low' });
+    expect(body.text.format).toMatchObject({ type: 'json_schema', name: 'x', strict: true });
+    expect(body.tools).toEqual([{ type: 'web_search' }]);
+    expect(body).not.toHaveProperty('messages');
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('max_tokens');
+  });
+
+  it('posts to /v1/responses with bearer auth and reads output_text', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ output_text: 'hello' }));
+    const { text } = await callResponses({ instructions: 'a', input: 'b', fetchImpl });
+    expect(text).toBe('hello');
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/responses');
+    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-test');
+  });
+
+  it('extracts text and citations from output items', () => {
+    const data = {
+      output: [
+        { type: 'web_search_call' },
+        { type: 'message', content: [{ type: 'output_text', text: 'A', annotations: [{ type: 'url_citation', url: 'https://e.com', title: 'E' }] }] },
+      ],
+    };
+    expect(extractText(data)).toBe('A');
+    expect(extractCitations(data)).toEqual([{ url: 'https://e.com', title: 'E' }]);
+  });
+
+  it('parses JSON output', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ output_text: '{"a":1}' }));
+    expect(await callResponsesJson({ instructions: 'a', input: 'b', fetchImpl })).toEqual({ a: 1 });
+  });
+
+  it('surfaces API errors instead of swallowing them', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
+    await expect(callResponses({ instructions: 'a', input: 'b', fetchImpl })).rejects.toThrow('bad key');
+  });
+
+  it('throws when the key is missing', async () => {
+    g.Deno = { env: { get: () => undefined } };
+    await expect(callResponses({ instructions: 'a', input: 'b' })).rejects.toThrow('OPENAI_API_KEY');
+  });
+});
+
+import { buildImageBody, callImages } from './openai.ts';
+
+describe('OpenAI Images helper', () => {
+  beforeEach(() => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+  });
+
+  it('builds an images request body', () => {
+    const body = buildImageBody({ prompt: 'p', safetyIdentifier: 'u1' }, 'gpt-image-2.6-flare');
+    expect(body).toMatchObject({ model: 'gpt-image-2.6-flare', prompt: 'p', size: '1024x1024', quality: 'medium', output_format: 'webp', safety_identifier: 'u1' });
+  });
+
+  it('calls /v1/images/generations and decodes b64_json', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('abc') }] }) });
+    const out = await callImages({ prompt: 'p', fetchImpl: fetchImpl as any });
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/generations');
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).model).toBe('gpt-image-2.6-flare');
+    expect(new TextDecoder().decode(out.bytes)).toBe('abc');
+    expect(out.contentType).toBe('image/webp');
+  });
+
+  it('uses /v1/images/edits with reference images', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('x') }] }) });
+    await callImages({ prompt: 'p', referenceImages: [{ bytes: new Uint8Array([1]), type: 'image/png', name: 'a.png' }], fetchImpl: fetchImpl as any });
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/edits');
+  });
+
+  it('surfaces image errors', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { message: 'moderation_blocked' } }) });
+    await expect(callImages({ prompt: 'p', fetchImpl: fetchImpl as any })).rejects.toThrow('moderation_blocked');
+  });
+});
+
+import { extractSources } from './openai.ts';
+
+describe('web_search tool', () => {
+  it('configures the web_search tool and requests sources', () => {
+    const body = buildRequestBody(
+      { instructions: 'a', input: 'b', webSearch: { searchContextSize: 'medium', allowedDomains: ['linkedin.com'], userLocation: { country: 'US' } }, toolChoice: 'required' },
+      'gpt-6-astra',
+    ) as any;
+    expect(body.tools).toEqual([
+      { type: 'web_search', search_context_size: 'medium', user_location: { type: 'approximate', country: 'US' }, filters: { allowed_domains: ['linkedin.com'] } },
+    ]);
+    expect(body.tool_choice).toBe('required');
+    expect(body.include).toEqual(['web_search_call.action.sources']);
+  });
+
+  it('merges consulted sources with citations without duplicates', () => {
+    const data = {
+      output: [
+        { type: 'web_search_call', action: { type: 'search', sources: [{ url: 'https://a.com', title: 'A' }, { url: 'https://b.com' }] } },
+        { type: 'message', content: [{ type: 'output_text', text: '{}', annotations: [{ type: 'url_citation', url: 'https://a.com', title: 'A cited' }] }] },
+      ],
+    };
+    expect(extractSources(data)).toEqual([
+      { url: 'https://a.com', title: 'A cited' },
+      { url: 'https://b.com', title: 'https://b.com' },
+    ]);
+  });
+
+  it('omits web_search fields when disabled', () => {
+    const body = buildRequestBody({ instructions: 'a', input: 'b' }, 'gpt-6-astra') as any;
+    expect(body.tools).toBeUndefined();
+    expect(body.include).toBeUndefined();
+  });
+});
+
+import { parseSseData, streamResponses } from './openai.ts';
+
+describe('streaming', () => {
+  it('parses SSE data blocks', () => {
+    expect(parseSseData('event: x\ndata: {"a":1}')).toEqual({ a: 1 });
+    expect(parseSseData('data: [DONE]')).toBeNull();
+    expect(parseSseData('event: ping')).toBeNull();
+  });
+
+  it('re-emits output_text deltas and a final done event with sources', async () => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+    const events = [
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hel"}\n\n',
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"lo"}\n\n',
+      'event: response.completed\ndata: {"type":"response.completed","response":{"output":[{"type":"web_search_call","action":{"sources":[{"url":"https://a.com","title":"A"}]}}]}}\n\n',
+    ];
+    const body = new ReadableStream({ start(c) { events.forEach((e) => c.enqueue(new TextEncoder().encode(e))); c.close(); } });
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, body });
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).stream).toBe(true);
+    expect(out).toContain('data: {"content":"Hel"}');
+    expect(out).toContain('data: {"content":"lo"}');
+    expect(out).toContain('"done":true');
+    expect(out).toContain('https://a.com');
+  });
+
+  it('reports upstream errors as an error event', async () => {
+    const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
+    (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
+    expect(out).toContain('"error":"bad key"');
+  });
+});

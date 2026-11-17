@@ -73,7 +73,7 @@ export const StreamingTextWithCitations: React.FC<StreamingTextWithCitationsProp
     }
   }, [isStreaming]);
 
-  const renderCitation = (citation: Citation, index: number) => {
+  const _renderCitation = (citation: Citation, index: number) => {
     const isAnimating = animatingCitations.has(citation.id);
 
     return (
