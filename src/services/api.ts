@@ -4,6 +4,9 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
+import { isEmailBlocklisted } from '../vendor/twenty/calendar-sync/is-email-blocklisted.util';
+import { sanitizeCalendarEvent } from '../vendor/twenty/calendar-sync/sanitizeCalendarEvent';
+import { resolveCalendarEventTimeZone } from '../vendor/twenty/calendar-sync/resolve-calendar-event-time-zone.util';
 import { contactTargetsForGuests, escapeIlike, matchGuestsToContacts, normalizeHandle } from '../lib/calendar/matchGuests';
 import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent, CalendarEventParticipant } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
@@ -711,6 +714,50 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
   };
 };
 
+/** Strip the control characters Postgres rejects (Twenty's `sanitizeCalendarEvent`) from the free-text fields. */
+const cleanText = (value: string): string => sanitizeCalendarEvent({ value }, ['value']).value;
+
+export const calendarBlocklistApi = {
+  async getAll(): Promise<{ id: string; handle: string }[]> {
+    const { data, error } = await supabase.from('calendar_blocklist').select('id, handle').order('created_at');
+    if (error) throw error;
+    return (data ?? []) as { id: string; handle: string }[];
+  },
+
+  /** An address ("a@b.com") or a whole domain ("@b.com"). */
+  async add(handle: string): Promise<void> {
+    const value = handle.trim().toLowerCase();
+    if (!value) return;
+    const { error } = await supabase.from('calendar_blocklist').upsert({ handle: value }, { onConflict: 'handle', ignoreDuplicates: true });
+    if (error) throw error;
+    blocklistCache = null;
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('calendar_blocklist').delete().eq('id', id);
+    if (error) throw error;
+    blocklistCache = null;
+  }
+};
+
+let blocklistCache: string[] | null = null;
+
+/** The blocked handles; a failed lookup means "nothing blocked" so the calendar still shows. */
+const loadBlocklist = async (): Promise<string[]> => {
+  if (blocklistCache) return blocklistCache;
+  try {
+    blocklistCache = (await calendarBlocklistApi.getAll()).map((entry) => entry.handle).filter(Boolean);
+  } catch (error) {
+    console.error('Failed to load the calendar blocklist:', error);
+    return [];
+  }
+  return blocklistCache;
+};
+
+/** Hide events that involve a blocked address or domain (Twenty's blocklist rule, `isEmailBlocklisted`). */
+const hasBlockedGuest = (guestHandles: string[], blocklist: string[]): boolean =>
+  blocklist.length > 0 && guestHandles.some((handle) => isEmailBlocklisted([], handle, blocklist));
+
 const GUEST_BATCH_SIZE = 100;
 
 /** Contacts whose email equals one of the handles (case-insensitive). */
@@ -756,9 +803,15 @@ export const calendarEventApi = {
     if (error) throw error;
 
     const result = data as TimelineCalendarEventsWithTotal;
+    const blocklist = await loadBlocklist();
+    const pageEvents = result.timelineCalendarEvents ?? [];
+    const visibleEvents = pageEvents.filter(
+      (event: TimelineCalendarEvent) => !hasBlockedGuest((event.participants ?? []).map((p) => p.handle ?? ''), blocklist)
+    );
     return {
-      totalNumberOfCalendarEvents: Number(result.totalNumberOfCalendarEvents ?? 0),
-      timelineCalendarEvents: (result.timelineCalendarEvents ?? []).map((event: TimelineCalendarEvent) => ({
+      // events hidden by the blocklist don't count either
+      totalNumberOfCalendarEvents: Math.max(0, Number(result.totalNumberOfCalendarEvents ?? 0) - (pageEvents.length - visibleEvents.length)),
+      timelineCalendarEvents: visibleEvents.map((event: TimelineCalendarEvent) => ({
         ...event,
         title: event.title ?? undefined,
         endsAt: event.endsAt ?? undefined,
@@ -774,13 +827,13 @@ export const calendarEventApi = {
     const { data: event, error } = await supabase
       .from('calendar_events')
       .insert({
-        title: input.title,
-        description: input.description || null,
-        location: input.location || null,
+        title: cleanText(input.title),
+        description: input.description ? cleanText(input.description) : null,
+        location: input.location ? cleanText(input.location) : null,
         start_date: toStorageInstant(input.startsAt, input.isFullDay),
         end_date: toStorageInstant(input.endsAt, input.isFullDay),
         is_all_day: input.isFullDay,
-        time_zone: input.timeZone,
+        time_zone: resolveCalendarEventTimeZone(input.timeZone),
         visibility: input.visibility,
         conference_link: input.conferenceLink || null
       })
@@ -846,7 +899,9 @@ export const calendarEventApi = {
       list.push({ firstName: '', lastName: '', displayName: g.display_name || g.handle, handle: g.handle, personId: g.contact_id ?? undefined });
       byEvent.set(g.calendar_event_id, list);
     }
-    return events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
+    const withGuests = events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
+    const blocklist = await loadBlocklist();
+    return withGuests.filter((e) => !hasBlockedGuest((e.participants ?? []).map((p) => p.handle ?? ''), blocklist));
   },
 
   /** Link an existing event to a record (contact, deal or task). Linking twice is harmless. */
@@ -917,11 +972,11 @@ export const calendarEventApi = {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (updates.startDate) patch.start_date = updates.startDate.toISOString();
     if (updates.endDate) patch.end_date = updates.endDate.toISOString();
-    if (updates.title !== undefined) patch.title = updates.title;
-    if (updates.location !== undefined) patch.location = updates.location || null;
-    if (updates.description !== undefined) patch.description = updates.description || null;
+    if (updates.title !== undefined) patch.title = cleanText(updates.title);
+    if (updates.location !== undefined) patch.location = updates.location ? cleanText(updates.location) : null;
+    if (updates.description !== undefined) patch.description = updates.description ? cleanText(updates.description) : null;
     if (updates.isAllDay !== undefined) patch.is_all_day = updates.isAllDay;
-    if (updates.timeZone !== undefined) patch.time_zone = updates.timeZone;
+    if (updates.timeZone !== undefined) patch.time_zone = resolveCalendarEventTimeZone(updates.timeZone);
     if (updates.visibility !== undefined) patch.visibility = updates.visibility;
     if (updates.position !== undefined) patch.position = updates.position;
     if (updates.conferenceLink !== undefined) patch.conference_link = updates.conferenceLink || null;

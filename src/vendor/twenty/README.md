@@ -36,3 +36,29 @@ Twenty's drag layer (@dnd-kit) cannot run inside react-big-calendar, so react-bi
 `isDefined`, `ArraySortDirection` and their upstream tests (from `object-record/utils` and `twenty-shared`).
 Glue that is ours: `src/components/calendar/dayOrder.ts` (feeds the upstream function from this app's records and applies the
 drop-index rules of upstream `useProcessCalendarCardDrop`) and the `DayRecordsDialog` list.
+
+## `calendar-sync/` - the calendar import manager's pure helpers (copied unchanged except for import paths)
+From `twenty-server/.../calendar` and `blocklist`, plus the `twenty-shared` date helpers they use, with their upstream specs
+(converted from jest to vitest imports): `is-valid-time-zone`, `resolve-calendar-event-time-zone`, `getValidTimeZoneOrUndefined`,
+`parseToInstantOrThrow` (+ `dateInputFormats`, `turnJSDateToPlainDate`), `is-email-blocklisted` (+ `get-domain-from-email`),
+`filter-out-blocklisted-events`, `filter-events-and-return-events-to-remove`, `sanitizeCalendarEvent`, `is-event-in-time-range`,
+`fetched-calendar-event.type`, `isDefined`, `isNonEmptyArray`. `has-calendar-event-changed` is the same logic with its entity type
+spelled out (upstream has no test for it; the one here is ours).
+Used by the app: time zone checks (composer, `calendarEventApi`), text clean-up on save (`sanitizeCalendarEvent`), and the
+**blocklist** (`calendar_blocklist` table, Calendar Settings card, hides events with a blocked guest from the calendar and timelines).
+Not wired: `is-event-in-time-range`, `filter-events-and-return-events-to-remove`, `has-calendar-event-changed`,
+`parseToInstantOrThrow` (kept because they are portable and tested; they would serve a file or feed import).
+
+## `record-calendar/card/` - card constants and ids (copied unchanged except for import paths)
+`RecordCalendarVisibleRecordLimit`, `...CardDndType`, `...DayCollisionPriority`, `...ClickOutsideListenerId`, the three card constants,
+`getRecordCalendarCardDraggableId`, `getRecordCalendarCardInstanceIdPrefix` and the upstream test. Not used yet:
+react-big-calendar decides how many cards fit a day and has its own drag ids.
+
+## Audited and NOT ported (and why)
+- **Import/sync engine** (`build-calendar-event-save-operations`, `compute-calendar-event-channel-role`, `resolve-calendar-event-sharing`,
+  `compute-calendar-event-sharing-key`, `build-calendar-event-participant-save-operations`, channel/account types): written around Twenty's
+  connected accounts and calendar channels; without them there is nothing to feed them.
+- **Provider code** (Google, Microsoft, CalDAV drivers, `to-*-event-input`, error parsers, CalDAV/iCal parsing which needs `node-ical`).
+- **React/jotai/Apollo/Linaria components and hooks** of `record-calendar` and `activities/calendar`: their logic is re-built in this app's
+  design (see the "Not verbatim" section); their tests need Twenty's state and GraphQL layers.
+- `isCalendarCreationEnabledForAccount`, `useOpenCalendarEventTargetsPicker` and similar: depend on connected accounts or Twenty's metadata.

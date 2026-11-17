@@ -18,10 +18,10 @@ vi.mock('../lib/supabase', () => {
         rows.guestQueries.push(list);
         return q;
       },
-      order: () => Promise.resolve({ data: rows.events, error: null })
+      order: () => Promise.resolve({ data: table === 'calendar_blocklist' ? [] : rows.events, error: null })
     };
     q.then = (res: (v: unknown) => unknown) =>
-      Promise.resolve({ data: table === 'calendar_events' ? rows.events : rows.guests.filter((g) => ids.includes(g.calendar_event_id)), error: null }).then(res);
+      Promise.resolve({ data: table === 'calendar_events' ? rows.events : table === 'calendar_blocklist' ? [] : rows.guests.filter((g) => ids.includes(g.calendar_event_id)), error: null }).then(res);
     return q;
   };
   return { supabase: { from: (table: string) => chain(table) } };

@@ -68,7 +68,7 @@ import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
 import { CalendarEventComposerModal } from './calendar/CalendarEventComposerModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
-import { CALENDAR_PREFERENCES_CHANGED } from '../lib/calendarPreferences';
+import { CALENDAR_PREFERENCES_CHANGED, CALENDAR_BLOCKLIST_CHANGED } from '../lib/calendarPreferences';
 
 const localizer = momentLocalizer(moment);
 
@@ -354,10 +354,14 @@ export const BigTaskCalendar: React.FC = () => {
   const [weekStartsOn, setWeekStartsOn] = useState(readWeekStartsOn);
   useEffect(() => {
     const refresh = () => setWeekStartsOn(readWeekStartsOn());
+    // the blocklist decides which events are returned, so a change means reloading them
+    const reloadEvents = () => void useTaskStore.getState().reloadCalendarEvents();
     window.addEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+    window.addEventListener(CALENDAR_BLOCKLIST_CHANGED, reloadEvents);
     window.addEventListener('storage', refresh);
     return () => {
       window.removeEventListener(CALENDAR_PREFERENCES_CHANGED, refresh);
+      window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reloadEvents);
       window.removeEventListener('storage', refresh);
     };
   }, []);

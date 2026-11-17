@@ -58,13 +58,13 @@ The **Delete mock data** button (top right) deletes only records flagged `is_sam
 - Flag your existing demo rows once with `scripts/mark-sample-data.sql`: read each statement, run its `select` first, adjust the condition to your demo data, then run the `update`.
 - Until rows are flagged the dialog shows "No Sample Data Found".
 
-## Migrations to apply (`supabase db push` applies all 25 in order)
+## Migrations to apply (`supabase db push` applies all 26 in order)
 New since the first release: `20251231000000_calendar_access_matches_app`, `20260101000000_is_sample_flag`,
 `20260102000000_record_position`, `20260103000000_favorites`, `20260104000000_record_views`, `20260105000000_attachments`
-(creates the private `attachments` Storage bucket; Storage must be enabled in the project), and `20260106000000_realtime_calendar_tables` (live calendar updates; Realtime must be enabled in the project, otherwise the calendar still works and refreshes on navigation).
+(creates the private `attachments` Storage bucket; Storage must be enabled in the project), and `20260106000000_realtime_calendar_tables` (live calendar updates; Realtime must be enabled in the project, otherwise the calendar still works and refreshes on navigation) and `20260107000000_calendar_blocklist` (Calendar Settings blocklist).
 
 ## Deploy checklist
-1. `supabase db push` (check the 25 migrations are listed), then `supabase functions deploy`.
+1. `supabase db push` (check the 26 migrations are listed), then `supabase functions deploy`.
 2. `supabase secrets set OPENAI_API_KEY=...` (and optionally `OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`).
 3. Netlify env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (+ `VITE_HOST_ORIGIN` if embedded); deploy.
 4. Smoke test with the live key: score and enrich a contact, draft an email, generate an avatar (file appears in `avatars`),
