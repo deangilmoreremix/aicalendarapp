@@ -10,9 +10,6 @@
 import { computeNewPositionOfDraggedRecord } from '../../vendor/twenty/record-calendar/position/computeNewPositionOfDraggedRecord';
 import type { UnifiedCalendarRecord } from './unifiedCalendarRecords';
 
-const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-
 /** Order used everywhere a day's records are listed: saved position first, then time, then title. */
 export const compareWithinDay = (a: UnifiedCalendarRecord, b: UnifiedCalendarRecord) =>
   (a.position ?? 0) - (b.position ?? 0) || +a.start - +b.start || a.title.localeCompare(b.title);
