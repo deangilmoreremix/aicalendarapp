@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { Contact } from '../types';
-import { contactApi } from '../services/api';
+import { contactApi, calendarEventApi } from '../services/api';
+
+/** Guests with this contact's email become the contact (best effort; never blocks saving the contact). */
+const linkGuests = async (contact: Contact) => {
+  try {
+    await calendarEventApi.linkGuestsToContact(contact);
+  } catch (error) {
+    console.error('Failed to link calendar guests to the contact:', error);
+  }
+};
 
 interface ContactState {
   contacts: Record<string, Contact>;
@@ -36,6 +45,7 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, [newContact.id]: newContact },
         isLoading: false,
       }));
+      void linkGuests(newContact);
     } catch (error) {
       console.error('Failed to create contact:', error);
       set({ error: 'Failed to create contact', isLoading: false });
@@ -50,6 +60,7 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, [id]: updatedContact },
         isLoading: false,
       }));
+      if (contactData.email !== undefined) void linkGuests(updatedContact);
     } catch (error) {
       console.error('Failed to update contact:', error);
       set({ error: 'Failed to update contact', isLoading: false });

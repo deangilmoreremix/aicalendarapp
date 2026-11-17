@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyRecordFilters,
   buildUnifiedRecords,
+  canRescheduleRecord,
   getDayOffset,
   getDropUpdates,
   getShiftedRecordUpdates,
@@ -131,6 +132,26 @@ describe('buildUnifiedRecords', () => {
     });
     expect(timed.allDay).toBe(false);
     expect(allDay.allDay).toBe(true);
+  });
+
+  it('places records by the extra date fields (completed, created, last updated) and does not let them be dragged', () => {
+    const created = new Date(2030, 4, 6, 10);
+    const done = new Date(2030, 4, 9, 15);
+    const updated = new Date(2030, 4, 12, 8);
+    const done1 = task({ id: 'a', createdAt: created, completedAt: done, status: 'completed', completed: true });
+    const open1 = task({ id: 'b', createdAt: created });
+    const fields = (t: 'createdAt' | 'completedAt') => buildUnifiedRecords({ tasks: [done1, open1], deals: [], contacts: [], events: [], fieldByType: { task: t } });
+    expect(fields('completedAt').map((r) => [r.id, r.start.getDate()])).toEqual([['a', 9]]); // not completed -> not shown
+    expect(fields('createdAt').map((r) => r.start.getDate())).toEqual([6, 6]);
+    const deal = { id: 'd', company: 'Acme', stage: 'lead', value: '1', createdAt: created, updatedAt: updated } as any;
+    const contact = { id: 'c', name: 'Ada', createdAt: created, updatedAt: updated } as any;
+    const placed = buildUnifiedRecords({ tasks: [], deals: [deal], contacts: [contact], events: [], fieldByType: { deal: 'updatedAt', contact: 'updatedAt' } });
+    expect(placed.map((r) => r.start.getDate())).toEqual([12, 12]);
+    for (const type of ['task', 'deal', 'contact'] as const) {
+      expect(canRescheduleRecord({ type }, { [type]: 'updatedAt' })).toBe(false);
+      expect(canRescheduleRecord({ type }, { [type]: 'completedAt' })).toBe(false);
+    }
+    expect(canRescheduleRecord({ type: 'task' }, { task: 'dueDate' })).toBe(true);
   });
 
   it('places a time-blocked task by the selected date field', () => {

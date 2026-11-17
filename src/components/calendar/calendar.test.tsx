@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-const { getTimeline, create, getSettings, update } = vi.hoisted(() => ({
+const { getTimeline, create, getSettings, update, searchLinkable, linkToRecord } = vi.hoisted(() => ({
+  searchLinkable: vi.fn(),
+  linkToRecord: vi.fn(),
   update: vi.fn(),
   getTimeline: vi.fn(),
   create: vi.fn(),
@@ -10,7 +12,7 @@ const { getTimeline, create, getSettings, update } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/api', () => ({
-  calendarEventApi: { getTimeline, create, getSettings, update },
+  calendarEventApi: { getTimeline, create, getSettings, update, searchLinkable, linkToRecord },
   activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   attachmentApi: { list: () => Promise.resolve([]), upload: vi.fn(), remove: vi.fn(), getDownloadUrl: vi.fn() },
   MAX_ATTACHMENT_BYTES: 25 * 1024 * 1024
@@ -114,6 +116,34 @@ describe('CalendarEventsCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
     await waitFor(() => expect(reload).toHaveBeenCalled());
     useTaskStore.setState({ reloadCalendarEvents: original });
+  });
+
+  it('links an existing event to the record from the Link event dialog', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    searchLinkable.mockResolvedValue([{ id: 'e7', title: 'Old kickoff', startDate: new Date(2031, 0, 5, 10), endDate: new Date(2031, 0, 5, 11), isAllDay: false }]);
+    linkToRecord.mockResolvedValue(undefined);
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /link event/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Link Old kickoff' }));
+    await waitFor(() => expect(linkToRecord).toHaveBeenCalledWith('e7', { type: 'contact', id: 'c1' }));
+    expect(searchLinkable).toHaveBeenCalledWith({ type: 'contact', id: 'c1' }, '');
+    await waitFor(() => expect(getTimeline).toHaveBeenCalled()); // the card reloads to show the linked event
+    await waitFor(() => expect(screen.queryByLabelText('Search events')).toBeNull()); // dialog closed
+  });
+
+  it('shows an empty list and errors in the Link event dialog', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    searchLinkable.mockResolvedValueOnce([]);
+    render(<CalendarEventsCard targetType="deal" targetId="d1" objectName="deal" />);
+    await screen.findByText('No Events');
+    fireEvent.click(screen.getByRole('button', { name: /link event/i }));
+    expect(await screen.findByText('No events to link.')).toBeInTheDocument();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    searchLinkable.mockRejectedValueOnce(new Error('down'));
+    fireEvent.change(screen.getByLabelText('Search events'), { target: { value: 'x' } });
+    expect(await screen.findByText('Could not load events.')).toBeInTheDocument();
   });
 
   it('shows the empty state with the object name', async () => {

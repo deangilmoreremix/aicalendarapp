@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Calendar follow-ups (branch `claude/calendar-link-match-realtime`)
+- **Link an existing event** to a contact or deal from its Calendar card (`calendar_event_targets`, duplicates ignored).
+- **Guests matched to contacts by email** (case-insensitive): a new event links matching guests to the contact and the event to that contact; when a contact is created or its email changes, existing guests with that email are linked too. Ours (glue): Twenty's matcher runs inside its workspace-schema server code and is not portable.
+- **Live updates** through Supabase Realtime for events, tasks, deals and contacts (migration `20260106000000_realtime_calendar_tables.sql` adds them to the `supabase_realtime` publication; skipped on plain Postgres).
+- **More date fields**: tasks by Completed / Created, deals and contacts by Last updated. Records placed by a system date (created / updated / completed) can't be dragged.
+
 ### OpenAI Responses API migration
 - All AI runs through the OpenAI Responses API (`gpt-6-astra`) via a shared Supabase Edge Function helper: strict JSON schemas, `web_search` for contact enrichment and research (with sources), real SSE streaming (`ai_stream`), GPT Image 2.6 avatars stored in Supabase Storage.
 - Removed non-stack services (Gemini copy, `googleapis`, Pexels/ui-avatars hotlinks, mock Google/Microsoft OAuth).

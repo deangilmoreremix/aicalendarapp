@@ -4,6 +4,7 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
+import { contactTargetsForGuests, escapeIlike, matchGuestsToContacts, normalizeHandle } from '../lib/calendar/matchGuests';
 import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent, CalendarEventParticipant } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
@@ -711,6 +712,32 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
 };
 
 const GUEST_BATCH_SIZE = 100;
+
+/** Contacts whose email equals one of the handles (case-insensitive). */
+const findContactsByEmails = async (handles: string[]): Promise<{ id: string; email: string }[]> => {
+  const emails = [...new Set(handles.map(normalizeHandle).filter(Boolean))];
+  if (emails.length === 0) return [];
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('id, email')
+    .or(emails.map((e) => `email.ilike.${escapeIlike(e)}`).join(','));
+  if (error) throw error;
+  return (data ?? []) as { id: string; email: string }[];
+};
+
+const matchAttendeesToContacts = async <A extends { handle: string; contactId?: string }>(attendees: A[]): Promise<A[]> => {
+  const unmatched = attendees.filter((a) => !a.contactId).map((a) => a.handle);
+  if (unmatched.length === 0) return attendees;
+  try {
+    return matchGuestsToContacts(attendees, await findContactsByEmails(unmatched));
+  } catch (error) {
+    // matching is a convenience: never block saving the event because the lookup failed
+    console.error('Failed to match guests to contacts:', error);
+    return attendees;
+  }
+};
+
+const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
 
 export const calendarEventApi = {
@@ -763,9 +790,13 @@ export const calendarEventApi = {
 
     const eventId = event.id as string;
 
-    if (input.attendees.length > 0) {
+    // guests whose email is a contact's email are linked to that contact, and the event is linked to the contact too
+    const attendees = await matchAttendeesToContacts(input.attendees);
+    const targets = [...input.targets, ...contactTargetsForGuests(attendees, input.targets)];
+
+    if (attendees.length > 0) {
       const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
-        input.attendees.map(a => ({
+        attendees.map(a => ({
           calendar_event_id: eventId,
           handle: a.handle,
           display_name: a.displayName ?? '',
@@ -775,9 +806,9 @@ export const calendarEventApi = {
       if (participantsError) throw participantsError;
     }
 
-    if (input.targets.length > 0) {
+    if (targets.length > 0) {
       const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
-        input.targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
+        targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
       );
       if (targetsError) throw targetsError;
     }
@@ -816,6 +847,70 @@ export const calendarEventApi = {
       byEvent.set(g.calendar_event_id, list);
     }
     return events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
+  },
+
+  /** Link an existing event to a record (contact, deal or task). Linking twice is harmless. */
+  async linkToRecord(eventId: string, target: { type: CalendarTargetType; id: string }): Promise<void> {
+    const { error } = await supabase
+      .from('calendar_event_targets')
+      .upsert({ calendar_event_id: eventId, target_type: target.type, target_id: target.id }, { onConflict: TARGET_CONFLICT, ignoreDuplicates: true });
+    if (error) throw error;
+  },
+
+  async unlinkFromRecord(eventId: string, target: { type: CalendarTargetType; id: string }): Promise<void> {
+    const { error } = await supabase
+      .from('calendar_event_targets')
+      .delete()
+      .eq('calendar_event_id', eventId)
+      .eq('target_type', target.type)
+      .eq('target_id', target.id);
+    if (error) throw error;
+  },
+
+  /** Recent events (newest first) that are not yet linked to this record, optionally filtered by title. */
+  async searchLinkable(target: { type: CalendarTargetType; id: string }, search = '', limit = 20): Promise<CalendarEvent[]> {
+    let query = supabase.from('calendar_events').select('*').order('start_date', { ascending: false }).limit(limit * 3);
+    const term = search.trim();
+    if (term) query = query.ilike('title', `%${escapeIlike(term)}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    const events = (data ?? []).map(mapCalendarEventFromDB);
+    if (events.length === 0) return [];
+    const { data: linked, error: linkedError } = await supabase
+      .from('calendar_event_targets')
+      .select('calendar_event_id')
+      .eq('target_type', target.type)
+      .eq('target_id', target.id)
+      .in('calendar_event_id', events.map((e) => e.id));
+    if (linkedError) throw linkedError;
+    const linkedIds = new Set((linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id));
+    return events.filter((e) => !linkedIds.has(e.id)).slice(0, limit);
+  },
+
+  /**
+   * A contact was created or its email changed: guests with that email become that contact, and their events are
+   * linked to the contact. Returns how many events were linked.
+   */
+  async linkGuestsToContact(contact: { id: string; email?: string | null }): Promise<number> {
+    const email = contact.email ? normalizeHandle(contact.email) : '';
+    if (!email) return 0;
+    const { data, error } = await supabase
+      .from('calendar_event_participants')
+      .update({ contact_id: contact.id })
+      .ilike('handle', escapeIlike(email))
+      .is('contact_id', null)
+      .select('calendar_event_id');
+    if (error) throw error;
+    const eventIds = [...new Set((data ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id))];
+    if (eventIds.length === 0) return 0;
+    const { error: targetsError } = await supabase
+      .from('calendar_event_targets')
+      .upsert(
+        eventIds.map((id) => ({ calendar_event_id: id, target_type: 'contact', target_id: contact.id })),
+        { onConflict: TARGET_CONFLICT, ignoreDuplicates: true }
+      );
+    if (targetsError) throw targetsError;
+    return eventIds.length;
   },
 
   async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {
