@@ -65,7 +65,6 @@ export const CalendarSettings: React.FC = () => {
 
   useEffect(() => {
     void loadBlocked();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addBlocked = async () => {
