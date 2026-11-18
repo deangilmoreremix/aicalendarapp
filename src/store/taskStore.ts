@@ -127,16 +127,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const currentTask = get().tasks[id];
     if (!currentTask) return;
 
-    const updatedTask: Task = {
-      ...currentTask,
+    // saved like any other change (optimistic, rolled back if saving fails): a local-only change would be lost
+    // the next time the tasks are refreshed from the database
+    void get().rescheduleTask(id, {
       completed,
       status: completed ? 'completed' : 'pending',
-      completedAt: completed ? new Date() : undefined,
-    };
-
-    set((state) => ({
-      tasks: { ...state.tasks, [id]: updatedTask },
-    }));
+      completedAt: completed ? new Date() : null,
+    });
   },
 
   selectTask: (id) => {

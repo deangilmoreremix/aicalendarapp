@@ -11,3 +11,15 @@ alter table public.calendar_blocklist enable row level security;
 drop policy if exists "open_all_calendar_blocklist" on public.calendar_blocklist;
 create policy "open_all_calendar_blocklist" on public.calendar_blocklist
   for all to anon, authenticated using (true) with check (true);
+
+-- Let open calendars hear about blocklist changes made elsewhere (same guarded publication step as the other calendar tables).
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'calendar_blocklist'
+     ) then
+    alter publication supabase_realtime add table public.calendar_blocklist;
+  end if;
+end $$;

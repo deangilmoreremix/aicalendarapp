@@ -6,6 +6,7 @@ const rt = vi.hoisted(() => ({
   channel: null as any,
   removeChannel: vi.fn(),
   reloadEvents: vi.fn(async () => {}),
+  invalidate: vi.fn(),
   taskGetAll: vi.fn(async () => [{ id: 't1', title: 'Fresh task' }]),
   dealGetAll: vi.fn(async () => []),
   contactGetAll: vi.fn(async () => [])
@@ -28,6 +29,7 @@ vi.mock('../lib/supabase', () => ({
   }
 }));
 vi.mock('../services/api', () => ({
+  invalidateBlocklistCache: rt.invalidate,
   taskApi: { getAll: rt.taskGetAll },
   dealApi: { getAll: rt.dealGetAll },
   contactApi: { getAll: rt.contactGetAll }
@@ -70,5 +72,36 @@ describe('useCalendarRealtime', () => {
     const { unmount } = renderHook(() => useCalendarRealtime());
     unmount();
     expect(rt.removeChannel).toHaveBeenCalled();
+  });
+
+  it('a blocklist change drops the cached list and reloads the events', async () => {
+    rt.invalidate.mockClear();
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.calendar_blocklist();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    expect(rt.invalidate).toHaveBeenCalledTimes(1);
+    expect(rt.reloadEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('never runs two refreshes of one table at once: a change during a refresh gets one more refresh after it', async () => {
+    let finishFirst!: () => void;
+    let calls = 0;
+    rt.taskGetAll.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) await new Promise<void>((r) => (finishFirst = r));
+      return [{ id: 't1', title: `fetch ${calls}` }];
+    });
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    expect(calls).toBe(1); // first fetch is slow and still running
+    rt.handlers.tasks(); // another change arrives meanwhile
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    expect(calls).toBe(1); // not started in parallel
+    finishFirst();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(calls).toBe(2); // one follow-up refresh, after the first finished
+    expect(useTaskStore.getState().tasks.t1.title).toBe('fetch 2'); // the newest data wins
+    rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'Fresh task' }]);
   });
 });

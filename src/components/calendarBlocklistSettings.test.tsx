@@ -50,4 +50,53 @@ describe('CalendarSettings: blocklist', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Block' }));
     expect(await screen.findByText('Could not add it to the blocklist.')).toBeInTheDocument();
   });
+
+  it('says so when the list cannot be loaded (not "Nothing is blocked") and offers a retry', async () => {
+    api.getAll.mockRejectedValueOnce(new Error('down'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<CalendarSettings />);
+    expect(await screen.findByText(/Could not load the blocklist/)).toBeInTheDocument();
+    expect(screen.queryByText('Nothing is blocked.')).toBeNull();
+    api.getAll.mockResolvedValueOnce([{ id: 'b1', handle: '@evil.com' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('@evil.com')).toBeInTheDocument();
+  });
+
+  it('tells open calendars about a successful add even when refreshing the list afterwards fails', async () => {
+    api.getAll.mockResolvedValueOnce([]);
+    api.add.mockResolvedValue(undefined);
+    const heard = vi.fn();
+    window.addEventListener('calendar-blocklist:changed', heard);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<CalendarSettings />);
+    await screen.findByText('Nothing is blocked.');
+    api.getAll.mockRejectedValueOnce(new Error('down'));
+    fireEvent.change(screen.getByLabelText('Address or domain to block'), { target: { value: 'a@b.io' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Block' }));
+    await waitFor(() => expect(heard).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Could not add it to the blocklist.')).toBeNull(); // the add itself worked
+    window.removeEventListener('calendar-blocklist:changed', heard);
+  });
+
+  it('an older, slower list read cannot bring back an entry that was just removed', async () => {
+    api.getAll.mockResolvedValueOnce([{ id: 'b1', handle: '@evil.com' }]);
+    api.remove.mockResolvedValue(undefined);
+    api.add.mockResolvedValue(undefined);
+    render(<CalendarSettings />);
+    await screen.findByText('@evil.com');
+    // an add starts a refresh that stays slow...
+    let slowRead!: (v: unknown) => void;
+    api.getAll.mockReturnValueOnce(new Promise((r) => (slowRead = r)));
+    fireEvent.change(screen.getByLabelText('Address or domain to block'), { target: { value: 'x@y.io' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Block' }));
+    await waitFor(() => expect(api.add).toHaveBeenCalled());
+    await waitFor(() => expect(api.getAll).toHaveBeenCalledTimes(2));
+    // ...the entry is removed meanwhile...
+    fireEvent.click(screen.getByRole('button', { name: 'Unblock @evil.com' }));
+    await waitFor(() => expect(screen.queryByText('@evil.com')).toBeNull());
+    // ...and then the old read finishes, still listing it
+    slowRead([{ id: 'b1', handle: '@evil.com' }, { id: 'b2', handle: 'x@y.io' }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText('@evil.com')).toBeNull();
+  });
 });

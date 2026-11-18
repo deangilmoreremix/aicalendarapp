@@ -47,13 +47,20 @@ describe('linking events to records', () => {
     expect(callsOf('calendar_event_targets', 'eq').map((c) => c.args)).toEqual([['calendar_event_id', 'e1'], ['target_type', 'deal'], ['target_id', 'd1']]);
   });
 
-  it('lists recent events that are not yet linked to the record', async () => {
+  it('lists recent events that are not yet linked to the record, excluding the linked ones in the query itself', async () => {
     const row = (id: string) => ({ id, title: id, start_date: '2031-01-05T10:00:00Z', end_date: '2031-01-05T11:00:00Z', is_all_day: false });
-    fake.results.calendar_events = { data: [row('a'), row('b'), row('c')], error: null };
-    fake.results.calendar_event_targets = { data: [{ calendar_event_id: 'b' }], error: null };
-    const events = await calendarEventApi.searchLinkable({ type: 'contact', id: 'c1' }, 'kick_off');
+    fake.results.calendar_event_targets = { data: [{ calendar_event_id: 'b' }, { calendar_event_id: 'x' }], error: null };
+    fake.results.calendar_events = { data: [row('a'), row('c')], error: null };
+    const events = await calendarEventApi.searchLinkable({ type: 'contact', id: 'c1' }, 'kick_off', 20);
     expect(events.map((e) => e.id)).toEqual(['a', 'c']);
+    expect(callsOf('calendar_events', 'not')[0].args).toEqual(['id', 'in', '(b,x)']); // before the limit, not after
+    expect(callsOf('calendar_events', 'limit')[0].args).toEqual([20]);
     expect(callsOf('calendar_events', 'ilike')[0].args).toEqual(['title', '%kick\\_off%']); // wildcard escaped
+    // nothing linked yet: no exclusion at all
+    fake.calls = [];
+    fake.results.calendar_event_targets = { data: [], error: null };
+    await calendarEventApi.searchLinkable({ type: 'deal', id: 'd1' });
+    expect(callsOf('calendar_events', 'not')).toHaveLength(0);
   });
 });
 
@@ -69,6 +76,13 @@ describe('matching guests to contacts', () => {
       { calendar_event_id: 'e1', target_type: 'contact', target_id: 'c1' },
       { calendar_event_id: 'e2', target_type: 'contact', target_id: 'c1' }
     ]);
+  });
+
+  it('links the events first and the guests second, so a failure never leaves it half done', async () => {
+    fake.results.calendar_event_participants = { data: [{ calendar_event_id: 'e1' }], error: null };
+    await calendarEventApi.linkGuestsToContact({ id: 'c1', email: 'ada@example.com' });
+    const order = fake.calls.map((c) => `${c.table}.${c.method}`).filter((m) => /select|upsert|update/.test(m) && !m.endsWith('.ilike'));
+    expect(order).toEqual(['calendar_event_participants.select', 'calendar_event_targets.upsert', 'calendar_event_participants.update']);
   });
 
   it('does nothing for a contact without an email', async () => {
@@ -100,6 +114,17 @@ describe('matching guests to contacts', () => {
       { calendar_event_id: 'e9', target_type: 'deal', target_id: 'd1' },
       { calendar_event_id: 'e9', target_type: 'contact', target_id: 'c1' }
     ]);
+  });
+
+  it('undoes the event when its guests or links cannot be saved (nothing half saved)', async () => {
+    fake.results.calendar_events = { data: { id: 'e9' }, error: null };
+    fake.results.calendar_event_targets = { data: null, error: new Error('links down') };
+    await expect(
+      calendarEventApi.create({ title: 't', startsAt: '2031-01-05T10:00:00Z', endsAt: '2031-01-05T11:00:00Z', isFullDay: false, timeZone: 'UTC', visibility: 'SHARE_EVERYTHING', attendees: [], targets: [{ type: 'deal', id: 'd1' }] } as any)
+    ).rejects.toThrow('links down');
+    const deleted = fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'delete');
+    expect(deleted).toHaveLength(1);
+    expect(fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'eq').map((c) => c.args)).toContainEqual(['id', 'e9']);
   });
 
   it('still saves the event when the contact lookup fails', async () => {

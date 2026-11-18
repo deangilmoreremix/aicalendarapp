@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const fake = vi.hoisted(() => ({
   calls: [] as { table: string; method: string; args: unknown[] }[],
   results: {} as Record<string, { data: unknown; error: unknown }>,
+  hold: undefined as Promise<void> | undefined, // makes reads wait, to stage a race
   rpc: { data: null as unknown, error: null as unknown }
 }));
 
@@ -12,7 +13,7 @@ vi.mock('../lib/supabase', () => {
       {},
       {
         get: (_t, method: string) => {
-          if (method === 'then') return (res: (v: unknown) => unknown) => Promise.resolve(fake.results[table] ?? { data: [], error: null }).then(res);
+          if (method === 'then') return (res: (v: unknown) => unknown) => Promise.resolve(table === 'calendar_blocklist' ? fake.hold : undefined).then(() => fake.results[table] ?? { data: [], error: null }).then(res);
           return (...args: unknown[]) => {
             fake.calls.push({ table, method, args });
             return q;
@@ -25,7 +26,7 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: builder, rpc: async () => fake.rpc } };
 });
 
-import { calendarEventApi, calendarBlocklistApi } from './api';
+import { calendarEventApi, calendarBlocklistApi, invalidateBlocklistCache, BLOCKLIST_CACHE_MS } from './api';
 
 const ev = (id: string) => ({ id, title: id, start_date: '2031-01-05T10:00:00Z', end_date: '2031-01-05T11:00:00Z', is_all_day: false });
 const range = () => calendarEventApi.getRange(new Date(2031, 0, 1), new Date(2031, 0, 31));
@@ -33,6 +34,7 @@ const range = () => calendarEventApi.getRange(new Date(2031, 0, 1), new Date(203
 beforeEach(() => {
   fake.calls = [];
   fake.results = {};
+  fake.hold = undefined;
   fake.rpc = { data: null, error: null };
 });
 
@@ -74,26 +76,86 @@ describe('calendar blocklist', () => {
     expect((await range()).map((e) => e.id)).toEqual(['a']);
   });
 
-  it('hides blocked events from a record timeline and lowers the total', async () => {
-    fake.results.calendar_blocklist = { data: [{ id: 'b1', handle: '@evil.com' }], error: null };
-    await calendarBlocklistApi.remove('none');
+  it('returns a record timeline as the database function gave it (it already leaves blocked events out before paging)', async () => {
     fake.rpc = {
       data: {
-        totalNumberOfCalendarEvents: 2,
+        totalNumberOfCalendarEvents: 11,
         timelineCalendarEvents: [
-          { id: 'a', title: 'ok', isFullDay: false, startsAt: '2031-01-05T10:00:00Z', participants: [{ handle: 'ada@good.com', displayName: 'Ada' }] },
-          { id: 'b', title: 'bad', isFullDay: false, startsAt: '2031-01-06T10:00:00Z', participants: [{ handle: 'bob@evil.com', displayName: 'Bob' }] }
+          { id: 'a', title: 'ok', isFullDay: false, startsAt: '2031-01-05T10:00:00Z', participants: [{ handle: 'ada@good.com', displayName: 'Ada' }] }
         ]
       },
       error: null
     };
     const result = await calendarEventApi.getTimeline('contact', 'c1');
     expect(result.timelineCalendarEvents.map((e) => e.id)).toEqual(['a']);
-    expect(result.totalNumberOfCalendarEvents).toBe(1);
+    expect(result.totalNumberOfCalendarEvents).toBe(11);
+  });
+
+  it('reuses the cached list for a short time, and a change here or a read that raced with it never leaves a stale list', async () => {
+    vi.useFakeTimers();
+    try {
+      fake.results.calendar_blocklist = { data: [{ id: 'b1', handle: '@evil.com' }], error: null };
+      fake.results.calendar_events = { data: [ev('a')], error: null };
+      fake.results.calendar_event_participants = { data: [{ calendar_event_id: 'a', handle: 'bob@evil.com', display_name: '', contact_id: null }], error: null };
+      invalidateBlocklistCache();
+      expect(await range()).toEqual([]); // blocked
+      const reads = () => fake.calls.filter((c) => c.table === 'calendar_blocklist' && c.method === 'select').length;
+      expect(reads()).toBe(1);
+      await range();
+      expect(reads()).toBe(1); // cached
+
+      // someone else unblocks the domain: after the cache lifetime the next load sees it
+      fake.results.calendar_blocklist = { data: [], error: null };
+      vi.advanceTimersByTime(BLOCKLIST_CACHE_MS + 1);
+      expect((await range()).map((e) => e.id)).toEqual(['a']);
+      expect(reads()).toBe(2);
+
+      // a Realtime change (or add/remove here) drops the cache straight away
+      fake.results.calendar_blocklist = { data: [{ id: 'b1', handle: '@evil.com' }], error: null };
+      invalidateBlocklistCache();
+      expect(await range()).toEqual([]);
+
+      // a read that started before a change and finished after it is used once but not kept
+      let release!: () => void;
+      fake.hold = new Promise<void>((r) => (release = r));
+      invalidateBlocklistCache();
+      const readsBefore = reads();
+      const slow = range();
+      await vi.waitFor(() => expect(reads()).toBe(readsBefore + 1)); // the blocklist read is now in flight (held)
+      invalidateBlocklistCache(); // a change lands while the read is in flight
+      release();
+      await slow;
+      fake.hold = undefined;
+      const before = reads();
+      await range();
+      expect(reads()).toBe(before + 1); // the raced read was not cached, so this one read again
+      await range();
+      expect(reads()).toBe(before + 1); // and an ordinary read is cached again
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
 describe('event text and time zone', () => {
+  it('removes every NUL and DEL character, not just the first', async () => {
+    fake.results.calendar_events = { data: { id: 'e1' }, error: null };
+    await calendarEventApi.create({
+      title: 'A\u0000B\u0000C\u007fD\u007f',
+      description: 'x\u0000\u0000y',
+      location: '',
+      startsAt: '2031-01-05T10:00:00Z',
+      endsAt: '2031-01-05T11:00:00Z',
+      isFullDay: false,
+      timeZone: 'UTC',
+      visibility: 'SHARE_EVERYTHING',
+      attendees: [],
+      targets: []
+    } as any);
+    const [insert] = fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'insert');
+    expect(insert.args[0]).toMatchObject({ title: 'ABCD', description: 'xy' });
+  });
+
   it('strips control characters and falls back to UTC when the time zone is empty', async () => {
     fake.results.calendar_events = { data: { id: 'e1' }, error: null };
     await calendarEventApi.create({

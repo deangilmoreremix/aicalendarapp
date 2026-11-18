@@ -7,16 +7,21 @@
 import { useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
-import { taskApi, dealApi, contactApi } from '../services/api';
+import { taskApi, dealApi, contactApi, invalidateBlocklistCache } from '../services/api';
 import { useTaskStore } from '../store/taskStore';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
 
-export const REALTIME_TABLES = ['calendar_events', 'tasks', 'deals', 'contacts'] as const;
+export const REALTIME_TABLES = ['calendar_events', 'calendar_blocklist', 'tasks', 'deals', 'contacts'] as const;
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
 
 const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
   calendar_events: () => useTaskStore.getState().reloadCalendarEvents(),
+  // the blocklist decides which events are returned: forget the cached list, then load the events again
+  calendar_blocklist: async () => {
+    invalidateBlocklistCache();
+    await useTaskStore.getState().reloadCalendarEvents();
+  },
   tasks: async () => {
     const tasks = await taskApi.getAll();
     useTaskStore.setState({ tasks: Object.fromEntries(tasks.map((t) => [t.id, t])) });
@@ -37,15 +42,33 @@ export const useCalendarRealtime = (enabled = true) => {
   useEffect(() => {
     if (!enabled) return;
     const pending = new Set<RealtimeTable>();
+    // one refresh per table at a time: a change that arrives meanwhile is remembered and refreshed once afterwards,
+    // so a slower, older fetch can never overwrite a newer one
+    const running = new Set<RealtimeTable>();
+    const again = new Set<RealtimeTable>();
     let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const refresh = async (table: RealtimeTable): Promise<void> => {
+      if (running.has(table)) {
+        again.add(table);
+        return;
+      }
+      running.add(table);
+      try {
+        await REFRESHERS[table]();
+      } catch (error) {
+        console.error(`Realtime refresh of ${table} failed:`, error);
+      } finally {
+        running.delete(table);
+        if (again.delete(table)) void refresh(table);
+      }
+    };
 
     const flush = () => {
       timer = undefined;
       const tables = [...pending];
       pending.clear();
-      for (const table of tables) {
-        REFRESHERS[table]().catch((error) => console.error(`Realtime refresh of ${table} failed:`, error));
-      }
+      for (const table of tables) void refresh(table);
     };
 
     const onChange = (table: RealtimeTable) => {

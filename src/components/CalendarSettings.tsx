@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Calendar, Settings, CheckCircle } from 'lucide-react';
@@ -42,14 +42,30 @@ export const CalendarSettings: React.FC = () => {
   const [visibility, setVisibility] = useState<CalendarChannelVisibility>(CalendarChannelVisibility.SHARE_EVERYTHING);
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<{ id: string; handle: string }[]>([]);
+  const [blockLoaded, setBlockLoaded] = useState(false);
+  const [blockLoadFailed, setBlockLoadFailed] = useState(false);
   const [blockInput, setBlockInput] = useState('');
   const [blockError, setBlockError] = useState<string | null>(null);
+  // only the newest list read may update the screen (an older, slower one must not bring back a removed entry)
+  const blockRequest = useRef(0);
+
+  const loadBlocked = async () => {
+    const request = ++blockRequest.current;
+    try {
+      const list = await calendarBlocklistApi.getAll();
+      if (request !== blockRequest.current) return;
+      setBlocked(list);
+      setBlockLoaded(true);
+      setBlockLoadFailed(false);
+    } catch (err) {
+      console.error('Could not load the calendar blocklist:', err);
+      if (request === blockRequest.current) setBlockLoadFailed(true);
+    }
+  };
 
   useEffect(() => {
-    calendarBlocklistApi
-      .getAll()
-      .then(setBlocked)
-      .catch((err) => console.error('Could not load the calendar blocklist:', err));
+    void loadBlocked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addBlocked = async () => {
@@ -58,25 +74,29 @@ export const CalendarSettings: React.FC = () => {
     setBlockError(null);
     try {
       await calendarBlocklistApi.add(handle);
-      setBlocked(await calendarBlocklistApi.getAll());
-      setBlockInput('');
-      window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
     } catch (err) {
       console.error('Could not add to the blocklist:', err);
       setBlockError('Could not add it to the blocklist.');
+      return;
     }
+    // the write succeeded: tell open calendars and clear the box; refreshing the list is a separate step that may fail
+    window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
+    setBlockInput('');
+    await loadBlocked();
   };
 
   const removeBlocked = async (id: string) => {
     setBlockError(null);
     try {
       await calendarBlocklistApi.remove(id);
-      setBlocked((list) => list.filter((entry) => entry.id !== id));
-      window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
     } catch (err) {
       console.error('Could not remove from the blocklist:', err);
       setBlockError('Could not remove it from the blocklist.');
+      return;
     }
+    blockRequest.current += 1; // reads that started before this removal are out of date now
+    setBlocked((list) => list.filter((entry) => entry.id !== id));
+    window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
   };
 
   useEffect(() => {
@@ -234,7 +254,16 @@ export const CalendarSettings: React.FC = () => {
             />
             <Button onClick={() => void addBlocked()}>Block</Button>
           </div>
-          {blocked.length === 0 ? (
+          {blockLoadFailed && !blockLoaded ? (
+            <p className="text-xs text-red-600">
+              Could not load the blocklist.{' '}
+              <button type="button" className="underline" onClick={() => void loadBlocked()}>
+                Try again
+              </button>
+            </p>
+          ) : !blockLoaded ? (
+            <p className="text-xs text-gray-500">Loading...</p>
+          ) : blocked.length === 0 ? (
             <p className="text-xs text-gray-500">Nothing is blocked.</p>
           ) : (
             <ul className="space-y-1">

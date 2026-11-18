@@ -715,7 +715,10 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
 };
 
 /** Strip the control characters Postgres rejects (Twenty's `sanitizeCalendarEvent`) from the free-text fields. */
-const cleanText = (value: string): string => sanitizeCalendarEvent({ value }, ['value']).value;
+// Twenty's sanitizer removes only the first NUL / DEL it meets (String.replace with a string); Postgres rejects any NUL,
+// so every occurrence is dropped here after it has run.
+const cleanText = (value: string): string =>
+  sanitizeCalendarEvent({ value }, ['value']).value.split('\u0000').join('').split('\u007f').join('');
 
 export const calendarBlocklistApi = {
   async getAll(): Promise<{ id: string; handle: string }[]> {
@@ -730,28 +733,40 @@ export const calendarBlocklistApi = {
     if (!value) return;
     const { error } = await supabase.from('calendar_blocklist').upsert({ handle: value }, { onConflict: 'handle', ignoreDuplicates: true });
     if (error) throw error;
-    blocklistCache = null;
+    invalidateBlocklistCache();
   },
 
   async remove(id: string): Promise<void> {
     const { error } = await supabase.from('calendar_blocklist').delete().eq('id', id);
     if (error) throw error;
-    blocklistCache = null;
+    invalidateBlocklistCache();
   }
 };
 
-let blocklistCache: string[] | null = null;
+/** The cached list is reused for this long, so changes made in another tab or by someone else show up soon. */
+export const BLOCKLIST_CACHE_MS = 30_000;
+let blocklistCache: { handles: string[]; at: number } | null = null;
+let blocklistGeneration = 0;
+
+/** Forget the cached list (after a change here or a Realtime change elsewhere). A read already in flight is dropped too. */
+export const invalidateBlocklistCache = () => {
+  blocklistGeneration += 1;
+  blocklistCache = null;
+};
 
 /** The blocked handles; a failed lookup means "nothing blocked" so the calendar still shows. */
 const loadBlocklist = async (): Promise<string[]> => {
-  if (blocklistCache) return blocklistCache;
+  if (blocklistCache && Date.now() - blocklistCache.at < BLOCKLIST_CACHE_MS) return blocklistCache.handles;
+  const generation = blocklistGeneration;
   try {
-    blocklistCache = (await calendarBlocklistApi.getAll()).map((entry) => entry.handle).filter(Boolean);
+    const handles = (await calendarBlocklistApi.getAll()).map((entry) => entry.handle).filter(Boolean);
+    // a change made while this read was in flight makes the result stale: use it once, but don't keep it
+    if (generation === blocklistGeneration) blocklistCache = { handles, at: Date.now() };
+    return handles;
   } catch (error) {
     console.error('Failed to load the calendar blocklist:', error);
     return [];
   }
-  return blocklistCache;
 };
 
 /** Hide events that involve a blocked address or domain (Twenty's blocklist rule, `isEmailBlocklisted`). */
@@ -802,16 +817,11 @@ export const calendarEventApi = {
     });
     if (error) throw error;
 
+    // events with a blocked guest are already left out (and not counted) by the function itself, before it paginates
     const result = data as TimelineCalendarEventsWithTotal;
-    const blocklist = await loadBlocklist();
-    const pageEvents = result.timelineCalendarEvents ?? [];
-    const visibleEvents = pageEvents.filter(
-      (event: TimelineCalendarEvent) => !hasBlockedGuest((event.participants ?? []).map((p) => p.handle ?? ''), blocklist)
-    );
     return {
-      // events hidden by the blocklist don't count either
-      totalNumberOfCalendarEvents: Math.max(0, Number(result.totalNumberOfCalendarEvents ?? 0) - (pageEvents.length - visibleEvents.length)),
-      timelineCalendarEvents: visibleEvents.map((event: TimelineCalendarEvent) => ({
+      totalNumberOfCalendarEvents: Number(result.totalNumberOfCalendarEvents ?? 0),
+      timelineCalendarEvents: (result.timelineCalendarEvents ?? []).map((event: TimelineCalendarEvent) => ({
         ...event,
         title: event.title ?? undefined,
         endsAt: event.endsAt ?? undefined,
@@ -847,23 +857,29 @@ export const calendarEventApi = {
     const attendees = await matchAttendeesToContacts(input.attendees);
     const targets = [...input.targets, ...contactTargetsForGuests(attendees, input.targets)];
 
-    if (attendees.length > 0) {
-      const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
-        attendees.map(a => ({
-          calendar_event_id: eventId,
-          handle: a.handle,
-          display_name: a.displayName ?? '',
-          contact_id: a.contactId ?? null
-        }))
-      );
-      if (participantsError) throw participantsError;
-    }
+    try {
+      if (attendees.length > 0) {
+        const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
+          attendees.map(a => ({
+            calendar_event_id: eventId,
+            handle: a.handle,
+            display_name: a.displayName ?? '',
+            contact_id: a.contactId ?? null
+          }))
+        );
+        if (participantsError) throw participantsError;
+      }
 
-    if (targets.length > 0) {
-      const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
-        targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
-      );
-      if (targetsError) throw targetsError;
+      if (targets.length > 0) {
+        const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
+          targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
+        );
+        if (targetsError) throw targetsError;
+      }
+    } catch (error) {
+      // the event, its guests and its links save together: undo the event (guests and links go with it) and report the failure
+      await supabase.from('calendar_events').delete().eq('id', eventId);
+      throw error;
     }
 
     return eventId;
@@ -924,22 +940,22 @@ export const calendarEventApi = {
 
   /** Recent events (newest first) that are not yet linked to this record, optionally filtered by title. */
   async searchLinkable(target: { type: CalendarTargetType; id: string }, search = '', limit = 20): Promise<CalendarEvent[]> {
-    let query = supabase.from('calendar_events').select('*').order('start_date', { ascending: false }).limit(limit * 3);
-    const term = search.trim();
-    if (term) query = query.ilike('title', `%${escapeIlike(term)}%`);
-    const { data, error } = await query;
-    if (error) throw error;
-    const events = (data ?? []).map(mapCalendarEventFromDB);
-    if (events.length === 0) return [];
+    // the events already linked to this record are excluded in the query itself, so the limit counts only linkable events
     const { data: linked, error: linkedError } = await supabase
       .from('calendar_event_targets')
       .select('calendar_event_id')
       .eq('target_type', target.type)
-      .eq('target_id', target.id)
-      .in('calendar_event_id', events.map((e) => e.id));
+      .eq('target_id', target.id);
     if (linkedError) throw linkedError;
-    const linkedIds = new Set((linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id));
-    return events.filter((e) => !linkedIds.has(e.id)).slice(0, limit);
+    const linkedIds = (linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id);
+
+    let query = supabase.from('calendar_events').select('*').order('start_date', { ascending: false }).limit(limit);
+    if (linkedIds.length > 0) query = query.not('id', 'in', `(${linkedIds.join(',')})`);
+    const term = search.trim();
+    if (term) query = query.ilike('title', `%${escapeIlike(term)}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapCalendarEventFromDB);
   },
 
   /**
@@ -949,12 +965,13 @@ export const calendarEventApi = {
   async linkGuestsToContact(contact: { id: string; email?: string | null }): Promise<number> {
     const email = contact.email ? normalizeHandle(contact.email) : '';
     if (!email) return 0;
+    // links first, guests second: if the second step fails nothing is half done (the guests are still unlinked, so
+    // running this again finishes the job and the first step is idempotent)
     const { data, error } = await supabase
       .from('calendar_event_participants')
-      .update({ contact_id: contact.id })
+      .select('calendar_event_id')
       .ilike('handle', escapeIlike(email))
-      .is('contact_id', null)
-      .select('calendar_event_id');
+      .is('contact_id', null);
     if (error) throw error;
     const eventIds = [...new Set((data ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id))];
     if (eventIds.length === 0) return 0;
@@ -965,6 +982,12 @@ export const calendarEventApi = {
         { onConflict: TARGET_CONFLICT, ignoreDuplicates: true }
       );
     if (targetsError) throw targetsError;
+    const { error: updateError } = await supabase
+      .from('calendar_event_participants')
+      .update({ contact_id: contact.id })
+      .ilike('handle', escapeIlike(email))
+      .is('contact_id', null);
+    if (updateError) throw updateError;
     return eventIds.length;
   },
 
