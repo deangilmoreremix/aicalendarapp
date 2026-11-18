@@ -7,7 +7,8 @@ const rt = vi.hoisted(() => ({
   removeChannel: vi.fn(),
   reloadEvents: vi.fn(async () => {}),
   invalidate: vi.fn(),
-  taskGetAll: vi.fn(async () => [{ id: 't1', title: 'Fresh task' }]),
+  taskGetAll: vi.fn(async (): Promise<any[]> => [{ id: 't1', title: 'Fresh task' }]),
+  taskUpdate: vi.fn(),
   dealGetAll: vi.fn(async () => []),
   contactGetAll: vi.fn(async () => [])
 }));
@@ -30,7 +31,7 @@ vi.mock('../lib/supabase', () => ({
 }));
 vi.mock('../services/api', () => ({
   invalidateBlocklistCache: rt.invalidate,
-  taskApi: { getAll: rt.taskGetAll },
+  taskApi: { getAll: rt.taskGetAll, update: rt.taskUpdate },
   dealApi: { getAll: rt.dealGetAll },
   contactApi: { getAll: rt.contactGetAll }
 }));
@@ -103,5 +104,38 @@ describe('useCalendarRealtime', () => {
     expect(calls).toBe(2); // one follow-up refresh, after the first finished
     expect(useTaskStore.getState().tasks.t1.title).toBe('fetch 2'); // the newest data wins
     rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'Fresh task' }]);
+  });
+
+  it('reloads the events when a guest or a link changes (they are saved after the event itself)', async () => {
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.calendar_event_participants();
+    rt.handlers.calendar_event_targets();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
+    expect(rt.reloadEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('a task read that overlaps a save of one of our tasks is not applied (it could carry the old state)', async () => {
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any } });
+    let finishRead!: (v: any[]) => void;
+    rt.taskGetAll.mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }));
+    rt.taskUpdate.mockImplementation(async (_id: string, u: any) => ({ id: 't1', title: 'T', priority: 'low', tags: [], ...u }));
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1); // the read starts (old state, not yet complete)
+    await useTaskStore.getState().rescheduleTask('t1', { completed: true, status: 'completed' } as any); // our save finishes meanwhile
+    rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: true, status: 'completed' }]);
+    finishRead([{ id: 't1', title: 'T', completed: false, status: 'pending' }]); // the stale read arrives last
+    await vi.advanceTimersByTimeAsync(10);
+    expect(useTaskStore.getState().tasks.t1.completed).toBe(true); // not unchecked by the stale read
+    expect(rt.taskGetAll.mock.calls.length).toBeGreaterThanOrEqual(2); // it read again instead
+  });
+
+  it('unrelated remote changes and deletions still apply when no save overlaps', async () => {
+    useTaskStore.setState({ tasks: { t1: { id: 't1' } as any, gone: { id: 'gone' } as any } });
+    rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'Fresh task' }, { id: 't2', title: 'New' }]);
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
+    expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']);
   });
 });

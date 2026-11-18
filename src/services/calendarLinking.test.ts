@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const fake = vi.hoisted(() => ({
   calls: [] as { table: string; method: string; args: unknown[] }[],
-  results: {} as Record<string, { data: unknown; error: unknown }>
+  results: {} as Record<string, { data: unknown; error: unknown }>,
+  rpcCalls: [] as { name: string; args: any }[],
+  rpcResult: { data: null as unknown, error: null as unknown }
 }));
 
 vi.mock('../lib/supabase', () => {
@@ -21,7 +23,7 @@ vi.mock('../lib/supabase', () => {
     );
     return q;
   };
-  return { supabase: { from: builder } };
+  return { supabase: { from: builder, rpc: async (name: string, args: unknown) => { fake.rpcCalls.push({ name, args }); return fake.rpcResult; } } };
 });
 
 import { calendarEventApi } from './api';
@@ -31,6 +33,8 @@ const callsOf = (table: string, method: string) => fake.calls.filter((c) => c.ta
 beforeEach(() => {
   fake.calls = [];
   fake.results = {};
+  fake.rpcCalls = [];
+  fake.rpcResult = { data: null, error: null };
 });
 
 describe('linking events to records', () => {
@@ -49,13 +53,20 @@ describe('linking events to records', () => {
 
   it('lists recent events that are not yet linked to the record, excluding the linked ones in the query itself', async () => {
     const row = (id: string) => ({ id, title: id, start_date: '2031-01-05T10:00:00Z', end_date: '2031-01-05T11:00:00Z', is_all_day: false });
-    fake.results.calendar_event_targets = { data: [{ calendar_event_id: 'b' }, { calendar_event_id: 'x' }], error: null };
+    const B = '3f2b8c1e-1111-4222-8333-444455556666';
+    const X = '3f2b8c1e-1111-4222-8333-444455557777';
+    fake.results.calendar_event_targets = { data: [{ calendar_event_id: B }, { calendar_event_id: X }], error: null };
     fake.results.calendar_events = { data: [row('a'), row('c')], error: null };
     const events = await calendarEventApi.searchLinkable({ type: 'contact', id: 'c1' }, 'kick_off', 20);
     expect(events.map((e) => e.id)).toEqual(['a', 'c']);
-    expect(callsOf('calendar_events', 'not')[0].args).toEqual(['id', 'in', '(b,x)']); // before the limit, not after
+    expect(callsOf('calendar_events', 'not')[0].args).toEqual(['id', 'in', `(${B},${X})`]); // before the limit, not after
     expect(callsOf('calendar_events', 'limit')[0].args).toEqual([20]);
     expect(callsOf('calendar_events', 'ilike')[0].args).toEqual(['title', '%kick\\_off%']); // wildcard escaped
+    // ids that are not UUIDs never reach the filter
+    fake.calls = [];
+    fake.results.calendar_event_targets = { data: [{ calendar_event_id: B }, { calendar_event_id: 'x),id.neq.(' }], error: null };
+    await calendarEventApi.searchLinkable({ type: 'contact', id: 'c1' });
+    expect(callsOf('calendar_events', 'not')[0].args).toEqual(['id', 'in', `(${B})`]);
     // nothing linked yet: no exclusion at all
     fake.calls = [];
     fake.results.calendar_event_targets = { data: [], error: null };
@@ -65,35 +76,31 @@ describe('linking events to records', () => {
 });
 
 describe('matching guests to contacts', () => {
-  it('links an event\'s guests and the event to a contact when the contact appears', async () => {
-    fake.results.calendar_event_participants = { data: [{ calendar_event_id: 'e1' }, { calendar_event_id: 'e1' }, { calendar_event_id: 'e2' }], error: null };
+  it("links a contact's guests and events in one database call (one transaction)", async () => {
+    fake.rpcResult = { data: 2, error: null };
     const linked = await calendarEventApi.linkGuestsToContact({ id: 'c1', email: ' Ada@Example.com ' });
     expect(linked).toBe(2);
-    expect(callsOf('calendar_event_participants', 'update')[0].args[0]).toEqual({ contact_id: 'c1' });
-    expect(callsOf('calendar_event_participants', 'ilike')[0].args).toEqual(['handle', 'ada@example.com']);
-    expect(callsOf('calendar_event_participants', 'is')[0].args).toEqual(['contact_id', null]); // only guests not linked yet
-    expect(callsOf('calendar_event_targets', 'upsert')[0].args[0]).toEqual([
-      { calendar_event_id: 'e1', target_type: 'contact', target_id: 'c1' },
-      { calendar_event_id: 'e2', target_type: 'contact', target_id: 'c1' }
-    ]);
+    expect(fake.rpcCalls).toEqual([{ name: 'link_guests_to_contact', args: { p_contact_id: 'c1', p_email: 'ada@example.com' } }]);
+    expect(fake.calls).toHaveLength(0); // no separate table writes that could half succeed
   });
 
-  it('links the events first and the guests second, so a failure never leaves it half done', async () => {
-    fake.results.calendar_event_participants = { data: [{ calendar_event_id: 'e1' }], error: null };
-    await calendarEventApi.linkGuestsToContact({ id: 'c1', email: 'ada@example.com' });
-    const order = fake.calls.map((c) => `${c.table}.${c.method}`).filter((m) => /select|upsert|update/.test(m) && !m.endsWith('.ilike'));
-    expect(order).toEqual(['calendar_event_participants.select', 'calendar_event_targets.upsert', 'calendar_event_participants.update']);
+  it('reports a failure, and running it again simply tries again', async () => {
+    fake.rpcResult = { data: null, error: new Error('down') };
+    await expect(calendarEventApi.linkGuestsToContact({ id: 'c1', email: 'ada@example.com' })).rejects.toThrow('down');
+    fake.rpcResult = { data: 1, error: null };
+    await expect(calendarEventApi.linkGuestsToContact({ id: 'c1', email: 'ada@example.com' })).resolves.toBe(1);
+    expect(fake.rpcCalls).toHaveLength(2);
   });
 
   it('does nothing for a contact without an email', async () => {
     expect(await calendarEventApi.linkGuestsToContact({ id: 'c1', email: '' })).toBe(0);
-    expect(fake.calls).toHaveLength(0);
+    expect(fake.rpcCalls).toHaveLength(0);
   });
 
-  it('a new event links guests whose email is a contact\'s email, and links the contact too', async () => {
-    fake.results.calendar_events = { data: { id: 'e9' }, error: null };
+  it("a new event links guests whose email is a contact's email, and links the contact too, in one call", async () => {
+    fake.rpcResult = { data: 'e9', error: null };
     fake.results.contacts = { data: [{ id: 'c1', email: 'ada@example.com' }], error: null };
-    await calendarEventApi.create({
+    const id = await calendarEventApi.create({
       title: 'Kickoff',
       description: '',
       location: '',
@@ -106,29 +113,31 @@ describe('matching guests to contacts', () => {
       attendees: [{ handle: 'Ada@Example.com' }, { handle: 'stranger@x.io' }],
       targets: [{ type: 'deal', id: 'd1' }]
     } as any);
-    expect(callsOf('calendar_event_participants', 'insert')[0].args[0]).toEqual([
-      { calendar_event_id: 'e9', handle: 'Ada@Example.com', display_name: '', contact_id: 'c1' },
-      { calendar_event_id: 'e9', handle: 'stranger@x.io', display_name: '', contact_id: null }
+    expect(id).toBe('e9');
+    expect(fake.rpcCalls).toHaveLength(1);
+    expect(fake.rpcCalls[0].name).toBe('create_calendar_event_with_guests');
+    expect(fake.rpcCalls[0].args.p_participants).toEqual([
+      { handle: 'Ada@Example.com', display_name: '', contact_id: 'c1' },
+      { handle: 'stranger@x.io', display_name: '', contact_id: null }
     ]);
-    expect(callsOf('calendar_event_targets', 'insert')[0].args[0]).toEqual([
-      { calendar_event_id: 'e9', target_type: 'deal', target_id: 'd1' },
-      { calendar_event_id: 'e9', target_type: 'contact', target_id: 'c1' }
+    expect(fake.rpcCalls[0].args.p_targets).toEqual([
+      { target_type: 'deal', target_id: 'd1' },
+      { target_type: 'contact', target_id: 'c1' }
     ]);
+    // the database function does all the writing: nothing is written (or cleaned up) from here
+    expect(fake.calls.filter((c) => c.table.startsWith('calendar_') && c.method !== 'select' && c.method !== 'in' && c.method !== 'ilike')).toHaveLength(0);
   });
 
-  it('undoes the event when its guests or links cannot be saved (nothing half saved)', async () => {
-    fake.results.calendar_events = { data: { id: 'e9' }, error: null };
-    fake.results.calendar_event_targets = { data: null, error: new Error('links down') };
+  it('reports the failure and leaves nothing to clean up when the database function fails', async () => {
+    fake.rpcResult = { data: null, error: new Error('links down') };
     await expect(
       calendarEventApi.create({ title: 't', startsAt: '2031-01-05T10:00:00Z', endsAt: '2031-01-05T11:00:00Z', isFullDay: false, timeZone: 'UTC', visibility: 'SHARE_EVERYTHING', attendees: [], targets: [{ type: 'deal', id: 'd1' }] } as any)
     ).rejects.toThrow('links down');
-    const deleted = fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'delete');
-    expect(deleted).toHaveLength(1);
-    expect(fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'eq').map((c) => c.args)).toContainEqual(['id', 'e9']);
+    expect(fake.calls.filter((c) => c.method === 'delete')).toHaveLength(0);
   });
 
   it('still saves the event when the contact lookup fails', async () => {
-    fake.results.calendar_events = { data: { id: 'e9' }, error: null };
+    fake.rpcResult = { data: 'e9', error: null };
     fake.results.contacts = { data: null, error: new Error('down') };
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await expect(

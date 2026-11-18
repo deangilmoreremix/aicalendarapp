@@ -96,6 +96,8 @@ export const CalendarSettings: React.FC = () => {
     blockRequest.current += 1; // reads that started before this removal are out of date now
     setBlocked((list) => list.filter((entry) => entry.id !== id));
     window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
+    // an entry added while reads were in flight may not be on screen yet: load the list again (older reads stay ignored)
+    await loadBlocked();
   };
 
   useEffect(() => {

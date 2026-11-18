@@ -744,7 +744,7 @@ export const calendarBlocklistApi = {
 };
 
 /** The cached list is reused for this long, so changes made in another tab or by someone else show up soon. */
-export const BLOCKLIST_CACHE_MS = 30_000;
+export const BLOCKLIST_CACHE_MS = 10_000;
 let blocklistCache: { handles: string[]; at: number } | null = null;
 let blocklistGeneration = 0;
 
@@ -799,6 +799,7 @@ const matchAttendeesToContacts = async <A extends { handle: string; contactId?: 
   }
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
 
@@ -834,9 +835,13 @@ export const calendarEventApi = {
   },
 
   async create(input: CreateCalendarEventInput): Promise<string> {
-    const { data: event, error } = await supabase
-      .from('calendar_events')
-      .insert({
+    // guests whose email is a contact's email are linked to that contact, and the event is linked to the contact too
+    const attendees = await matchAttendeesToContacts(input.attendees);
+    const targets = [...input.targets, ...contactTargetsForGuests(attendees, input.targets)];
+
+    // the event, its guests and its links are saved by one database function, i.e. in one transaction: all or nothing
+    const { data, error } = await supabase.rpc('create_calendar_event_with_guests', {
+      p_event: {
         title: cleanText(input.title),
         description: input.description ? cleanText(input.description) : null,
         location: input.location ? cleanText(input.location) : null,
@@ -846,43 +851,16 @@ export const calendarEventApi = {
         time_zone: resolveCalendarEventTimeZone(input.timeZone),
         visibility: input.visibility,
         conference_link: input.conferenceLink || null
-      })
-      .select('id')
-      .single();
+      },
+      p_participants: attendees.map(a => ({
+        handle: a.handle,
+        display_name: a.displayName ?? '',
+        contact_id: a.contactId ?? null
+      })),
+      p_targets: targets.map(t => ({ target_type: t.type, target_id: t.id }))
+    });
     if (error) throw error;
-
-    const eventId = event.id as string;
-
-    // guests whose email is a contact's email are linked to that contact, and the event is linked to the contact too
-    const attendees = await matchAttendeesToContacts(input.attendees);
-    const targets = [...input.targets, ...contactTargetsForGuests(attendees, input.targets)];
-
-    try {
-      if (attendees.length > 0) {
-        const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
-          attendees.map(a => ({
-            calendar_event_id: eventId,
-            handle: a.handle,
-            display_name: a.displayName ?? '',
-            contact_id: a.contactId ?? null
-          }))
-        );
-        if (participantsError) throw participantsError;
-      }
-
-      if (targets.length > 0) {
-        const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
-          targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
-        );
-        if (targetsError) throw targetsError;
-      }
-    } catch (error) {
-      // the event, its guests and its links save together: undo the event (guests and links go with it) and report the failure
-      await supabase.from('calendar_events').delete().eq('id', eventId);
-      throw error;
-    }
-
-    return eventId;
+    return data as string;
   },
 
   /** Events overlapping [from, to] (RLS limits rows to the owner). */
@@ -947,7 +925,8 @@ export const calendarEventApi = {
       .eq('target_type', target.type)
       .eq('target_id', target.id);
     if (linkedError) throw linkedError;
-    const linkedIds = (linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id);
+    // only well-formed ids go into the filter below
+    const linkedIds = (linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id).filter((id) => UUID_PATTERN.test(id));
 
     let query = supabase.from('calendar_events').select('*').order('start_date', { ascending: false }).limit(limit);
     if (linkedIds.length > 0) query = query.not('id', 'in', `(${linkedIds.join(',')})`);
@@ -965,30 +944,10 @@ export const calendarEventApi = {
   async linkGuestsToContact(contact: { id: string; email?: string | null }): Promise<number> {
     const email = contact.email ? normalizeHandle(contact.email) : '';
     if (!email) return 0;
-    // links first, guests second: if the second step fails nothing is half done (the guests are still unlinked, so
-    // running this again finishes the job and the first step is idempotent)
-    const { data, error } = await supabase
-      .from('calendar_event_participants')
-      .select('calendar_event_id')
-      .ilike('handle', escapeIlike(email))
-      .is('contact_id', null);
+    // one database function links the events and the guests in one transaction
+    const { data, error } = await supabase.rpc('link_guests_to_contact', { p_contact_id: contact.id, p_email: email });
     if (error) throw error;
-    const eventIds = [...new Set((data ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id))];
-    if (eventIds.length === 0) return 0;
-    const { error: targetsError } = await supabase
-      .from('calendar_event_targets')
-      .upsert(
-        eventIds.map((id) => ({ calendar_event_id: id, target_type: 'contact', target_id: contact.id })),
-        { onConflict: TARGET_CONFLICT, ignoreDuplicates: true }
-      );
-    if (targetsError) throw targetsError;
-    const { error: updateError } = await supabase
-      .from('calendar_event_participants')
-      .update({ contact_id: contact.id })
-      .ilike('handle', escapeIlike(email))
-      .is('contact_id', null);
-    if (updateError) throw updateError;
-    return eventIds.length;
+    return Number(data ?? 0);
   },
 
   async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {

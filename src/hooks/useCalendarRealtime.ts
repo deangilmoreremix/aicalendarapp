@@ -8,23 +8,34 @@ import { useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 import { taskApi, dealApi, contactApi, invalidateBlocklistCache } from '../services/api';
-import { useTaskStore } from '../store/taskStore';
+import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince } from '../store/taskStore';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
 
-export const REALTIME_TABLES = ['calendar_events', 'calendar_blocklist', 'tasks', 'deals', 'contacts'] as const;
+export const REALTIME_TABLES = ['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'calendar_blocklist', 'tasks', 'deals', 'contacts'] as const;
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
 
 const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
   calendar_events: () => useTaskStore.getState().reloadCalendarEvents(),
+  // guests and links are saved after the event itself: reload the events when they arrive so no one sees a half-saved event
+  calendar_event_participants: () => useTaskStore.getState().reloadCalendarEvents(),
+  calendar_event_targets: () => useTaskStore.getState().reloadCalendarEvents(),
   // the blocklist decides which events are returned: forget the cached list, then load the events again
   calendar_blocklist: async () => {
     invalidateBlocklistCache();
     await useTaskStore.getState().reloadCalendarEvents();
   },
   tasks: async () => {
-    const tasks = await taskApi.getAll();
-    useTaskStore.setState({ tasks: Object.fromEntries(tasks.map((t) => [t.id, t])) });
+    // a read that overlaps a save of one of our own tasks may carry the old state: read again instead of applying it
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const epoch = getTaskWriteEpoch();
+      const tasks = await taskApi.getAll();
+      if (taskWritesSettledSince(epoch)) {
+        useTaskStore.setState({ tasks: Object.fromEntries(tasks.map((t) => [t.id, t])) });
+        return;
+      }
+    }
+    // still busy: the save itself ends with the saved task in the store, so the next change refreshes the rest
   },
   deals: async () => {
     const deals = await dealApi.getAll();

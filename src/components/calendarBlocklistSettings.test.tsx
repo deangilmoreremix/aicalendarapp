@@ -91,12 +91,14 @@ describe('CalendarSettings: blocklist', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Block' }));
     await waitFor(() => expect(api.add).toHaveBeenCalled());
     await waitFor(() => expect(api.getAll).toHaveBeenCalledTimes(2));
-    // ...the entry is removed meanwhile...
+    // ...the entry is removed meanwhile (the fresh load that follows the removal sees the new entry too)...
+    api.getAll.mockResolvedValue([{ id: 'b2', handle: 'x@y.io' }]);
     fireEvent.click(screen.getByRole('button', { name: 'Unblock @evil.com' }));
     await waitFor(() => expect(screen.queryByText('@evil.com')).toBeNull());
     // ...and then the old read finishes, still listing it
     slowRead([{ id: 'b1', handle: '@evil.com' }, { id: 'b2', handle: 'x@y.io' }]);
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByText('@evil.com')).toBeNull();
+    expect(screen.getByText('x@y.io')).toBeInTheDocument(); // the entry that was just added stays on screen
   });
 });

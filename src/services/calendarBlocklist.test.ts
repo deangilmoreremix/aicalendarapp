@@ -4,7 +4,8 @@ const fake = vi.hoisted(() => ({
   calls: [] as { table: string; method: string; args: unknown[] }[],
   results: {} as Record<string, { data: unknown; error: unknown }>,
   hold: undefined as Promise<void> | undefined, // makes reads wait, to stage a race
-  rpc: { data: null as unknown, error: null as unknown }
+  rpc: { data: null as unknown, error: null as unknown },
+  rpcCalls: [] as { name: string; args: any }[]
 }));
 
 vi.mock('../lib/supabase', () => {
@@ -23,7 +24,7 @@ vi.mock('../lib/supabase', () => {
     );
     return q;
   };
-  return { supabase: { from: builder, rpc: async () => fake.rpc } };
+  return { supabase: { from: builder, rpc: async (name: string, args: unknown) => { fake.rpcCalls.push({ name, args }); return fake.rpc; } } };
 });
 
 import { calendarEventApi, calendarBlocklistApi, invalidateBlocklistCache, BLOCKLIST_CACHE_MS } from './api';
@@ -36,6 +37,7 @@ beforeEach(() => {
   fake.results = {};
   fake.hold = undefined;
   fake.rpc = { data: null, error: null };
+  fake.rpcCalls = [];
 });
 
 describe('calendar blocklist', () => {
@@ -139,7 +141,7 @@ describe('calendar blocklist', () => {
 
 describe('event text and time zone', () => {
   it('removes every NUL and DEL character, not just the first', async () => {
-    fake.results.calendar_events = { data: { id: 'e1' }, error: null };
+    fake.rpc = { data: 'e1', error: null };
     await calendarEventApi.create({
       title: 'A\u0000B\u0000C\u007fD\u007f',
       description: 'x\u0000\u0000y',
@@ -152,12 +154,12 @@ describe('event text and time zone', () => {
       attendees: [],
       targets: []
     } as any);
-    const [insert] = fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'insert');
-    expect(insert.args[0]).toMatchObject({ title: 'ABCD', description: 'xy' });
+    expect(fake.rpcCalls[0].name).toBe('create_calendar_event_with_guests');
+    expect(fake.rpcCalls[0].args.p_event).toMatchObject({ title: 'ABCD', description: 'xy' });
   });
 
   it('strips control characters and falls back to UTC when the time zone is empty', async () => {
-    fake.results.calendar_events = { data: { id: 'e1' }, error: null };
+    fake.rpc = { data: 'e1', error: null };
     await calendarEventApi.create({
       title: 'Bad\u0000title',
       description: 'ok',
@@ -170,7 +172,6 @@ describe('event text and time zone', () => {
       attendees: [],
       targets: []
     } as any);
-    const [insert] = fake.calls.filter((c) => c.table === 'calendar_events' && c.method === 'insert');
-    expect(insert.args[0]).toMatchObject({ title: 'Badtitle', time_zone: 'UTC' });
+    expect(fake.rpcCalls[0].args.p_event).toMatchObject({ title: 'Badtitle', time_zone: 'UTC' });
   });
 });

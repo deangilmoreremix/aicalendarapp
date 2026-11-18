@@ -41,6 +41,15 @@ type TaskStore = TaskState & TaskActions;
 
 
 /** Local copy of a task after a patch; `null` (clear this value) becomes `undefined` on the in-memory task. */
+// Saves of the same task run one after another (a later save can never be overtaken by an earlier one, and each save's
+// rollback starts from the state right before it). The counters let a Realtime refresh notice that a save overlapped it.
+const taskSaveQueue = new Map<string, Promise<unknown>>();
+let pendingTaskWrites = 0;
+let taskWriteEpoch = 0;
+export const getTaskWriteEpoch = () => taskWriteEpoch;
+/** True when no task save started or finished since `epoch` and none is running. */
+export const taskWritesSettledSince = (epoch: number) => pendingTaskWrites === 0 && taskWriteEpoch === epoch;
+
 const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
   const { completedAt, relatedTo, ...rest } = update;
   const next: Task = { ...task, ...rest };
@@ -240,19 +249,34 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ selectedTask: task?.id || null });
   },
 
-  rescheduleTask: async (id, taskData) => {
-    const previous = get().tasks[id];
-    if (!previous) return false;
-    set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
-    try {
-      const saved = await taskApi.update(id, taskData);
-      set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
-      return true;
-    } catch (error) {
-      console.error('Failed to reschedule task:', error);
-      set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
-      return false;
-    }
+  rescheduleTask: (id, taskData) => {
+    if (!get().tasks[id]) return Promise.resolve(false);
+    pendingTaskWrites += 1;
+    taskWriteEpoch += 1;
+    const run = async (): Promise<boolean> => {
+      // the baseline is taken when this save starts, after earlier saves of the same task have finished
+      const previous = get().tasks[id];
+      if (!previous) return false;
+      set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
+      try {
+        const saved = await taskApi.update(id, taskData);
+        set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
+        return true;
+      } catch (error) {
+        console.error('Failed to reschedule task:', error);
+        set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
+        return false;
+      }
+    };
+    // nothing in flight for this task: start at once (the screen changes right away); otherwise wait for the earlier save
+    const earlier = taskSaveQueue.get(id);
+    const result = earlier ? earlier.then(run, run) : run();
+    taskSaveQueue.set(id, result);
+    return result.finally(() => {
+      pendingTaskWrites -= 1;
+      taskWriteEpoch += 1;
+      if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
+    });
   },
 
   loadCalendarEvents: async (from, to) => {
