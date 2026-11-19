@@ -84,6 +84,42 @@ describe('useCalendarRealtime', () => {
     expect(rt.reloadEvents).toHaveBeenCalledTimes(1);
   });
 
+  it('a blocklist change also tells open record timelines (they listen for calendar-blocklist:changed)', async () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-blocklist:changed', heard);
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.calendar_blocklist();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    window.removeEventListener('calendar-blocklist:changed', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it('the final read after waiting for saves is checked too: a save that finishes during it is not overwritten by the stale response', async () => {
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any } });
+    // a save is pending, so the first rounds wait for it
+    let finishFirstSave!: () => void;
+    rt.taskUpdate.mockImplementationOnce(() => new Promise((resolve) => { finishFirstSave = () => resolve({ id: 't1', title: 'T', priority: 'low', tags: [], completed: false, status: 'pending', title2: 1 }); }));
+    void useTaskStore.getState().rescheduleTask('t1', { title: 'T' } as any);
+    let finishStaleRead!: (v: any[]) => void;
+    let reads = 0;
+    rt.taskGetAll.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) return new Promise((resolve) => { finishStaleRead = resolve; });
+      return Promise.resolve([{ id: 't1', title: 'T', completed: true, status: 'completed' }]);
+    });
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
+    finishFirstSave();
+    await vi.advanceTimersByTimeAsync(10); // the read starts now (old state), no save in flight
+    // a completion is saved and finishes while that read is in flight
+    rt.taskUpdate.mockImplementation(async (_id: string, u: any) => ({ id: 't1', title: 'T', priority: 'low', tags: [], ...u }));
+    await useTaskStore.getState().rescheduleTask('t1', { completed: true, status: 'completed' } as any);
+    finishStaleRead([{ id: 't1', title: 'T', completed: false, status: 'pending' }]);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(useTaskStore.getState().tasks.t1.completed).toBe(true);
+  });
+
   it('never runs two refreshes of one table at once: a change during a refresh gets one more refresh after it', async () => {
     let finishFirst!: () => void;
     let calls = 0;

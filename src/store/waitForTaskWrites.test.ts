@@ -48,4 +48,20 @@ describe('waitForTaskWrites', () => {
     // the failed completion did not remove the edit that finished after it
     expect(useTaskStore.getState().tasks.t1.title).toBe('Edited');
   });
+
+  it('an edit followed by a failing completion keeps the edit (the completion starts from the saved edit)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls: { u: any; resolve: (v: any) => void; reject: (e: Error) => void }[] = [];
+    api.update.mockImplementation((_id: string, u: any) => new Promise((resolve, reject) => calls.push({ u, resolve, reject })));
+    const base = { id: 't1', title: 'Old', status: 'pending', completed: false, priority: 'low', tags: [] } as any;
+    useTaskStore.setState({ tasks: { t1: base }, error: null });
+    const edit = useTaskStore.getState().updateTask('t1', { title: 'Edited' } as any);
+    useTaskStore.getState().markTaskComplete('t1', true); // queued behind the edit
+    calls[0].resolve({ ...base, title: 'Edited' });
+    await edit;
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    calls[1].reject(new Error('completion failed'));
+    await vi.waitFor(() => expect(useTaskStore.getState().tasks.t1.completed).toBe(false));
+    expect(useTaskStore.getState().tasks.t1.title).toBe('Edited'); // the edit survives the failed completion
+  });
 });

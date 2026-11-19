@@ -118,6 +118,15 @@ describe('CalendarEventsCard', () => {
     useTaskStore.setState({ reloadCalendarEvents: original });
   });
 
+  it('reloads its timeline when the blocklist changes (a blocked event disappears, an unblocked one appears)', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    await waitFor(() => expect(getTimeline).toHaveBeenCalledWith('contact', 'c1', 10, 0));
+  });
+
   it('links an existing event to the record from the Link event dialog', async () => {
     getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
     searchLinkable.mockResolvedValue([{ id: 'e7', title: 'Old kickoff', startDate: new Date(2031, 0, 5, 10), endDate: new Date(2031, 0, 5, 11), isAllDay: false }]);

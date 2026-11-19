@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 import { taskApi, dealApi, contactApi, invalidateBlocklistCache } from '../services/api';
+import { CALENDAR_BLOCKLIST_CHANGED } from '../lib/calendarPreferences';
 import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince, waitForTaskWrites } from '../store/taskStore';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
@@ -23,11 +24,15 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
   // the blocklist decides which events are returned: forget the cached list, then load the events again
   calendar_blocklist: async () => {
     invalidateBlocklistCache();
+    // open record timelines (Calendar cards) listen to this event too; the main calendar also reloads through it
+    window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
     await useTaskStore.getState().reloadCalendarEvents();
   },
   tasks: async () => {
-    // a read that overlaps a save of one of our own tasks may carry the old state: read again instead of applying it
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    // a read that overlaps a save of one of our own tasks may carry the old state: wait for the saves, read, and apply
+    // the result only if no save started or finished meanwhile (otherwise read again; bounded)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await waitForTaskWrites();
       const epoch = getTaskWriteEpoch();
       const tasks = await taskApi.getAll();
       if (taskWritesSettledSince(epoch)) {
@@ -35,11 +40,7 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
         return;
       }
     }
-    // still busy: wait until the saves have finished (they may also fail), then read once more so remote changes
-    // that were discarded above are not lost when no further Realtime event arrives
-    await waitForTaskWrites();
-    const tasks = await taskApi.getAll();
-    useTaskStore.setState({ tasks: Object.fromEntries(tasks.map((t) => [t.id, t])) });
+    // still busy: the saves end with their saved tasks in the store, and the next change refreshes the rest
   },
   deals: async () => {
     const deals = await dealApi.getAll();

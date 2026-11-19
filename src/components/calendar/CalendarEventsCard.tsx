@@ -14,6 +14,7 @@ import { TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE } from '../../vendor/twenty/
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
 import { useTaskStore } from '../../store/taskStore';
+import { CALENDAR_BLOCKLIST_CHANGED } from '../../lib/calendarPreferences';
 
 type CalendarEventsCardProps = {
   targetType: CalendarTargetType;
@@ -51,6 +52,13 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // the blocklist decides which events this timeline shows: reload it when the blocklist changes
+  useEffect(() => {
+    const reload = () => void load();
+    window.addEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
+    return () => window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
   }, [load]);
 
   // Same "has more" rule as upstream

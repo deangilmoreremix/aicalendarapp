@@ -126,11 +126,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // after any earlier save of the same task, so the requests reach the server in order
-      const updatedTask = await enqueueTaskSave(id, () => taskApi.update(id, taskData));
-      set((state) => ({
-        tasks: { ...state.tasks, [id]: updatedTask },
-        isLoading: false,
-      }));
+      // the saved task goes into the store INSIDE the queued step, so a save queued behind this one starts from it
+      await enqueueTaskSave(id, async () => {
+        const updatedTask = await taskApi.update(id, taskData);
+        set((state) => ({
+          tasks: { ...state.tasks, [id]: updatedTask },
+          isLoading: false,
+        }));
+      });
     } catch (error) {
       console.error('Failed to update task:', error);
       set({ error: 'Failed to update task', isLoading: false });
