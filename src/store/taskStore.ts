@@ -48,6 +48,10 @@ let pendingTaskWrites = 0;
 let taskWriteEpoch = 0;
 export const getTaskWriteEpoch = () => taskWriteEpoch;
 /** True when no task save started or finished since `epoch` and none is running. */
+const taskWriteWaiters: (() => void)[] = [];
+/** Resolves when no task save is running (a failed save counts as finished too). */
+export const waitForTaskWrites = (): Promise<void> =>
+  pendingTaskWrites === 0 ? Promise.resolve() : new Promise((resolve) => { taskWriteWaiters.push(resolve); });
 export const taskWritesSettledSince = (epoch: number) => pendingTaskWrites === 0 && taskWriteEpoch === epoch;
 
 const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
@@ -275,6 +279,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     return result.finally(() => {
       pendingTaskWrites -= 1;
       taskWriteEpoch += 1;
+      if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
       if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
     });
   },

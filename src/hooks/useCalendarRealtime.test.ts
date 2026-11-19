@@ -138,4 +138,26 @@ describe('useCalendarRealtime', () => {
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
     expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']);
   });
+
+  it.each([
+    ['succeeds', true],
+    ['fails', false]
+  ])('a refresh given up because a save is still pending runs again when that save %s (no later Realtime event needed)', async (_label, succeeds) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any } });
+    let finishSave!: () => void;
+    rt.taskUpdate.mockImplementation(() => new Promise((resolve, reject) => {
+      finishSave = () => (succeeds ? resolve({ id: 't1', title: 'T', priority: 'low', tags: [], completed: true, status: 'completed' }) : reject(new Error('down')));
+    }));
+    // a save of our own task is running; a remote creation and deletion are waiting to be read
+    void useTaskStore.getState().rescheduleTask('t1', { completed: true, status: 'completed' } as any);
+    rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: false, status: 'pending' }, { id: 't2', title: 'Remote' }]);
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
+    expect(Object.keys(useTaskStore.getState().tasks)).toEqual(['t1']); // not applied while the save is pending
+    finishSave();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']); // the remote change arrived
+  });
 });

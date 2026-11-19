@@ -2,6 +2,7 @@ import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { contactApi } from '../services/api';
+import { linkGuests } from '../store/contactStore';
 import { X, Upload, Download, AlertCircle, CheckCircle, Info, Users, Database, FileSpreadsheet } from 'lucide-react';
 
 interface ImportContactsModalProps {
@@ -275,7 +276,8 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
             status: `Importing contact ${i + 1} of ${parsedContacts.length}...`
           });
 
-          await contactApi.create(parsedContacts[i]);
+          const created = await contactApi.create(parsedContacts[i]);
+          void linkGuests(created); // events of guests with this email become the contact's events (best effort)
           successCount++;
 
           // Small delay to show progress

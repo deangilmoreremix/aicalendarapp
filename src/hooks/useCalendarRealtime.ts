@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 import { taskApi, dealApi, contactApi, invalidateBlocklistCache } from '../services/api';
-import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince } from '../store/taskStore';
+import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince, waitForTaskWrites } from '../store/taskStore';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
 
@@ -35,7 +35,11 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
         return;
       }
     }
-    // still busy: the save itself ends with the saved task in the store, so the next change refreshes the rest
+    // still busy: wait until the saves have finished (they may also fail), then read once more so remote changes
+    // that were discarded above are not lost when no further Realtime event arrives
+    await waitForTaskWrites();
+    const tasks = await taskApi.getAll();
+    useTaskStore.setState({ tasks: Object.fromEntries(tasks.map((t) => [t.id, t])) });
   },
   deals: async () => {
     const deals = await dealApi.getAll();

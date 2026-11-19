@@ -3,7 +3,7 @@ import { Contact } from '../types';
 import { contactApi, calendarEventApi } from '../services/api';
 
 /** Guests with this contact's email become the contact (best effort; never blocks saving the contact). */
-const linkGuests = async (contact: Contact) => {
+export const linkGuests = async (contact: Contact) => {
   try {
     await calendarEventApi.linkGuestsToContact(contact);
   } catch (error) {
@@ -100,6 +100,8 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, ...contactsMap },
         isLoading: false,
       }));
+      // imported contacts whose email matches an existing event guest get that guest's events too (best effort)
+      for (const contact of newContacts) void linkGuests(contact);
     } catch (error) {
       console.error('Failed to import contacts:', error);
       set({ error: 'Failed to import contacts', isLoading: false });
