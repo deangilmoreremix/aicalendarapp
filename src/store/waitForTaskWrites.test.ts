@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ update: vi.fn() }));
+const api = vi.hoisted(() => ({ update: vi.fn(), remove: vi.fn(), create: vi.fn() }));
 vi.mock('../services/api', async (orig) => {
   const actual = await orig<typeof import('../services/api')>();
-  return { ...actual, taskApi: { ...actual.taskApi, update: api.update } };
+  return { ...actual, taskApi: { ...actual.taskApi, update: api.update, delete: api.remove, create: api.create } };
 });
 
-import { useTaskStore, waitForTaskWrites } from './taskStore';
+import { useTaskStore, waitForTaskWrites, getTaskWriteEpoch, taskWritesSettledSince } from './taskStore';
 
 describe('waitForTaskWrites', () => {
   it('resolves at once when idle, and after the last save settles even when it fails', async () => {
@@ -63,5 +63,34 @@ describe('waitForTaskWrites', () => {
     calls[1].reject(new Error('completion failed'));
     await vi.waitFor(() => expect(useTaskStore.getState().tasks.t1.completed).toBe(false));
     expect(useTaskStore.getState().tasks.t1.title).toBe('Edited'); // the edit survives the failed completion
+  });
+
+  it('a task deleted while its completion is still saving stays deleted when the completion fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let failCompletion!: (e: Error) => void;
+    api.update.mockImplementation(() => new Promise((_r, reject) => { failCompletion = reject; }));
+    api.remove.mockResolvedValue(undefined);
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any }, error: null });
+    useTaskStore.getState().markTaskComplete('t1', true);
+    const deletion = useTaskStore.getState().deleteTask('t1');
+    expect(api.remove).not.toHaveBeenCalled(); // waits for the completion save to settle
+    failCompletion(new Error('down'));
+    await deletion;
+    expect(api.remove).toHaveBeenCalledWith('t1');
+    expect(useTaskStore.getState().tasks.t1).toBeUndefined();
+  });
+
+  it('creating a task counts as a pending write until the new task is in the store', async () => {
+    let finishCreate!: (t: any) => void;
+    api.create.mockImplementation(() => new Promise((resolve) => { finishCreate = resolve; }));
+    useTaskStore.setState({ tasks: {}, error: null });
+    const epoch = getTaskWriteEpoch();
+    const creation = useTaskStore.getState().createTask({ title: 'New' } as any);
+    expect(taskWritesSettledSince(epoch)).toBe(false); // a read that started before this must be rejected
+    finishCreate({ id: 'n1', title: 'New', status: 'pending', completed: false, priority: 'medium', tags: [] });
+    await creation;
+    expect(useTaskStore.getState().tasks.n1.title).toBe('New');
+    expect(taskWritesSettledSince(epoch)).toBe(false); // the epoch moved, so an old read is still rejected
+    await expect(waitForTaskWrites()).resolves.toBeUndefined();
   });
 });

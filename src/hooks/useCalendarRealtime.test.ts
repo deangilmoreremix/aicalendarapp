@@ -208,4 +208,45 @@ describe('useCalendarRealtime', () => {
     await vi.advanceTimersByTimeAsync(10);
     expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']); // the remote change arrived
   });
+
+  it('timelines are told to reload even when the main calendar reload fails', async () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-data:changed', heard);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    rt.reloadEvents.mockRejectedValueOnce(new Error('network'));
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.calendar_events();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    window.removeEventListener('calendar-data:changed', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it('a task refresh that could not apply is tried again later (and the remote change then arrives)', async () => {
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any } });
+    // saves of our own keep overlapping every read, until the last one finishes
+    let finishSave!: () => void;
+    rt.taskUpdate.mockImplementation(() => new Promise((resolve) => { finishSave = () => resolve({ id: 't1', title: 'T', priority: 'low', tags: [], status: 'pending', completed: false }); }));
+    void useTaskStore.getState().rescheduleTask('t1', { title: 'T' } as any);
+    rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: false, status: 'pending' }, { id: 't2', title: 'Remote' }]);
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
+    finishSave();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']);
+  });
+
+  it('does not read tasks while a save is pending, and unmounting with a retry pending is safe', async () => {
+    useTaskStore.setState({ tasks: {} });
+    // every read is "overlapped" by a save that never finishes
+    rt.taskUpdate.mockImplementation(() => new Promise(() => {}));
+    useTaskStore.setState({ tasks: { t1: { id: 't1', title: 'T', status: 'pending', completed: false, priority: 'low', tags: [] } as any } });
+    void useTaskStore.getState().rescheduleTask('t1', { title: 'T' } as any);
+    rt.taskGetAll.mockClear();
+    const { unmount } = renderHook(() => useCalendarRealtime());
+    rt.handlers.tasks();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 5000);
+    expect(rt.taskGetAll).not.toHaveBeenCalled(); // never reads while a save is pending (it waits)
+    unmount();
+  });
 });

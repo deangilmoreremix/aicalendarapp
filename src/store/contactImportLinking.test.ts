@@ -50,4 +50,20 @@ describe('importing contacts links their calendar guests', () => {
     expect(heard).toHaveBeenCalledTimes(1);
     window.removeEventListener('calendar-data:changed', heard);
   });
+
+  it('a batch import tells open Calendar cards once, not once per contact', async () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-data:changed', heard);
+    api.create.mockImplementation(async (c: any) => ({ ...c, id: `id-${c.email}` }));
+    api.link.mockResolvedValue(1);
+    await useContactStore.getState().importContacts([
+      { name: 'A', email: 'a@x.io' } as any,
+      { name: 'B', email: 'b@x.io' } as any,
+      { name: 'C', email: 'c@x.io' } as any
+    ]);
+    await vi.waitFor(() => expect(api.link).toHaveBeenCalledTimes(3));
+    await new Promise((r) => setTimeout(r, 10));
+    window.removeEventListener('calendar-data:changed', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
 });

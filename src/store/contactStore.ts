@@ -3,15 +3,24 @@ import { Contact } from '../types';
 import { contactApi, calendarEventApi } from '../services/api';
 import { CALENDAR_DATA_CHANGED } from '../lib/calendarPreferences';
 
-/** Guests with this contact's email become the contact (best effort; never blocks saving the contact). */
-export const linkGuests = async (contact: Contact) => {
+/** Tells open Calendar cards (a linked contact's included) to reload their timeline. */
+export const notifyCalendarDataChanged = () => window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+
+/**
+ * Guests with this contact's email become the contact (best effort; never blocks saving the contact). Resolves to
+ * true when events were linked. A batch (import) passes `notify: false` and calls `notifyCalendarDataChanged` once.
+ */
+export const linkGuests = async (contact: Contact, options: { notify?: boolean } = {}): Promise<boolean> => {
   try {
     const linked = await calendarEventApi.linkGuestsToContact(contact);
-    // events were just linked to this contact: open Calendar cards (this contact's included) reload their timeline
-    if (linked > 0) window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+    if (linked > 0) {
+      if (options.notify !== false) notifyCalendarDataChanged();
+      return true;
+    }
   } catch (error) {
     console.error('Failed to link calendar guests to the contact:', error);
   }
+  return false;
 };
 
 interface ContactState {
@@ -104,7 +113,10 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         isLoading: false,
       }));
       // imported contacts whose email matches an existing event guest get that guest's events too (best effort)
-      for (const contact of newContacts) void linkGuests(contact);
+      // one notification for the whole batch, not one per contact
+      void Promise.all(newContacts.map((contact) => linkGuests(contact, { notify: false }))).then((results) => {
+        if (results.some(Boolean)) notifyCalendarDataChanged();
+      });
     } catch (error) {
       console.error('Failed to import contacts:', error);
       set({ error: 'Failed to import contacts', isLoading: false });

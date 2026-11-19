@@ -17,12 +17,15 @@ export const REALTIME_TABLES = ['calendar_events', 'calendar_event_participants'
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
 
 // reload the main calendar's events, then tell open record timelines (Calendar cards) to reload theirs
+// (the timelines are told first, so a failing or slow main reload cannot hold them back)
 const reloadEventsAndTimelines = async () => {
-  await useTaskStore.getState().reloadCalendarEvents();
   window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+  await useTaskStore.getState().reloadCalendarEvents();
 };
 
-const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
+/** A refresher returns 'retry' when it could not apply what it read (a save of our own overlapped every read). */
+type RefreshResult = void | 'retry';
+const REFRESHERS: Record<RealtimeTable, () => Promise<RefreshResult>> = {
   calendar_events: reloadEventsAndTimelines,
   // guests and links are saved after the event itself: reload when they arrive so no one sees a half-saved event
   calendar_event_participants: reloadEventsAndTimelines,
@@ -46,7 +49,8 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
         return;
       }
     }
-    // still busy: the saves end with their saved tasks in the store, and the next change refreshes the rest
+    // still busy: try again a little later instead of dropping what other users or tabs changed
+    return 'retry';
   },
   deals: async () => {
     const deals = await dealApi.getAll();
@@ -59,6 +63,9 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
 };
 
 export const REALTIME_DEBOUNCE_MS = 400;
+/** A refresh that could not apply is tried again after this long, at most MAX_REFRESH_RETRIES times in a row. */
+export const REFRESH_RETRY_MS = 1000;
+const MAX_REFRESH_RETRIES = 3;
 
 export const useCalendarRealtime = (enabled = true) => {
   useEffect(() => {
@@ -68,6 +75,8 @@ export const useCalendarRealtime = (enabled = true) => {
     // so a slower, older fetch can never overwrite a newer one
     const running = new Set<RealtimeTable>();
     const again = new Set<RealtimeTable>();
+    const retries = new Map<RealtimeTable, number>();
+    const retryTimers = new Set<ReturnType<typeof setTimeout>>();
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const refresh = async (table: RealtimeTable): Promise<void> => {
@@ -77,7 +86,20 @@ export const useCalendarRealtime = (enabled = true) => {
       }
       running.add(table);
       try {
-        await REFRESHERS[table]();
+        const result = await REFRESHERS[table]();
+        if (result === 'retry') {
+          const used = retries.get(table) ?? 0;
+          if (used < MAX_REFRESH_RETRIES) {
+            retries.set(table, used + 1);
+            const retryTimer = setTimeout(() => {
+              retryTimers.delete(retryTimer);
+              void refresh(table);
+            }, REFRESH_RETRY_MS);
+            retryTimers.add(retryTimer);
+          }
+        } else {
+          retries.delete(table);
+        }
       } catch (error) {
         console.error(`Realtime refresh of ${table} failed:`, error);
       } finally {
@@ -112,6 +134,7 @@ export const useCalendarRealtime = (enabled = true) => {
 
     return () => {
       if (timer !== undefined) clearTimeout(timer);
+      retryTimers.forEach((t) => clearTimeout(t));
       if (channel) void supabase.removeChannel(channel);
     };
   }, [enabled]);

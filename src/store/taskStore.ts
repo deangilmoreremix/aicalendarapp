@@ -54,6 +54,26 @@ export const waitForTaskWrites = (): Promise<void> =>
   pendingTaskWrites === 0 ? Promise.resolve() : new Promise((resolve) => { taskWriteWaiters.push(resolve); });
 export const taskWritesSettledSince = (epoch: number) => pendingTaskWrites === 0 && taskWriteEpoch === epoch;
 
+const finishTaskWrite = () => {
+  pendingTaskWrites -= 1;
+  taskWriteEpoch += 1;
+  if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
+};
+
+/**
+ * Counts a write that is not queued per task (creating a task) as pending from before its request until after its
+ * result is in the store, so a Realtime read that overlaps it is not applied.
+ */
+const trackTaskWrite = async <T>(run: () => Promise<T>): Promise<T> => {
+  pendingTaskWrites += 1;
+  taskWriteEpoch += 1;
+  try {
+    return await run();
+  } finally {
+    finishTaskWrite();
+  }
+};
+
 /**
  * Runs `run` after any earlier save of the same task has finished (saves of other tasks don't wait) and counts it as a
  * pending write while it is queued or running. With nothing in flight it starts at once.
@@ -65,9 +85,7 @@ const enqueueTaskSave = <T>(id: string, run: () => Promise<T>): Promise<T> => {
   const result = earlier ? earlier.then(run, run) : run();
   taskSaveQueue.set(id, result);
   return result.finally(() => {
-    pendingTaskWrites -= 1;
-    taskWriteEpoch += 1;
-    if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
+    finishTaskWrite();
     if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
   });
 };
@@ -97,7 +115,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   createTask: async (taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const newTask = await taskApi.create({
+      await trackTaskWrite(async () => {
+        const created = await taskApi.create({
         title: taskData.title || '',
         description: taskData.description || '',
         dueDate: taskData.dueDate,
@@ -110,12 +129,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         attachments: [],
         subtasks: [],
         ...taskData,
+        });
+        // the new task is in the store before the write counts as finished
+        set((state) => ({ tasks: { ...state.tasks, [created.id]: created } }));
+        return created;
       });
-
-      set((state) => ({
-        tasks: { ...state.tasks, [newTask.id]: newTask },
-        isLoading: false,
-      }));
+      set({ isLoading: false });
     } catch (error) {
       console.error('Failed to create task:', error);
       set({ error: 'Failed to create task', isLoading: false });
@@ -143,14 +162,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   deleteTask: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await taskApi.delete(id);
-      set((state) => {
-        const { [id]: deleted, ...remainingTasks } = state.tasks;
-        return {
-          tasks: remainingTasks,
-          selectedTask: state.selectedTask === id ? null : state.selectedTask,
-          isLoading: false,
-        };
+      // after any earlier save of the same task settled, so a failing completion can't bring the task back afterwards
+      await enqueueTaskSave(id, async () => {
+        await taskApi.delete(id);
+        set((state) => {
+          const { [id]: deleted, ...remainingTasks } = state.tasks;
+          return {
+            tasks: remainingTasks,
+            selectedTask: state.selectedTask === id ? null : state.selectedTask,
+            isLoading: false,
+          };
+        });
       });
     } catch (error) {
       console.error('Failed to delete task:', error);

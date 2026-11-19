@@ -179,6 +179,18 @@ describe('CalendarEventsCard', () => {
     vi.unstubAllGlobals();
   });
 
+  it('collapses a burst of reload signals into a single reload', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    for (let i = 0; i < 5; i += 1) window.dispatchEvent(new Event('calendar-data:changed'));
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    await waitFor(() => expect(getTimeline).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 300));
+    expect(getTimeline).toHaveBeenCalledTimes(1);
+  });
+
   it('links an existing event to the record from the Link event dialog', async () => {
     getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
     searchLinkable.mockResolvedValue([{ id: 'e7', title: 'Old kickoff', startDate: new Date(2031, 0, 5, 10), endDate: new Date(2031, 0, 5, 11), isAllDay: false }]);

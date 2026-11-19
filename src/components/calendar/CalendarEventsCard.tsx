@@ -25,6 +25,9 @@ type CalendarEventsCardProps = {
   composerContext?: CalendarComposerContext;
 };
 
+/** Reload signals that arrive within this time of each other cause a single reload of the timeline. */
+const TIMELINE_RELOAD_DEBOUNCE_MS = 150;
+
 export const CalendarEventsCard = ({ targetType, targetId, objectName, composerContext }: CalendarEventsCardProps) => {
   const [events, setEvents] = useState<TimelineCalendarEvent[] | undefined>(undefined);
   const [total, setTotal] = useState(0);
@@ -59,12 +62,21 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     void load();
   }, [load]);
 
-  // the blocklist decides which events this timeline shows, and events, guests and links can change elsewhere
+  // the blocklist decides which events this timeline shows, and events, guests and links can change elsewhere.
+  // A burst of such signals (one per changed table, one per imported contact) is collapsed into one reload.
   useEffect(() => {
-    const reload = () => void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reload = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        void load();
+      }, TIMELINE_RELOAD_DEBOUNCE_MS);
+    };
     window.addEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
     window.addEventListener(CALENDAR_DATA_CHANGED, reload);
     return () => {
+      if (timer !== undefined) clearTimeout(timer);
       window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
       window.removeEventListener(CALENDAR_DATA_CHANGED, reload);
     };
