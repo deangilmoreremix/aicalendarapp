@@ -57,9 +57,15 @@ begin
     return 0;
   end if;
 
-  select array_agg(distinct calendar_event_id) into v_events
-  from public.calendar_event_participants
-  where lower(btrim(handle)) = v_email and contact_id is null;
+  -- claim the guests first and work only with the rows this call actually claimed, so two contacts with the same
+  -- email can never both link (or count) the same event
+  with claimed as (
+    update public.calendar_event_participants
+    set contact_id = p_contact_id
+    where lower(btrim(handle)) = v_email and contact_id is null
+    returning calendar_event_id
+  )
+  select array_agg(distinct calendar_event_id) into v_events from claimed;
 
   if v_events is null then
     return 0;
@@ -68,10 +74,6 @@ begin
   insert into public.calendar_event_targets (calendar_event_id, target_type, target_id)
   select e, 'contact', p_contact_id from unnest(v_events) e
   on conflict (calendar_event_id, target_type, target_id) do nothing;
-
-  update public.calendar_event_participants
-  set contact_id = p_contact_id
-  where lower(btrim(handle)) = v_email and contact_id is null;
 
   return coalesce(array_length(v_events, 1), 0);
 end;

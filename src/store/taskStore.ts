@@ -54,6 +54,24 @@ export const waitForTaskWrites = (): Promise<void> =>
   pendingTaskWrites === 0 ? Promise.resolve() : new Promise((resolve) => { taskWriteWaiters.push(resolve); });
 export const taskWritesSettledSince = (epoch: number) => pendingTaskWrites === 0 && taskWriteEpoch === epoch;
 
+/**
+ * Runs `run` after any earlier save of the same task has finished (saves of other tasks don't wait) and counts it as a
+ * pending write while it is queued or running. With nothing in flight it starts at once.
+ */
+const enqueueTaskSave = <T>(id: string, run: () => Promise<T>): Promise<T> => {
+  pendingTaskWrites += 1;
+  taskWriteEpoch += 1;
+  const earlier = taskSaveQueue.get(id);
+  const result = earlier ? earlier.then(run, run) : run();
+  taskSaveQueue.set(id, result);
+  return result.finally(() => {
+    pendingTaskWrites -= 1;
+    taskWriteEpoch += 1;
+    if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
+    if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
+  });
+};
+
 const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
   const { completedAt, relatedTo, ...rest } = update;
   const next: Task = { ...task, ...rest };
@@ -107,7 +125,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateTask: async (id, taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const updatedTask = await taskApi.update(id, taskData);
+      // after any earlier save of the same task, so the requests reach the server in order
+      const updatedTask = await enqueueTaskSave(id, () => taskApi.update(id, taskData));
       set((state) => ({
         tasks: { ...state.tasks, [id]: updatedTask },
         isLoading: false,
@@ -255,9 +274,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   rescheduleTask: (id, taskData) => {
     if (!get().tasks[id]) return Promise.resolve(false);
-    pendingTaskWrites += 1;
-    taskWriteEpoch += 1;
-    const run = async (): Promise<boolean> => {
+    return enqueueTaskSave(id, async (): Promise<boolean> => {
       // the baseline is taken when this save starts, after earlier saves of the same task have finished
       const previous = get().tasks[id];
       if (!previous) return false;
@@ -271,16 +288,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
         return false;
       }
-    };
-    // nothing in flight for this task: start at once (the screen changes right away); otherwise wait for the earlier save
-    const earlier = taskSaveQueue.get(id);
-    const result = earlier ? earlier.then(run, run) : run();
-    taskSaveQueue.set(id, result);
-    return result.finally(() => {
-      pendingTaskWrites -= 1;
-      taskWriteEpoch += 1;
-      if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
-      if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
     });
   },
 

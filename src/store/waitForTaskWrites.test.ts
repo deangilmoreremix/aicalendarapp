@@ -23,4 +23,29 @@ describe('waitForTaskWrites', () => {
     fail(new Error('down'));
     await vi.waitFor(() => expect(done).toBe(true));
   });
+
+  it('updateTask waits for an earlier save of the same task, is counted as a pending write, and does not hold up other tasks', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls: { id: string; u: any; resolve: (v: any) => void; reject: (e: Error) => void }[] = [];
+    api.update.mockImplementation((id: string, u: any) => new Promise((resolve, reject) => calls.push({ id, u, resolve, reject })));
+    const base = (id: string) => ({ id, title: id, status: 'pending', completed: false, priority: 'low', tags: [] }) as any;
+    useTaskStore.setState({ tasks: { t1: base('t1'), t2: base('t2') }, error: null });
+
+    useTaskStore.getState().markTaskComplete('t1', true); // save 1 of t1, in flight
+    const edit = useTaskStore.getState().updateTask('t1', { title: 'Edited' } as any); // must wait for it
+    void useTaskStore.getState().updateTask('t2', { title: 'Other' } as any); // another task: starts at once
+    await vi.waitFor(() => expect(calls.map((c) => `${c.id}:${Object.keys(c.u)[0]}`)).toEqual(['t1:completed', 't2:title']));
+
+    let settled = false;
+    void waitForTaskWrites().then(() => { settled = true; });
+    calls[0].reject(new Error('down')); // the completion fails...
+    await vi.waitFor(() => expect(calls).toHaveLength(3)); // ...then the edit is sent
+    expect(calls[2]).toMatchObject({ id: 't1', u: { title: 'Edited' } });
+    calls[1].resolve({ ...base('t2'), title: 'Other' });
+    calls[2].resolve({ ...base('t1'), title: 'Edited' });
+    await edit;
+    await vi.waitFor(() => expect(settled).toBe(true));
+    // the failed completion did not remove the edit that finished after it
+    expect(useTaskStore.getState().tasks.t1.title).toBe('Edited');
+  });
 });
