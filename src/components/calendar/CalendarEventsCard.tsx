@@ -3,7 +3,7 @@
  * Source: packages/twenty-front/src/modules/activities/calendar/components/CalendarEventsCard.tsx
  * Logic follows upstream; styling uses this app's Tailwind design instead of Linaria/twenty-ui.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Link2 } from 'lucide-react';
 
 import { CalendarEventsCardContent } from './CalendarEventsCardContent';
@@ -14,7 +14,7 @@ import { TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE } from '../../vendor/twenty/
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
 import { useTaskStore } from '../../store/taskStore';
-import { CALENDAR_BLOCKLIST_CHANGED } from '../../lib/calendarPreferences';
+import { CALENDAR_BLOCKLIST_CHANGED, CALENDAR_DATA_CHANGED } from '../../lib/calendarPreferences';
 
 type CalendarEventsCardProps = {
   targetType: CalendarTargetType;
@@ -35,18 +35,23 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [openedEventId, setOpenedEventId] = useState<string | null>(null);
 
+  // every (re)load starts a new generation: an older first page or a pagination page that finishes later is dropped
+  const generation = useRef(0);
+
   const load = useCallback(async () => {
+    const mine = ++generation.current;
     setFirstQueryLoading(true);
     setError(null);
     try {
       const result = await calendarEventApi.getTimeline(targetType, targetId, TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE, 0);
+      if (mine !== generation.current) return;
       setEvents(result.timelineCalendarEvents);
       setTotal(result.totalNumberOfCalendarEvents);
     } catch (err) {
       console.error('Failed to load calendar events:', err);
-      setError('Could not load calendar events.');
+      if (mine === generation.current) setError('Could not load calendar events.');
     } finally {
-      setFirstQueryLoading(false);
+      if (mine === generation.current) setFirstQueryLoading(false);
     }
   }, [targetType, targetId]);
 
@@ -54,11 +59,15 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     void load();
   }, [load]);
 
-  // the blocklist decides which events this timeline shows: reload it when the blocklist changes
+  // the blocklist decides which events this timeline shows, and events, guests and links can change elsewhere
   useEffect(() => {
     const reload = () => void load();
     window.addEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
-    return () => window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
+    window.addEventListener(CALENDAR_DATA_CHANGED, reload);
+    return () => {
+      window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
+      window.removeEventListener(CALENDAR_DATA_CHANGED, reload);
+    };
   }, [load]);
 
   // Same "has more" rule as upstream
@@ -66,6 +75,7 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
 
   const handleLastRowVisible = async () => {
     if (!hasMoreCalendarEvents || isFetchingMore) return;
+    const mine = generation.current; // a reload while this page is loading makes it out of date
     setIsFetchingMore(true);
     try {
       const result = await calendarEventApi.getTimeline(
@@ -74,6 +84,7 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE,
         events?.length ?? 0
       );
+      if (mine !== generation.current) return;
       setEvents((current) => [...(current ?? []), ...result.timelineCalendarEvents]);
       setTotal(result.totalNumberOfCalendarEvents);
     } catch (err) {

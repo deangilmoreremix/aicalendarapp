@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 
 import { supabase } from '../lib/supabase';
 import { taskApi, dealApi, contactApi, invalidateBlocklistCache } from '../services/api';
-import { CALENDAR_BLOCKLIST_CHANGED } from '../lib/calendarPreferences';
+import { CALENDAR_BLOCKLIST_CHANGED, CALENDAR_DATA_CHANGED } from '../lib/calendarPreferences';
 import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince, waitForTaskWrites } from '../store/taskStore';
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
@@ -16,11 +16,17 @@ import { useContactStore } from '../store/contactStore';
 export const REALTIME_TABLES = ['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'calendar_blocklist', 'tasks', 'deals', 'contacts'] as const;
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
 
+// reload the main calendar's events, then tell open record timelines (Calendar cards) to reload theirs
+const reloadEventsAndTimelines = async () => {
+  await useTaskStore.getState().reloadCalendarEvents();
+  window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+};
+
 const REFRESHERS: Record<RealtimeTable, () => Promise<void>> = {
-  calendar_events: () => useTaskStore.getState().reloadCalendarEvents(),
-  // guests and links are saved after the event itself: reload the events when they arrive so no one sees a half-saved event
-  calendar_event_participants: () => useTaskStore.getState().reloadCalendarEvents(),
-  calendar_event_targets: () => useTaskStore.getState().reloadCalendarEvents(),
+  calendar_events: reloadEventsAndTimelines,
+  // guests and links are saved after the event itself: reload when they arrive so no one sees a half-saved event
+  calendar_event_participants: reloadEventsAndTimelines,
+  calendar_event_targets: reloadEventsAndTimelines,
   // the blocklist decides which events are returned: forget the cached list, then load the events again
   calendar_blocklist: async () => {
     invalidateBlocklistCache();

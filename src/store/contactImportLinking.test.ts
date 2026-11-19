@@ -37,4 +37,17 @@ describe('importing contacts links their calendar guests', () => {
     expect(useContactStore.getState().error).toBeNull();
     expect(Object.keys(useContactStore.getState().contacts)).toEqual(['id1']);
   });
+
+  it('tells open Calendar cards to reload when events were linked, and stays quiet when none were', async () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-data:changed', heard);
+    const { linkGuests } = await import('./contactStore');
+    api.link.mockResolvedValue(2);
+    await linkGuests({ id: 'c1', email: 'a@x.io' } as any);
+    expect(heard).toHaveBeenCalledTimes(1);
+    api.link.mockResolvedValue(0);
+    await linkGuests({ id: 'c2', email: 'b@x.io' } as any);
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener('calendar-data:changed', heard);
+  });
 });

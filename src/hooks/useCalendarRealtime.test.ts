@@ -84,6 +84,18 @@ describe('useCalendarRealtime', () => {
     expect(rt.reloadEvents).toHaveBeenCalledTimes(1);
   });
 
+  it('event, guest and link changes tell open record timelines to reload (calendar-data:changed)', async () => {
+    const heard = vi.fn();
+    window.addEventListener('calendar-data:changed', heard);
+    renderHook(() => useCalendarRealtime());
+    rt.handlers.calendar_events();
+    rt.handlers.calendar_event_participants();
+    rt.handlers.calendar_event_targets();
+    await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
+    window.removeEventListener('calendar-data:changed', heard);
+    expect(heard).toHaveBeenCalledTimes(3); // once per refreshed table, after the main calendar reloaded
+  });
+
   it('a blocklist change also tells open record timelines (they listen for calendar-blocklist:changed)', async () => {
     const heard = vi.fn();
     window.addEventListener('calendar-blocklist:changed', heard);

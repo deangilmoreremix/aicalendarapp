@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { Contact } from '../types';
 import { contactApi, calendarEventApi } from '../services/api';
+import { CALENDAR_DATA_CHANGED } from '../lib/calendarPreferences';
 
 /** Guests with this contact's email become the contact (best effort; never blocks saving the contact). */
 export const linkGuests = async (contact: Contact) => {
   try {
-    await calendarEventApi.linkGuestsToContact(contact);
+    const linked = await calendarEventApi.linkGuestsToContact(contact);
+    // events were just linked to this contact: open Calendar cards (this contact's included) reload their timeline
+    if (linked > 0) window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
   } catch (error) {
     console.error('Failed to link calendar guests to the contact:', error);
   }
