@@ -1,3 +1,4 @@
+import { useCalendarRealtime } from './hooks/useCalendarRealtime';
 import React, { useState, Suspense, lazy } from 'react';
 import { Calendar, Search, List, Activity, Columns, Moon, Sun, Brain, Trash2, Settings, Table2 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const { insights, generateInsights } = useAI();
   const { tasks, markTaskComplete, loadInitialData } = useTaskStore();
   const { contacts, loadContacts } = useContactStore();
+  useCalendarRealtime();
   const [view, setView] = useState<'calendar' | 'kanban' | 'list' | 'activity' | 'table'>('calendar');
 
   const handleViewChange = (newView: 'calendar' | 'kanban' | 'list' | 'activity' | 'table') => {

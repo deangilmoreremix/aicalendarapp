@@ -51,15 +51,19 @@ export const DATE_FIELD_OPTIONS: Record<UnifiedRecordType, { value: string; labe
   task: [
     { value: 'scheduled', label: 'Scheduled time, else due date' },
     { value: 'dueDate', label: 'Due date' },
-    { value: 'startTime', label: 'Start time' }
+    { value: 'startTime', label: 'Start time' },
+    { value: 'completedAt', label: 'Completed' },
+    { value: 'createdAt', label: 'Created' }
   ],
   deal: [
     { value: 'dueDate', label: 'Due date' },
-    { value: 'createdAt', label: 'Created' }
+    { value: 'createdAt', label: 'Created' },
+    { value: 'updatedAt', label: 'Last updated' }
   ],
   contact: [
     { value: 'nextFollowUp', label: 'Next follow-up' },
-    { value: 'createdAt', label: 'Created' }
+    { value: 'createdAt', label: 'Created' },
+    { value: 'updatedAt', label: 'Last updated' }
   ],
   event: [{ value: 'startDate', label: 'Start' }]
 };
@@ -130,6 +134,8 @@ export const buildUnifiedRecords = ({
       let timed = false;
       if (chosen === 'dueDate') {
         start = end = task.dueDate;
+      } else if (chosen === 'completedAt' || chosen === 'createdAt') {
+        start = end = toDate(task[chosen]) ?? undefined;
       } else if (chosen === 'startTime') {
         start = task.startTime;
         end = task.endTime ?? task.startTime;
@@ -161,7 +167,8 @@ export const buildUnifiedRecords = ({
 
   if (visibleTypes.includes('deal')) {
     for (const deal of deals) {
-      const day = field('deal') === 'createdAt' ? toDate(deal.createdAt) : parseDateOnly(deal.dueDate);
+      const dealField = field('deal');
+      const day = dealField === 'createdAt' || dealField === 'updatedAt' ? toDate(deal[dealField]) : parseDateOnly(deal.dueDate);
       if (!day) continue; // free-text due dates ("Tomorrow") cannot be placed
       out.push({
         key: `deal:${deal.id}`,
@@ -182,7 +189,8 @@ export const buildUnifiedRecords = ({
 
   if (visibleTypes.includes('contact')) {
     for (const contact of contacts) {
-      const day = field('contact') === 'createdAt' ? toDate(contact.createdAt) : parseDateOnly(contact.nextFollowUp);
+      const contactField = field('contact');
+      const day = contactField === 'createdAt' || contactField === 'updatedAt' ? toDate(contact[contactField]) : parseDateOnly(contact.nextFollowUp);
       if (!day) continue;
       out.push({
         key: `contact:${contact.id}`,
@@ -247,16 +255,19 @@ export const applyRecordFilters = (records: UnifiedCalendarRecord[], filters: Ca
   return result;
 };
 
+/** Dates the system sets: a card placed by one of these can't be moved by dragging. */
+const SYSTEM_DATE_FIELDS = new Set(['createdAt', 'updatedAt', 'completedAt']);
+
 /**
- * A deal or contact placed by its creation date can't be moved on the calendar: a drop would change
- * a different field (due date / follow-up) from the one the card is positioned by.
+ * A record placed by a system date (created / updated / completed) can't be moved on the calendar: a drop would
+ * change a different field (due date / follow-up) from the one the card is positioned by.
  */
 export const canRescheduleRecord = (
   record: Pick<UnifiedCalendarRecord, 'type'>,
   fieldByType: Partial<Record<UnifiedRecordType, string>> = {}
 ): boolean => {
-  if (record.type !== 'deal' && record.type !== 'contact') return true;
-  return (fieldByType[record.type] ?? DEFAULT_FIELD_BY_TYPE[record.type]) !== 'createdAt';
+  if (record.type === 'event') return true;
+  return !SYSTEM_DATE_FIELDS.has(fieldByType[record.type] ?? DEFAULT_FIELD_BY_TYPE[record.type]);
 };
 
 export interface RescheduleUpdates {

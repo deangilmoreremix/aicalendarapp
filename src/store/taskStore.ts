@@ -41,6 +41,55 @@ type TaskStore = TaskState & TaskActions;
 
 
 /** Local copy of a task after a patch; `null` (clear this value) becomes `undefined` on the in-memory task. */
+// Saves of the same task run one after another (a later save can never be overtaken by an earlier one, and each save's
+// rollback starts from the state right before it). The counters let a Realtime refresh notice that a save overlapped it.
+const taskSaveQueue = new Map<string, Promise<unknown>>();
+let pendingTaskWrites = 0;
+let taskWriteEpoch = 0;
+export const getTaskWriteEpoch = () => taskWriteEpoch;
+/** True when no task save started or finished since `epoch` and none is running. */
+const taskWriteWaiters: (() => void)[] = [];
+/** Resolves when no task save is running (a failed save counts as finished too). */
+export const waitForTaskWrites = (): Promise<void> =>
+  pendingTaskWrites === 0 ? Promise.resolve() : new Promise((resolve) => { taskWriteWaiters.push(resolve); });
+export const taskWritesSettledSince = (epoch: number) => pendingTaskWrites === 0 && taskWriteEpoch === epoch;
+
+const finishTaskWrite = () => {
+  pendingTaskWrites -= 1;
+  taskWriteEpoch += 1;
+  if (pendingTaskWrites === 0) taskWriteWaiters.splice(0).forEach((resolve) => resolve());
+};
+
+/**
+ * Counts a write that is not queued per task (creating a task) as pending from before its request until after its
+ * result is in the store, so a Realtime read that overlaps it is not applied.
+ */
+const trackTaskWrite = async <T>(run: () => Promise<T>): Promise<T> => {
+  pendingTaskWrites += 1;
+  taskWriteEpoch += 1;
+  try {
+    return await run();
+  } finally {
+    finishTaskWrite();
+  }
+};
+
+/**
+ * Runs `run` after any earlier save of the same task has finished (saves of other tasks don't wait) and counts it as a
+ * pending write while it is queued or running. With nothing in flight it starts at once.
+ */
+const enqueueTaskSave = <T>(id: string, run: () => Promise<T>): Promise<T> => {
+  pendingTaskWrites += 1;
+  taskWriteEpoch += 1;
+  const earlier = taskSaveQueue.get(id);
+  const result = earlier ? earlier.then(run, run) : run();
+  taskSaveQueue.set(id, result);
+  return result.finally(() => {
+    finishTaskWrite();
+    if (taskSaveQueue.get(id) === result) taskSaveQueue.delete(id);
+  });
+};
+
 const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
   const { completedAt, relatedTo, ...rest } = update;
   const next: Task = { ...task, ...rest };
@@ -66,7 +115,8 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   createTask: async (taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const newTask = await taskApi.create({
+      await trackTaskWrite(async () => {
+        const created = await taskApi.create({
         title: taskData.title || '',
         description: taskData.description || '',
         dueDate: taskData.dueDate,
@@ -79,12 +129,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         attachments: [],
         subtasks: [],
         ...taskData,
+        });
+        // the new task is in the store before the write counts as finished
+        set((state) => ({ tasks: { ...state.tasks, [created.id]: created } }));
+        return created;
       });
-
-      set((state) => ({
-        tasks: { ...state.tasks, [newTask.id]: newTask },
-        isLoading: false,
-      }));
+      set({ isLoading: false });
     } catch (error) {
       console.error('Failed to create task:', error);
       set({ error: 'Failed to create task', isLoading: false });
@@ -94,11 +144,15 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateTask: async (id, taskData) => {
     set({ isLoading: true, error: null });
     try {
-      const updatedTask = await taskApi.update(id, taskData);
-      set((state) => ({
-        tasks: { ...state.tasks, [id]: updatedTask },
-        isLoading: false,
-      }));
+      // after any earlier save of the same task, so the requests reach the server in order
+      // the saved task goes into the store INSIDE the queued step, so a save queued behind this one starts from it
+      await enqueueTaskSave(id, async () => {
+        const updatedTask = await taskApi.update(id, taskData);
+        set((state) => ({
+          tasks: { ...state.tasks, [id]: updatedTask },
+          isLoading: false,
+        }));
+      });
     } catch (error) {
       console.error('Failed to update task:', error);
       set({ error: 'Failed to update task', isLoading: false });
@@ -108,14 +162,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   deleteTask: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      await taskApi.delete(id);
-      set((state) => {
-        const { [id]: deleted, ...remainingTasks } = state.tasks;
-        return {
-          tasks: remainingTasks,
-          selectedTask: state.selectedTask === id ? null : state.selectedTask,
-          isLoading: false,
-        };
+      // after any earlier save of the same task settled, so a failing completion can't bring the task back afterwards
+      await enqueueTaskSave(id, async () => {
+        await taskApi.delete(id);
+        set((state) => {
+          const { [id]: deleted, ...remainingTasks } = state.tasks;
+          return {
+            tasks: remainingTasks,
+            selectedTask: state.selectedTask === id ? null : state.selectedTask,
+            isLoading: false,
+          };
+        });
       });
     } catch (error) {
       console.error('Failed to delete task:', error);
@@ -127,16 +184,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const currentTask = get().tasks[id];
     if (!currentTask) return;
 
-    const updatedTask: Task = {
-      ...currentTask,
+    // saved like any other change (optimistic, rolled back if saving fails): a local-only change would be lost
+    // the next time the tasks are refreshed from the database
+    void get().rescheduleTask(id, {
       completed,
       status: completed ? 'completed' : 'pending',
-      completedAt: completed ? new Date() : undefined,
-    };
-
-    set((state) => ({
-      tasks: { ...state.tasks, [id]: updatedTask },
-    }));
+      completedAt: completed ? new Date() : null,
+    });
   },
 
   selectTask: (id) => {
@@ -243,19 +297,23 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ selectedTask: task?.id || null });
   },
 
-  rescheduleTask: async (id, taskData) => {
-    const previous = get().tasks[id];
-    if (!previous) return false;
-    set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
-    try {
-      const saved = await taskApi.update(id, taskData);
-      set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
-      return true;
-    } catch (error) {
-      console.error('Failed to reschedule task:', error);
-      set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
-      return false;
-    }
+  rescheduleTask: (id, taskData) => {
+    if (!get().tasks[id]) return Promise.resolve(false);
+    return enqueueTaskSave(id, async (): Promise<boolean> => {
+      // the baseline is taken when this save starts, after earlier saves of the same task have finished
+      const previous = get().tasks[id];
+      if (!previous) return false;
+      set((state) => ({ tasks: { ...state.tasks, [id]: applyTaskUpdate(previous, taskData) } }));
+      try {
+        const saved = await taskApi.update(id, taskData);
+        set((state) => ({ tasks: { ...state.tasks, [id]: saved } }));
+        return true;
+      } catch (error) {
+        console.error('Failed to reschedule task:', error);
+        set((state) => ({ tasks: { ...state.tasks, [id]: previous }, error: 'Failed to reschedule task' }));
+        return false;
+      }
+    });
   },
 
   loadCalendarEvents: async (from, to) => {

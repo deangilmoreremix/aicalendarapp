@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-const { getTimeline, create, getSettings, update } = vi.hoisted(() => ({
+const { getTimeline, create, getSettings, update, searchLinkable, linkToRecord } = vi.hoisted(() => ({
+  searchLinkable: vi.fn(),
+  linkToRecord: vi.fn(),
   update: vi.fn(),
   getTimeline: vi.fn(),
   create: vi.fn(),
@@ -10,7 +12,7 @@ const { getTimeline, create, getSettings, update } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/api', () => ({
-  calendarEventApi: { getTimeline, create, getSettings, update },
+  calendarEventApi: { getTimeline, create, getSettings, update, searchLinkable, linkToRecord },
   activityApi: { getForEntity: () => Promise.resolve([]), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   attachmentApi: { list: () => Promise.resolve([]), upload: vi.fn(), remove: vi.fn(), getDownloadUrl: vi.fn() },
   MAX_ATTACHMENT_BYTES: 25 * 1024 * 1024
@@ -114,6 +116,107 @@ describe('CalendarEventsCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create event' }));
     await waitFor(() => expect(reload).toHaveBeenCalled());
     useTaskStore.setState({ reloadCalendarEvents: original });
+  });
+
+  it('reloads its timeline when the blocklist changes (a blocked event disappears, an unblocked one appears)', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    await waitFor(() => expect(getTimeline).toHaveBeenCalledWith('contact', 'c1', 10, 0));
+  });
+
+  it('reloads its timeline when an event, a guest or a link changed elsewhere', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    window.dispatchEvent(new Event('calendar-data:changed'));
+    await waitFor(() => expect(getTimeline).toHaveBeenCalledWith('contact', 'c1', 10, 0));
+  });
+
+  it('an older first-page response cannot overwrite a newer reload', async () => {
+    const oldPage = { totalNumberOfCalendarEvents: 1, timelineCalendarEvents: [event({ id: 'old', title: 'Blocked event', startsAt: '2030-03-15T10:00:00.000Z', endsAt: '2030-03-15T11:00:00.000Z' })] };
+    const freshPage = { totalNumberOfCalendarEvents: 1, timelineCalendarEvents: [event({ id: 'new', title: 'Visible event', startsAt: '2030-03-16T10:00:00.000Z', endsAt: '2030-03-16T11:00:00.000Z' })] };
+    let finishOld!: (v: unknown) => void;
+    getTimeline.mockReturnValueOnce(new Promise((resolve) => { finishOld = resolve; })); // slow first load
+    getTimeline.mockResolvedValue(freshPage); // the reload after the blocklist changed
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await waitFor(() => expect(getTimeline).toHaveBeenCalledTimes(1));
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    expect(await screen.findByText('Visible event')).toBeInTheDocument();
+    finishOld(oldPage); // the old read finishes last
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText('Blocked event')).toBeNull();
+    expect(screen.getByText('Visible event')).toBeInTheDocument();
+  });
+
+  it('a pagination page that finishes after a reload is dropped', async () => {
+    const observers: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(cb: (entries: { isIntersecting: boolean }[]) => void) { observers.push(cb); }
+      observe() {}
+      disconnect() {}
+    });
+    const ev = (id: string, title: string, day: string) => event({ id, title, startsAt: `2030-03-${day}T10:00:00.000Z`, endsAt: `2030-03-${day}T11:00:00.000Z` });
+    // 2 events shown, 3 in total, so the card asks for more
+    getTimeline.mockResolvedValueOnce({ totalNumberOfCalendarEvents: 3, timelineCalendarEvents: [ev('a', 'Event A', '15'), ev('b', 'Event B', '14')] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('Event A');
+    let finishMore!: (v: unknown) => void;
+    getTimeline.mockReturnValueOnce(new Promise((resolve) => { finishMore = resolve; })); // the next page, slow
+    observers.at(-1)!([{ isIntersecting: true }]);
+    await waitFor(() => expect(getTimeline).toHaveBeenCalledTimes(2));
+    // meanwhile a blocklist change reloads: Event B is now blocked
+    getTimeline.mockResolvedValueOnce({ totalNumberOfCalendarEvents: 1, timelineCalendarEvents: [ev('a', 'Event A', '15')] });
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    await waitFor(() => expect(screen.queryByText('Event B')).toBeNull());
+    finishMore({ totalNumberOfCalendarEvents: 3, timelineCalendarEvents: [ev('c', 'Event C', '13')] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText('Event C')).toBeNull(); // the old page was not appended
+    expect(screen.queryByText('Event B')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('collapses a burst of reload signals into a single reload', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    for (let i = 0; i < 5; i += 1) window.dispatchEvent(new Event('calendar-data:changed'));
+    window.dispatchEvent(new Event('calendar-blocklist:changed'));
+    await waitFor(() => expect(getTimeline).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 300));
+    expect(getTimeline).toHaveBeenCalledTimes(1);
+  });
+
+  it('links an existing event to the record from the Link event dialog', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    searchLinkable.mockResolvedValue([{ id: 'e7', title: 'Old kickoff', startDate: new Date(2031, 0, 5, 10), endDate: new Date(2031, 0, 5, 11), isAllDay: false }]);
+    linkToRecord.mockResolvedValue(undefined);
+    render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+    await screen.findByText('No Events');
+    getTimeline.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /link event/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Link Old kickoff' }));
+    await waitFor(() => expect(linkToRecord).toHaveBeenCalledWith('e7', { type: 'contact', id: 'c1' }));
+    expect(searchLinkable).toHaveBeenCalledWith({ type: 'contact', id: 'c1' }, '');
+    await waitFor(() => expect(getTimeline).toHaveBeenCalled()); // the card reloads to show the linked event
+    await waitFor(() => expect(screen.queryByLabelText('Search events')).toBeNull()); // dialog closed
+  });
+
+  it('shows an empty list and errors in the Link event dialog', async () => {
+    getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+    searchLinkable.mockResolvedValueOnce([]);
+    render(<CalendarEventsCard targetType="deal" targetId="d1" objectName="deal" />);
+    await screen.findByText('No Events');
+    fireEvent.click(screen.getByRole('button', { name: /link event/i }));
+    expect(await screen.findByText('No events to link.')).toBeInTheDocument();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    searchLinkable.mockRejectedValueOnce(new Error('down'));
+    fireEvent.change(screen.getByLabelText('Search events'), { target: { value: 'x' } });
+    expect(await screen.findByText('Could not load events.')).toBeInTheDocument();
   });
 
   it('shows the empty state with the object name', async () => {

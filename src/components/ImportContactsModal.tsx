@@ -2,6 +2,7 @@ import { initialsAvatar } from '../utils/avatars';
 import React, { useState, useRef } from 'react';
 import { ModernButton } from './ui/ModernButton';
 import { contactApi } from '../services/api';
+import { linkGuests, notifyCalendarDataChanged } from '../store/contactStore';
 import { X, Upload, Download, AlertCircle, CheckCircle, Info, Users, Database, FileSpreadsheet } from 'lucide-react';
 
 interface ImportContactsModalProps {
@@ -267,6 +268,7 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
       let failCount = 0;
 
       // Import contacts with progress tracking
+      const linkJobs: Promise<boolean>[] = [];
       for (let i = 0; i < parsedContacts.length; i++) {
         try {
           setImportProgress({
@@ -275,7 +277,9 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
             status: `Importing contact ${i + 1} of ${parsedContacts.length}...`
           });
 
-          await contactApi.create(parsedContacts[i]);
+          const created = await contactApi.create(parsedContacts[i]);
+          // events of guests with this email become the contact's events (best effort); one notification after the batch
+          linkJobs.push(linkGuests(created, { notify: false }));
           successCount++;
 
           // Small delay to show progress
@@ -285,6 +289,10 @@ export const ImportContactsModal: React.FC<ImportContactsModalProps> = ({ isOpen
           failCount++;
         }
       }
+
+      void Promise.all(linkJobs).then((results) => {
+        if (results.some(Boolean)) notifyCalendarDataChanged();
+      });
 
       setImportResults({ success: successCount, failed: failCount });
       setImportProgress(null);

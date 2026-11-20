@@ -4,6 +4,10 @@ import type {
   TimelineCalendarEventsWithTotal
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
+import { isEmailBlocklisted } from '../vendor/twenty/calendar-sync/is-email-blocklisted.util';
+import { sanitizeCalendarEvent } from '../vendor/twenty/calendar-sync/sanitizeCalendarEvent';
+import { resolveCalendarEventTimeZone } from '../vendor/twenty/calendar-sync/resolve-calendar-event-time-zone.util';
+import { contactTargetsForGuests, escapeIlike, matchGuestsToContacts, normalizeHandle } from '../lib/calendar/matchGuests';
 import { Contact, Task, TaskUpdate, Deal, Activity, AIInsight, CalendarEvent, CalendarEventParticipant } from '../types';
 import type { ContactEnrichmentData } from './aiEnrichmentService';
 
@@ -710,7 +714,93 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
   };
 };
 
+/** Strip the control characters Postgres rejects (Twenty's `sanitizeCalendarEvent`) from the free-text fields. */
+// Twenty's sanitizer removes only the first NUL / DEL it meets (String.replace with a string); Postgres rejects any NUL,
+// so every occurrence is dropped here after it has run.
+const cleanText = (value: string): string =>
+  sanitizeCalendarEvent({ value }, ['value']).value.split('\u0000').join('').split('\u007f').join('');
+
+export const calendarBlocklistApi = {
+  async getAll(): Promise<{ id: string; handle: string }[]> {
+    const { data, error } = await supabase.from('calendar_blocklist').select('id, handle').order('created_at');
+    if (error) throw error;
+    return (data ?? []) as { id: string; handle: string }[];
+  },
+
+  /** An address ("a@b.com") or a whole domain ("@b.com"). */
+  async add(handle: string): Promise<void> {
+    const value = handle.trim().toLowerCase();
+    if (!value) return;
+    const { error } = await supabase.from('calendar_blocklist').upsert({ handle: value }, { onConflict: 'handle', ignoreDuplicates: true });
+    if (error) throw error;
+    invalidateBlocklistCache();
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('calendar_blocklist').delete().eq('id', id);
+    if (error) throw error;
+    invalidateBlocklistCache();
+  }
+};
+
+/** The cached list is reused for this long, so changes made in another tab or by someone else show up soon. */
+export const BLOCKLIST_CACHE_MS = 10_000;
+let blocklistCache: { handles: string[]; at: number } | null = null;
+let blocklistGeneration = 0;
+
+/** Forget the cached list (after a change here or a Realtime change elsewhere). A read already in flight is dropped too. */
+export const invalidateBlocklistCache = () => {
+  blocklistGeneration += 1;
+  blocklistCache = null;
+};
+
+/** The blocked handles; a failed lookup means "nothing blocked" so the calendar still shows. */
+const loadBlocklist = async (): Promise<string[]> => {
+  if (blocklistCache && Date.now() - blocklistCache.at < BLOCKLIST_CACHE_MS) return blocklistCache.handles;
+  const generation = blocklistGeneration;
+  try {
+    const handles = (await calendarBlocklistApi.getAll()).map((entry) => entry.handle).filter(Boolean);
+    // a change made while this read was in flight makes the result stale: use it once, but don't keep it
+    if (generation === blocklistGeneration) blocklistCache = { handles, at: Date.now() };
+    return handles;
+  } catch (error) {
+    console.error('Failed to load the calendar blocklist:', error);
+    return [];
+  }
+};
+
+/** Hide events that involve a blocked address or domain (Twenty's blocklist rule, `isEmailBlocklisted`). */
+const hasBlockedGuest = (guestHandles: string[], blocklist: string[]): boolean =>
+  blocklist.length > 0 && guestHandles.some((handle) => isEmailBlocklisted([], handle, blocklist));
+
 const GUEST_BATCH_SIZE = 100;
+
+/** Contacts whose email equals one of the handles (case-insensitive). */
+const findContactsByEmails = async (handles: string[]): Promise<{ id: string; email: string }[]> => {
+  const emails = [...new Set(handles.map(normalizeHandle).filter(Boolean))];
+  if (emails.length === 0) return [];
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('id, email')
+    .or(emails.map((e) => `email.ilike.${escapeIlike(e)}`).join(','));
+  if (error) throw error;
+  return (data ?? []) as { id: string; email: string }[];
+};
+
+const matchAttendeesToContacts = async <A extends { handle: string; contactId?: string }>(attendees: A[]): Promise<A[]> => {
+  const unmatched = attendees.filter((a) => !a.contactId).map((a) => a.handle);
+  if (unmatched.length === 0) return attendees;
+  try {
+    return matchGuestsToContacts(attendees, await findContactsByEmails(unmatched));
+  } catch (error) {
+    // matching is a convenience: never block saving the event because the lookup failed
+    console.error('Failed to match guests to contacts:', error);
+    return attendees;
+  }
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
 
 export const calendarEventApi = {
@@ -728,6 +818,7 @@ export const calendarEventApi = {
     });
     if (error) throw error;
 
+    // events with a blocked guest are already left out (and not counted) by the function itself, before it paginates
     const result = data as TimelineCalendarEventsWithTotal;
     return {
       totalNumberOfCalendarEvents: Number(result.totalNumberOfCalendarEvents ?? 0),
@@ -744,45 +835,32 @@ export const calendarEventApi = {
   },
 
   async create(input: CreateCalendarEventInput): Promise<string> {
-    const { data: event, error } = await supabase
-      .from('calendar_events')
-      .insert({
-        title: input.title,
-        description: input.description || null,
-        location: input.location || null,
+    // guests whose email is a contact's email are linked to that contact, and the event is linked to the contact too
+    const attendees = await matchAttendeesToContacts(input.attendees);
+    const targets = [...input.targets, ...contactTargetsForGuests(attendees, input.targets)];
+
+    // the event, its guests and its links are saved by one database function, i.e. in one transaction: all or nothing
+    const { data, error } = await supabase.rpc('create_calendar_event_with_guests', {
+      p_event: {
+        title: cleanText(input.title),
+        description: input.description ? cleanText(input.description) : null,
+        location: input.location ? cleanText(input.location) : null,
         start_date: toStorageInstant(input.startsAt, input.isFullDay),
         end_date: toStorageInstant(input.endsAt, input.isFullDay),
         is_all_day: input.isFullDay,
-        time_zone: input.timeZone,
+        time_zone: resolveCalendarEventTimeZone(input.timeZone),
         visibility: input.visibility,
         conference_link: input.conferenceLink || null
-      })
-      .select('id')
-      .single();
+      },
+      p_participants: attendees.map(a => ({
+        handle: a.handle,
+        display_name: a.displayName ?? '',
+        contact_id: a.contactId ?? null
+      })),
+      p_targets: targets.map(t => ({ target_type: t.type, target_id: t.id }))
+    });
     if (error) throw error;
-
-    const eventId = event.id as string;
-
-    if (input.attendees.length > 0) {
-      const { error: participantsError } = await supabase.from('calendar_event_participants').insert(
-        input.attendees.map(a => ({
-          calendar_event_id: eventId,
-          handle: a.handle,
-          display_name: a.displayName ?? '',
-          contact_id: a.contactId ?? null
-        }))
-      );
-      if (participantsError) throw participantsError;
-    }
-
-    if (input.targets.length > 0) {
-      const { error: targetsError } = await supabase.from('calendar_event_targets').insert(
-        input.targets.map(t => ({ calendar_event_id: eventId, target_type: t.type, target_id: t.id }))
-      );
-      if (targetsError) throw targetsError;
-    }
-
-    return eventId;
+    return data as string;
   },
 
   /** Events overlapping [from, to] (RLS limits rows to the owner). */
@@ -815,18 +893,72 @@ export const calendarEventApi = {
       list.push({ firstName: '', lastName: '', displayName: g.display_name || g.handle, handle: g.handle, personId: g.contact_id ?? undefined });
       byEvent.set(g.calendar_event_id, list);
     }
-    return events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
+    const withGuests = events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
+    const blocklist = await loadBlocklist();
+    return withGuests.filter((e) => !hasBlockedGuest((e.participants ?? []).map((p) => p.handle ?? ''), blocklist));
+  },
+
+  /** Link an existing event to a record (contact, deal or task). Linking twice is harmless. */
+  async linkToRecord(eventId: string, target: { type: CalendarTargetType; id: string }): Promise<void> {
+    const { error } = await supabase
+      .from('calendar_event_targets')
+      .upsert({ calendar_event_id: eventId, target_type: target.type, target_id: target.id }, { onConflict: TARGET_CONFLICT, ignoreDuplicates: true });
+    if (error) throw error;
+  },
+
+  async unlinkFromRecord(eventId: string, target: { type: CalendarTargetType; id: string }): Promise<void> {
+    const { error } = await supabase
+      .from('calendar_event_targets')
+      .delete()
+      .eq('calendar_event_id', eventId)
+      .eq('target_type', target.type)
+      .eq('target_id', target.id);
+    if (error) throw error;
+  },
+
+  /** Recent events (newest first) that are not yet linked to this record, optionally filtered by title. */
+  async searchLinkable(target: { type: CalendarTargetType; id: string }, search = '', limit = 20): Promise<CalendarEvent[]> {
+    // the events already linked to this record are excluded in the query itself, so the limit counts only linkable events
+    const { data: linked, error: linkedError } = await supabase
+      .from('calendar_event_targets')
+      .select('calendar_event_id')
+      .eq('target_type', target.type)
+      .eq('target_id', target.id);
+    if (linkedError) throw linkedError;
+    // only well-formed ids go into the filter below
+    const linkedIds = (linked ?? []).map((r: { calendar_event_id: string }) => r.calendar_event_id).filter((id) => UUID_PATTERN.test(id));
+
+    let query = supabase.from('calendar_events').select('*').order('start_date', { ascending: false }).limit(limit);
+    if (linkedIds.length > 0) query = query.not('id', 'in', `(${linkedIds.join(',')})`);
+    const term = search.trim();
+    if (term) query = query.ilike('title', `%${escapeIlike(term)}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapCalendarEventFromDB);
+  },
+
+  /**
+   * A contact was created or its email changed: guests with that email become that contact, and their events are
+   * linked to the contact. Returns how many events were linked.
+   */
+  async linkGuestsToContact(contact: { id: string; email?: string | null }): Promise<number> {
+    const email = contact.email ? normalizeHandle(contact.email) : '';
+    if (!email) return 0;
+    // one database function links the events and the guests in one transaction
+    const { data, error } = await supabase.rpc('link_guests_to_contact', { p_contact_id: contact.id, p_email: email });
+    if (error) throw error;
+    return Number(data ?? 0);
   },
 
   async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (updates.startDate) patch.start_date = updates.startDate.toISOString();
     if (updates.endDate) patch.end_date = updates.endDate.toISOString();
-    if (updates.title !== undefined) patch.title = updates.title;
-    if (updates.location !== undefined) patch.location = updates.location || null;
-    if (updates.description !== undefined) patch.description = updates.description || null;
+    if (updates.title !== undefined) patch.title = cleanText(updates.title);
+    if (updates.location !== undefined) patch.location = updates.location ? cleanText(updates.location) : null;
+    if (updates.description !== undefined) patch.description = updates.description ? cleanText(updates.description) : null;
     if (updates.isAllDay !== undefined) patch.is_all_day = updates.isAllDay;
-    if (updates.timeZone !== undefined) patch.time_zone = updates.timeZone;
+    if (updates.timeZone !== undefined) patch.time_zone = resolveCalendarEventTimeZone(updates.timeZone);
     if (updates.visibility !== undefined) patch.visibility = updates.visibility;
     if (updates.position !== undefined) patch.position = updates.position;
     if (updates.conferenceLink !== undefined) patch.conference_link = updates.conferenceLink || null;

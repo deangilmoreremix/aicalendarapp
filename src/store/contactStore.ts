@@ -1,6 +1,27 @@
 import { create } from 'zustand';
 import { Contact } from '../types';
-import { contactApi } from '../services/api';
+import { contactApi, calendarEventApi } from '../services/api';
+import { CALENDAR_DATA_CHANGED } from '../lib/calendarPreferences';
+
+/** Tells open Calendar cards (a linked contact's included) to reload their timeline. */
+export const notifyCalendarDataChanged = () => window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+
+/**
+ * Guests with this contact's email become the contact (best effort; never blocks saving the contact). Resolves to
+ * true when events were linked. A batch (import) passes `notify: false` and calls `notifyCalendarDataChanged` once.
+ */
+export const linkGuests = async (contact: Contact, options: { notify?: boolean } = {}): Promise<boolean> => {
+  try {
+    const linked = await calendarEventApi.linkGuestsToContact(contact);
+    if (linked > 0) {
+      if (options.notify !== false) notifyCalendarDataChanged();
+      return true;
+    }
+  } catch (error) {
+    console.error('Failed to link calendar guests to the contact:', error);
+  }
+  return false;
+};
 
 interface ContactState {
   contacts: Record<string, Contact>;
@@ -36,6 +57,7 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, [newContact.id]: newContact },
         isLoading: false,
       }));
+      void linkGuests(newContact);
     } catch (error) {
       console.error('Failed to create contact:', error);
       set({ error: 'Failed to create contact', isLoading: false });
@@ -50,6 +72,7 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, [id]: updatedContact },
         isLoading: false,
       }));
+      if (contactData.email !== undefined) void linkGuests(updatedContact);
     } catch (error) {
       console.error('Failed to update contact:', error);
       set({ error: 'Failed to update contact', isLoading: false });
@@ -89,6 +112,11 @@ export const useContactStore = create<ContactStore>((set, get) => ({
         contacts: { ...state.contacts, ...contactsMap },
         isLoading: false,
       }));
+      // imported contacts whose email matches an existing event guest get that guest's events too (best effort)
+      // one notification for the whole batch, not one per contact
+      void Promise.all(newContacts.map((contact) => linkGuests(contact, { notify: false }))).then((results) => {
+        if (results.some(Boolean)) notifyCalendarDataChanged();
+      });
     } catch (error) {
       console.error('Failed to import contacts:', error);
       set({ error: 'Failed to import contacts', isLoading: false });

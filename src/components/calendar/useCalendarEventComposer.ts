@@ -16,6 +16,7 @@ import { getCalendarEventDatesAfterStartChange } from '../../vendor/twenty/calen
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
 import type { CalendarEvent } from '../../types';
+import { getValidTimeZoneOrUndefined } from '../../vendor/twenty/calendar-sync/getValidTimeZoneOrUndefined';
 
 export type CalendarComposerAttendee = { handle: string; displayName?: string; contactId?: string };
 
@@ -48,7 +49,7 @@ export const useCalendarEventComposer = ({
   /** New events start at 9:00 on this day (e.g. the empty day that was clicked on the calendar). */
   initialDate?: Date;
 }) => {
-  const [timeZone, setTimeZone] = useState(() => editing?.timeZone || browserTimeZone());
+  const [timeZone, setTimeZone] = useState(() => getValidTimeZoneOrUndefined(editing?.timeZone) ?? browserTimeZone());
   const [title, setTitle] = useState(editing?.title ?? '');
   const [description, setDescription] = useState(editing?.description ?? '');
   const [location, setLocation] = useState(editing?.location ?? '');

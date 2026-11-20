@@ -3,16 +3,18 @@
  * Source: packages/twenty-front/src/modules/activities/calendar/components/CalendarEventsCard.tsx
  * Logic follows upstream; styling uses this app's Tailwind design instead of Linaria/twenty-ui.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { CalendarPlus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { CalendarPlus, Link2 } from 'lucide-react';
 
 import { CalendarEventsCardContent } from './CalendarEventsCardContent';
 import { CalendarEventComposerModal, type CalendarComposerContext } from './CalendarEventComposerModal';
 import { CalendarEventDetailsModal } from './CalendarEventDetailsModal';
+import { LinkCalendarEventsDialog } from './LinkCalendarEventsDialog';
 import { TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE } from '../../vendor/twenty/calendar/constants/Calendar';
 import { type TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
 import { useTaskStore } from '../../store/taskStore';
+import { CALENDAR_BLOCKLIST_CHANGED, CALENDAR_DATA_CHANGED } from '../../lib/calendarPreferences';
 
 type CalendarEventsCardProps = {
   targetType: CalendarTargetType;
@@ -23,6 +25,9 @@ type CalendarEventsCardProps = {
   composerContext?: CalendarComposerContext;
 };
 
+/** Reload signals that arrive within this time of each other cause a single reload of the timeline. */
+const TIMELINE_RELOAD_DEBOUNCE_MS = 150;
+
 export const CalendarEventsCard = ({ targetType, targetId, objectName, composerContext }: CalendarEventsCardProps) => {
   const [events, setEvents] = useState<TimelineCalendarEvent[] | undefined>(undefined);
   const [total, setTotal] = useState(0);
@@ -30,20 +35,26 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [openedEventId, setOpenedEventId] = useState<string | null>(null);
 
+  // every (re)load starts a new generation: an older first page or a pagination page that finishes later is dropped
+  const generation = useRef(0);
+
   const load = useCallback(async () => {
+    const mine = ++generation.current;
     setFirstQueryLoading(true);
     setError(null);
     try {
       const result = await calendarEventApi.getTimeline(targetType, targetId, TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE, 0);
+      if (mine !== generation.current) return;
       setEvents(result.timelineCalendarEvents);
       setTotal(result.totalNumberOfCalendarEvents);
     } catch (err) {
       console.error('Failed to load calendar events:', err);
-      setError('Could not load calendar events.');
+      if (mine === generation.current) setError('Could not load calendar events.');
     } finally {
-      setFirstQueryLoading(false);
+      if (mine === generation.current) setFirstQueryLoading(false);
     }
   }, [targetType, targetId]);
 
@@ -51,11 +62,32 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     void load();
   }, [load]);
 
+  // the blocklist decides which events this timeline shows, and events, guests and links can change elsewhere.
+  // A burst of such signals (one per changed table, one per imported contact) is collapsed into one reload.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reload = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        void load();
+      }, TIMELINE_RELOAD_DEBOUNCE_MS);
+    };
+    window.addEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
+    window.addEventListener(CALENDAR_DATA_CHANGED, reload);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+      window.removeEventListener(CALENDAR_BLOCKLIST_CHANGED, reload);
+      window.removeEventListener(CALENDAR_DATA_CHANGED, reload);
+    };
+  }, [load]);
+
   // Same "has more" rule as upstream
   const hasMoreCalendarEvents = events && total ? events.length < total : false;
 
   const handleLastRowVisible = async () => {
     if (!hasMoreCalendarEvents || isFetchingMore) return;
+    const mine = generation.current; // a reload while this page is loading makes it out of date
     setIsFetchingMore(true);
     try {
       const result = await calendarEventApi.getTimeline(
@@ -64,6 +96,7 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         TIMELINE_CALENDAR_EVENTS_DEFAULT_PAGE_SIZE,
         events?.length ?? 0
       );
+      if (mine !== generation.current) return;
       setEvents((current) => [...(current ?? []), ...result.timelineCalendarEvents]);
       setTotal(result.totalNumberOfCalendarEvents);
     } catch (err) {
@@ -81,14 +114,24 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Calendar {total > 0 && <span className="text-sm font-normal text-gray-500">({total})</span>}
         </h3>
-        <button
-          type="button"
-          onClick={() => setIsComposerOpen(true)}
-          className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <CalendarPlus className="mr-2 h-4 w-4" />
-          New event
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsLinkOpen(true)}
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            Link event
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsComposerOpen(true)}
+            className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            New event
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -114,6 +157,14 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
             void useTaskStore.getState().reloadCalendarEvents();
           }}
           context={composerContext ?? { targets: [{ type: targetType, id: targetId }] }}
+        />
+      )}
+      {isLinkOpen && (
+        <LinkCalendarEventsDialog
+          targetType={targetType}
+          targetId={targetId}
+          onClose={() => setIsLinkOpen(false)}
+          onLinked={() => void load()}
         />
       )}
       <CalendarEventDetailsModal event={openedEvent} onClose={() => setOpenedEventId(null)} />
