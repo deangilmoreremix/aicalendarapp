@@ -80,3 +80,6 @@ The tasks table is named `crm_tasks` (it used to be `tasks`). If you already app
 ## `twenty/` submodule
 `.gitmodules` still lists the upstream Twenty repository; the folder is empty and unused at runtime (`netlify.toml` removes it
 before building). Vendored code lives in `src/vendor/twenty/`.
+
+## Deployed to a shared Supabase project (notes)
+The calendar/CRM migrations (everything except `20251012*`) were applied to project `bzxohkrxcwodllketcpz` through the Supabase connector, so its migration history carries the connector's own version stamps: do not run `supabase db push` against it (use `supabase migration repair` first if you ever need to). The edge functions are deployed with the CLI: `supabase link --project-ref bzxohkrxcwodllketcpz && supabase functions deploy`, and `supabase secrets set OPENAI_API_KEY=...` only if the project does not already have one.
