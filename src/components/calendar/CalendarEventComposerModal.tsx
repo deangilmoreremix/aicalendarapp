@@ -7,7 +7,8 @@ import { Temporal } from 'temporal-polyfill';
 import { X } from 'lucide-react';
 
 import { Dialog, DialogContent } from '../ui/dialog';
-import { useCalendarEventComposer, type CalendarComposerContext } from './useCalendarEventComposer';
+import { useCalendarEventComposer, type CalendarComposerContext, type RepeatEnds } from './useCalendarEventComposer';
+import type { RecurrenceFrequency } from '../../lib/calendar/recurrence';
 import type { CalendarEvent } from '../../types';
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 
@@ -22,6 +23,8 @@ type CalendarEventComposerModalProps = {
   editing?: CalendarEvent;
   initialDate?: Date;
 };
+
+const WEEKDAYS: [string, number][] = [['Mon', 1], ['Tue', 2], ['Wed', 3], ['Thu', 4], ['Fri', 5], ['Sat', 6], ['Sun', 0]];
 
 const inputClass =
   'w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100';
@@ -151,6 +154,77 @@ export const CalendarEventComposerModal = ({ isOpen, onClose, onCreated, context
               ))}
             </select>
           </label>
+
+          <fieldset className="space-y-2 text-sm">
+            <legend className="mb-1 text-gray-700 dark:text-gray-300">Repeat</legend>
+            <select
+              aria-label="Repeat"
+              className={inputClass}
+              value={composer.repeatFreq}
+              onChange={(e) => composer.setRepeatFreq(e.target.value as RecurrenceFrequency | '')}
+            >
+              <option value="">Does not repeat</option>
+              <option value="DAILY">Daily</option>
+              <option value="WEEKLY">Weekly</option>
+              <option value="MONTHLY">Monthly</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+            {composer.repeatFreq !== '' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700 dark:text-gray-300">Every</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    aria-label="Repeat interval"
+                    className={`${inputClass} !w-20`}
+                    value={composer.repeatInterval}
+                    onChange={(e) => composer.setRepeatInterval(Number(e.target.value))}
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {{ DAILY: 'day(s)', WEEKLY: 'week(s)', MONTHLY: 'month(s)', YEARLY: 'year(s)' }[composer.repeatFreq]}
+                  </span>
+                </div>
+                {composer.repeatFreq === 'WEEKLY' && (
+                  <div className="flex flex-wrap gap-1" role="group" aria-label="Repeat on">
+                    {WEEKDAYS.map(([label, day]) => {
+                      const on = composer.repeatDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => composer.setRepeatDays(on ? composer.repeatDays.filter((d) => d !== day) : [...composer.repeatDays, day])}
+                          className={`rounded-md border px-2 py-1 text-xs ${on ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <select aria-label="Repeat ends" className={`${inputClass} !w-40`} value={composer.repeatEnds} onChange={(e) => composer.setRepeatEnds(e.target.value as RepeatEnds)}>
+                    <option value="never">Never ends</option>
+                    <option value="until">Ends on</option>
+                    <option value="count">Ends after</option>
+                  </select>
+                  {composer.repeatEnds === 'until' && (
+                    <input type="date" aria-label="Repeat until" className={`${inputClass} !w-44`} value={composer.repeatUntil} onChange={(e) => composer.setRepeatUntil(e.target.value)} />
+                  )}
+                  {composer.repeatEnds === 'count' && (
+                    <>
+                      <input type="number" min={1} max={1000} aria-label="Repeat count" className={`${inputClass} !w-24`} value={composer.repeatCount} onChange={(e) => composer.setRepeatCount(Number(e.target.value))} />
+                      <span className="text-gray-700 dark:text-gray-300">times</span>
+                    </>
+                  )}
+                </div>
+                {composer.repeatInvalid && <p className="text-xs text-red-600">Check the repeat settings (every 1-99, end date not before the start, up to 1000 times).</p>}
+                {composer.isEditing && <p className="text-xs text-gray-500">Changes apply to the whole series.</p>}
+              </>
+            )}
+          </fieldset>
 
           <label className="block text-sm">
             <span className="mb-1 block text-gray-700 dark:text-gray-300">Location</span>

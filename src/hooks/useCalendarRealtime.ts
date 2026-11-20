@@ -13,7 +13,7 @@ import { useTaskStore, getTaskWriteEpoch, taskWritesSettledSince, waitForTaskWri
 import { useDealStore } from '../store/dealStore';
 import { useContactStore } from '../store/contactStore';
 
-export const REALTIME_TABLES = ['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'calendar_blocklist', 'tasks', 'deals', 'contacts'] as const;
+export const REALTIME_TABLES = ['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'calendar_blocklist', 'crm_tasks', 'deals', 'contacts'] as const;
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
 
 // reload the main calendar's events, then tell open record timelines (Calendar cards) to reload theirs
@@ -37,7 +37,7 @@ const REFRESHERS: Record<RealtimeTable, () => Promise<RefreshResult>> = {
     window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
     await useTaskStore.getState().reloadCalendarEvents();
   },
-  tasks: async () => {
+  crm_tasks: async () => {
     // a read that overlaps a save of one of our own tasks may carry the old state: wait for the saves, read, and apply
     // the result only if no save started or finished meanwhile (otherwise read again; bounded)
     for (let attempt = 0; attempt < 5; attempt += 1) {

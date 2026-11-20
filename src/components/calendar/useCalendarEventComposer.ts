@@ -16,6 +16,7 @@ import { getCalendarEventDatesAfterStartChange } from '../../vendor/twenty/calen
 import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import { calendarEventApi, type CalendarTargetType } from '../../services/api';
 import type { CalendarEvent } from '../../types';
+import { formatRule, parseRule, MAX_INTERVAL, MAX_OCCURRENCES, type RecurrenceFrequency, type RecurrenceRule } from '../../lib/calendar/recurrence';
 import { getValidTimeZoneOrUndefined } from '../../vendor/twenty/calendar-sync/getValidTimeZoneOrUndefined';
 
 export type CalendarComposerAttendee = { handle: string; displayName?: string; contactId?: string };
@@ -35,10 +36,18 @@ const localDateString = (d: Date) =>
 const toStoredDate = (value: string, isFullDay: boolean) =>
   isFullDay ? new Date(`${value}T00:00:00`) : new Date(value);
 
+/** Editing one occurrence of a repeating event edits the series: start from the series' own first dates. */
+const seriesBase = (event: CalendarEvent | undefined): CalendarEvent | undefined =>
+  event?.seriesId
+    ? { ...event, id: event.seriesId, startDate: event.seriesStartDate ?? event.startDate, endDate: event.seriesEndDate ?? event.endDate }
+    : event;
+
+export type RepeatEnds = 'never' | 'until' | 'count';
+
 export const useCalendarEventComposer = ({
   context,
   onCreated,
-  editing,
+  editing: editingProp,
   initialDate
 }: {
   context: CalendarComposerContext;
@@ -49,7 +58,15 @@ export const useCalendarEventComposer = ({
   /** New events start at 9:00 on this day (e.g. the empty day that was clicked on the calendar). */
   initialDate?: Date;
 }) => {
+  const editing = seriesBase(editingProp);
+  const existingRule = parseRule(editing?.recurrenceRule);
   const [timeZone, setTimeZone] = useState(() => getValidTimeZoneOrUndefined(editing?.timeZone) ?? browserTimeZone());
+  const [repeatFreq, setRepeatFreq] = useState<RecurrenceFrequency | ''>(existingRule?.freq ?? '');
+  const [repeatInterval, setRepeatInterval] = useState(existingRule?.interval ?? 1);
+  const [repeatDays, setRepeatDays] = useState<number[]>(existingRule?.byDay ?? []);
+  const [repeatEnds, setRepeatEnds] = useState<RepeatEnds>(existingRule?.until ? 'until' : existingRule?.count !== undefined ? 'count' : 'never');
+  const [repeatUntil, setRepeatUntil] = useState(existingRule?.until ? localDateString(existingRule.until) : '');
+  const [repeatCount, setRepeatCount] = useState(existingRule?.count ?? 10);
   const [title, setTitle] = useState(editing?.title ?? '');
   const [description, setDescription] = useState(editing?.description ?? '');
   const [location, setLocation] = useState(editing?.location ?? '');
@@ -90,8 +107,27 @@ export const useCalendarEventComposer = ({
     .filter(Boolean);
   const invalidGuests = guestHandles.filter((handle) => !EMAIL_PATTERN.test(handle));
 
+  const repeatInvalid =
+    repeatFreq !== '' &&
+    (!Number.isInteger(repeatInterval) || repeatInterval < 1 || repeatInterval > MAX_INTERVAL ||
+      (repeatEnds === 'count' && (!Number.isInteger(repeatCount) || repeatCount < 1 || repeatCount > MAX_OCCURRENCES)) ||
+      (repeatEnds === 'until' && (!repeatUntil || repeatUntil < localDateString(toStoredDate(dates.startsAt, isFullDay)))));
+
+  /** The RRULE text for the chosen repeat settings, or undefined for an event that does not repeat. */
+  const buildRecurrenceRule = (): string | undefined => {
+    if (repeatFreq === '') return undefined;
+    const rule: RecurrenceRule = { freq: repeatFreq, interval: repeatInterval };
+    if (repeatFreq === 'WEEKLY' && repeatDays.length > 0) rule.byDay = [...repeatDays].sort((a, b) => a - b);
+    if (repeatEnds === 'count') rule.count = repeatCount;
+    if (repeatEnds === 'until') {
+      // an end date the person did not change keeps the exact instant it was saved (or imported) with
+      rule.until = existingRule?.until && repeatUntil === localDateString(existingRule.until) ? existingRule.until : new Date(`${repeatUntil}T23:59:59`);
+    }
+    return formatRule(rule);
+  };
+
   const hasValidDateRange = isFullDay ? dates.endsAt > dates.startsAt : Date.parse(dates.endsAt) > Date.parse(dates.startsAt);
-  const canCreate = title.trim().length > 0 && hasValidDateRange && (editing ? true : invalidGuests.length === 0) && !isCreating;
+  const canCreate = title.trim().length > 0 && hasValidDateRange && !repeatInvalid && (editing ? true : invalidGuests.length === 0) && !isCreating;
 
   const handleStartChange = (startsAt: string) =>
     setDates((current) => getCalendarEventDatesAfterStartChange({ dates: current, startsAt, isFullDay }));
@@ -124,10 +160,11 @@ export const useCalendarEventComposer = ({
           isAllDay: isFullDay,
           timeZone,
           visibility,
-          conferenceLink
+          conferenceLink,
+          recurrenceRule: buildRecurrenceRule() ?? null
         };
         await calendarEventApi.update(editing.id, saved);
-        onCreated(saved as Partial<CalendarEvent>);
+        onCreated({ ...saved, recurrenceRule: saved.recurrenceRule ?? undefined } as Partial<CalendarEvent>);
         return;
       }
       const defaultAttendee = context.defaultAttendee;
@@ -141,6 +178,7 @@ export const useCalendarEventComposer = ({
         timeZone,
         visibility,
         conferenceLink,
+        recurrenceRule: buildRecurrenceRule(),
         attendees: guestHandles.map((handle) => ({
           handle,
           displayName: defaultAttendee && defaultAttendee.handle.toLowerCase() === handle ? defaultAttendee.displayName : undefined,
@@ -155,7 +193,7 @@ export const useCalendarEventComposer = ({
     } finally {
       setIsCreating(false);
     }
-  }, [canCreate, editing, context, title, description, location, dates, isFullDay, timeZone, visibility, conferenceLink, guestHandles, onCreated]);
+  }, [canCreate, editing, context, title, description, location, dates, isFullDay, timeZone, visibility, conferenceLink, guestHandles, onCreated, repeatFreq, repeatInterval, repeatDays, repeatEnds, repeatUntil, repeatCount]);
 
   return {
     title,
@@ -180,6 +218,19 @@ export const useCalendarEventComposer = ({
     handleEndChange,
     hasValidDateRange,
     canCreate,
+    repeatFreq,
+    setRepeatFreq,
+    repeatInterval,
+    setRepeatInterval,
+    repeatDays,
+    setRepeatDays,
+    repeatEnds,
+    setRepeatEnds,
+    repeatUntil,
+    setRepeatUntil,
+    repeatCount,
+    setRepeatCount,
+    repeatInvalid,
     isEditing: !!editing,
     isCreating,
     error,

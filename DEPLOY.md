@@ -58,10 +58,14 @@ The **Delete mock data** button (top right) deletes only records flagged `is_sam
 - Flag your existing demo rows once with `scripts/mark-sample-data.sql`: read each statement, run its `select` first, adjust the condition to your demo data, then run the `update`.
 - Until rows are flagged the dialog shows "No Sample Data Found".
 
-## Migrations to apply (`supabase db push` applies all 29 in order)
+## Migrations to apply (`supabase db push` applies all 32 in order)
 New since the first release: `20251231000000_calendar_access_matches_app`, `20260101000000_is_sample_flag`,
 `20260102000000_record_position`, `20260103000000_favorites`, `20260104000000_record_views`, `20260105000000_attachments`
-(creates the private `attachments` Storage bucket; Storage must be enabled in the project), and `20260106000000_realtime_calendar_tables` (live calendar updates; Realtime must be enabled in the project, otherwise the calendar still works and refreshes on navigation) and `20260107000000_calendar_blocklist` (Calendar Settings blocklist), and `20260108000000_timeline_applies_blocklist` (record timelines leave out blocked events before paging), and `20260109000000_atomic_calendar_writes` (creating an event with its guests and links, and linking guests to a new contact, each run as one database transaction) and `20260110000000_updated_at_triggers` (keeps `updated_at` current on contacts and deals so the calendar's "Last updated" date follows edits).
+(creates the private `attachments` Storage bucket; Storage must be enabled in the project), and `20260106000000_realtime_calendar_tables` (live calendar updates; Realtime must be enabled in the project, otherwise the calendar still works and refreshes on navigation) and `20260107000000_calendar_blocklist` (Calendar Settings blocklist), and `20260108000000_timeline_applies_blocklist` (record timelines leave out blocked events before paging), and `20260109000000_atomic_calendar_writes` (creating an event with its guests and links, and linking guests to a new contact, each run as one database transaction) and `20260110000000_updated_at_triggers` (keeps `updated_at` current on contacts and deals so the calendar's "Last updated" date follows edits), `20260111000000_app_grants` (explicit grants to the API roles, needed where new public tables are private by default), `20260112000000_ical_uid_recurrence` (.ics import UIDs and repeating events) and `20260113000000_clean_orphan_events` (Calendar Settings cleaner).
+
+The tasks table is named `crm_tasks` (it used to be `tasks`). If you already applied the old migrations to a project, run `alter table public.tasks rename to crm_tasks;` once before `supabase db push`.
+
+**Shared Supabase project?** Do not run the old `20251012*` migrations in a project that hosts other apps: they drop and recreate policies and indexes on tables such as `users`, `api_keys` and `apps`. Apply only the calendar/CRM migrations (everything from `00000000000000_create_crm_core_tables` onwards except `20251012*`), and remember the tables are open to anyone with the anon key until sign-in and per-user policies are added.
 
 ## Deploy checklist
 1. `supabase db push`, then `supabase migration list` and check the local and remote histories match (an existing project only applies the new ones), then `supabase functions deploy`.
@@ -76,3 +80,6 @@ New since the first release: `20251231000000_calendar_access_matches_app`, `2026
 ## `twenty/` submodule
 `.gitmodules` still lists the upstream Twenty repository; the folder is empty and unused at runtime (`netlify.toml` removes it
 before building). Vendored code lives in `src/vendor/twenty/`.
+
+## Deployed to a shared Supabase project (notes)
+The calendar/CRM migrations (everything except `20251012*`) were applied to project `bzxohkrxcwodllketcpz` through the Supabase connector, so its migration history carries the connector's own version stamps: do not run `supabase db push` against it (use `supabase migration repair` first if you ever need to). The edge functions are deployed with the CLI: `supabase link --project-ref bzxohkrxcwodllketcpz && supabase functions deploy`, and `supabase secrets set OPENAI_API_KEY=...` only if the project does not already have one.

@@ -39,7 +39,7 @@ create table if not exists public.contacts (
 -- ----------------------------------------------------------------------------
 -- tasks
 -- ----------------------------------------------------------------------------
-create table if not exists public.tasks (
+create table if not exists public.crm_tasks (
   id                 uuid primary key default gen_random_uuid(),
   title              text not null,
   description        text,
@@ -108,7 +108,7 @@ create table if not exists public.activities (
 );
 
 create index if not exists idx_contacts_user_id on public.contacts (user_id);
-create index if not exists idx_tasks_user_id on public.tasks (user_id);
+create index if not exists idx_crm_tasks_user_id on public.crm_tasks (user_id);
 create index if not exists idx_deals_user_id on public.deals (user_id);
 create index if not exists idx_activities_user_id on public.activities (user_id);
 create index if not exists idx_activities_entity on public.activities (entity_type, entity_id);
@@ -127,7 +127,7 @@ create index if not exists idx_activities_entity on public.activities (entity_ty
 -- open-access policies below.
 -- ----------------------------------------------------------------------------
 alter table public.contacts   enable row level security;
-alter table public.tasks      enable row level security;
+alter table public.crm_tasks  enable row level security;
 alter table public.deals      enable row level security;
 alter table public.activities enable row level security;
 
@@ -135,7 +135,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['contacts','tasks','deals','activities']
+  foreach t in array array['contacts','crm_tasks','deals','activities']
   loop
     execute format('drop policy if exists "open_all_%1$s" on public.%1$s;', t);
     execute format(

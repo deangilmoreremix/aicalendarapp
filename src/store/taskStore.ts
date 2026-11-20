@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { Task, TaskUpdate, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
-import { taskApi, calendarEventApi } from '../services/api';
+import { taskApi, calendarEventApi, storedEventId } from '../services/api';
 import { generateId } from '../utils';
 
 interface TaskState {
   tasks: Record<string, Task>;
   calendarEvents: CalendarEvent[];
+  /** The range `calendarEvents` was last loaded for successfully (null before the first load). */
+  calendarEventsRange: { from: Date; to: Date } | null;
   activities: Activity[];
   appointments: Record<string, Appointment>;
   selectedTask: string | null;
@@ -105,6 +107,7 @@ let lastCalendarRange: { from: Date; to: Date } | null = null;
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: {},
   calendarEvents: [],
+  calendarEventsRange: null,
   activities: [],
   appointments: {},
   selectedTask: null,
@@ -321,7 +324,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const request = ++latestCalendarRangeRequest;
     try {
       const events = await calendarEventApi.getRange(from, to);
-      if (request === latestCalendarRangeRequest) set({ calendarEvents: events });
+      if (request === latestCalendarRangeRequest) set({ calendarEvents: events, calendarEventsRange: { from, to } });
     } catch (error) {
       console.error('Failed to load calendar events:', error);
       if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
@@ -336,7 +339,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const previous = get().calendarEvents;
     set({ calendarEvents: previous.map(e => (e.id === id ? { ...e, ...updates } : e)) });
     try {
-      await calendarEventApi.update(id, updates);
+      await calendarEventApi.update(storedEventId(id), updates);
       return true;
     } catch (error) {
       console.error('Failed to reschedule event:', error);
@@ -346,14 +349,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   patchCalendarEvent: (id, updates) => {
+    // an edit of a repeating event changes the whole series, so the occurrences are worked out again
+    if (id.includes('#') || updates.recurrenceRule || get().calendarEvents.some((e) => e.id === id && e.recurrenceRule)) {
+      void get().reloadCalendarEvents();
+      return;
+    }
     set((state) => ({ calendarEvents: state.calendarEvents.map((e) => (e.id === id ? { ...e, ...updates } : e)) }));
   },
 
   removeCalendarEvent: async (id) => {
     const previous = get().calendarEvents;
-    set({ calendarEvents: previous.filter(e => e.id !== id) });
+    const stored = storedEventId(id);
+    // deleting an occurrence deletes the whole series (single-occurrence exceptions are not supported)
+    set({ calendarEvents: previous.filter(e => e.id !== id && e.id !== stored && e.seriesId !== stored) });
     try {
-      await calendarEventApi.delete(id);
+      await calendarEventApi.delete(stored);
       return true;
     } catch (error) {
       console.error('Failed to delete event:', error);

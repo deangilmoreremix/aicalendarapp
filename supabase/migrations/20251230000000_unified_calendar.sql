@@ -1,7 +1,7 @@
 -- Unified CRM calendar support
 -- 1) tasks.start_time/end_time: the Task type and calendar already used them but no column existed,
 --    so time-blocked tasks were dropped on create and rejected on update.
-alter table public.tasks
+alter table public.crm_tasks
   add column if not exists start_time timestamptz,
   add column if not exists end_time   timestamptz;
 
@@ -9,7 +9,7 @@ alter table public.tasks
 alter table public.contacts
   add column if not exists next_follow_up date;
 
-create index if not exists idx_tasks_due_date on public.tasks(due_date);
+create index if not exists idx_crm_tasks_due_date on public.crm_tasks(due_date);
 create index if not exists idx_contacts_next_follow_up on public.contacts(next_follow_up);
 
 -- 3) Saved calendar views (shape follows Twenty's View: calendarLayout, calendar field, filters,

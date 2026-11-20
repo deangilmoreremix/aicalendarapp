@@ -102,3 +102,37 @@ describe('CalendarSettings: blocklist', () => {
     expect(screen.getByText('x@y.io')).toBeInTheDocument(); // the entry that was just added stays on screen
   });
 });
+
+describe('CalendarSettings: clean up events', () => {
+  beforeEach(() => {
+    api.getAll.mockReset();
+    api.getAll.mockResolvedValue([]);
+  });
+
+  it('asks first, then removes orphan events and reports how many', async () => {
+    const { calendarEventApi } = await import('../services/api');
+    (calendarEventApi as any).cleanOrphans = vi.fn().mockResolvedValue(3);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const heard = vi.fn();
+    window.addEventListener('calendar-data:changed', heard);
+    render(<CalendarSettings />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clean up orphan events' }));
+    expect(await screen.findByText('Removed 3 events.')).toBeInTheDocument();
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener('calendar-data:changed', heard);
+  });
+
+  it('does nothing when the confirmation is declined, and reports a failure', async () => {
+    const { calendarEventApi } = await import('../services/api');
+    const clean = vi.fn().mockRejectedValue(new Error('down'));
+    (calendarEventApi as any).cleanOrphans = clean;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<CalendarSettings />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Clean up orphan events' }));
+    expect(clean).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Clean up orphan events' }));
+    expect(await screen.findByText('Could not clean up events.')).toBeInTheDocument();
+  });
+});
