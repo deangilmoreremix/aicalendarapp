@@ -63,6 +63,9 @@ import { RecordCalendarEventCard } from './calendar/RecordCalendarEventCard';
 import { RecordContextMenu, type RecordMenuAction } from './calendar/RecordContextMenu';
 import { CalendarFiltersMenu } from './calendar/CalendarFiltersMenu';
 import { CalendarViewsMenu } from './calendar/CalendarViewsMenu';
+import { CalendarDataMenu } from './calendar/CalendarDataMenu';
+import { buildIcs } from '../lib/calendar/ics';
+import { calendarEventsToIcs, downloadTextFile } from '../lib/calendar/icsEvents';
 import type { CalendarView, CalendarViewFilters } from '../services/api';
 import { Task, CalendarEvent, CalendarEventParticipant } from '../types';
 import { CalendarEventComposerModal } from './calendar/CalendarEventComposerModal';
@@ -732,6 +735,11 @@ export const BigTaskCalendar: React.FC = () => {
           <CalendarViewsMenu
             current={{ layout: currentView.toUpperCase() as CalendarView['layout'], fieldByType, filters, visibleTypes }}
             onApply={applySavedView}
+          />
+          <CalendarDataMenu
+            exportCount={new Set(calendarEvents.map((e) => e.seriesId ?? e.id)).size}
+            onExport={() => downloadTextFile('calendar.ics', buildIcs(calendarEventsToIcs(calendarEvents)))}
+            onImported={() => void useTaskStore.getState().reloadCalendarEvents()}
           />
 
           {/* Calendar visibility toggle */}

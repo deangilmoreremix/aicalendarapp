@@ -8,6 +8,7 @@ a timeline per record, and OpenAI-powered scoring, enrichment, insights and draf
 - **Unified calendar** (react-big-calendar): tasks, deals, contacts (next follow-up) and events; drag to reschedule, reorder
   inside a day, click an empty day to create, hover preview, right-click menu, favorites, week numbers, saved views.
 - **Filters**: rule builder (AND/OR, per-field operators) used by the calendar and the table view; saved record views.
+- **Calendar import/export**: .ics export (visible range or one record's events) and import; **repeating events** (daily/weekly/monthly/yearly); an orphan-event cleaner in Calendar Settings.
 - **Table view** for contacts, deals and tasks: sort, column picker, search, paging, bulk actions.
 - **Records**: compact/full detail layouts, notes (markdown-lite), files (Supabase Storage), typed timeline, task widgets.
 - **Command menu** (Ctrl/Cmd+K): find any record or run an action.

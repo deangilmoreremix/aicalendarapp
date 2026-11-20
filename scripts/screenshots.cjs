@@ -71,7 +71,7 @@ const linkedEvents = () => ({
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   await page.route('http://127.0.0.1:54321/**', async (route) => {
-    const req = route.request(); const url = new URL(req.url()); const table = url.pathname.split('/').pop(); const method = req.method();
+    const req = route.request(); const url = new URL(req.url()); const table = url.pathname.split('/').pop().replace(/^crm_tasks$/, 'tasks'); const method = req.method();
     const headers = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-expose-headers': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (url.pathname.includes('/functions/v1/')) {
@@ -246,7 +246,7 @@ const linkedEvents = () => ({
   await shot('28-day-list-before');
   const handle = page.getByLabel(/^Reorder TechCorp/); const dropAt = page.getByLabel(/^Reorder Renewal call/);
   const hb = await handle.boundingBox(); const tb = await dropAt.boundingBox();
-  const patches = []; page.on('request', (r) => { if (r.method() === 'PATCH' && /deals|tasks|contacts|calendar_events/.test(r.url())) patches.push(r.url().split('/').pop().split('?')[0] + ' ' + r.postData()); });
+  const patches = []; page.on('request', (r) => { if (r.method() === 'PATCH' && /deals|tasks|crm_tasks|contacts|calendar_events/.test(r.url())) patches.push(r.url().split('/').pop().split('?')[0] + ' ' + r.postData()); });
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down(); await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 + 10, { steps: 4 });
   await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height + 12, { steps: 10 }); await wait(300); await page.mouse.up(); await wait(900);
   console.log('day list after:', JSON.stringify(await listNames()));

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Task, TaskUpdate, CalendarEvent, Activity, TaskFilters, Appointment } from '../types';
-import { taskApi, calendarEventApi } from '../services/api';
+import { taskApi, calendarEventApi, storedEventId } from '../services/api';
 import { generateId } from '../utils';
 
 interface TaskState {
@@ -336,7 +336,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const previous = get().calendarEvents;
     set({ calendarEvents: previous.map(e => (e.id === id ? { ...e, ...updates } : e)) });
     try {
-      await calendarEventApi.update(id, updates);
+      await calendarEventApi.update(storedEventId(id), updates);
       return true;
     } catch (error) {
       console.error('Failed to reschedule event:', error);
@@ -346,14 +346,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   patchCalendarEvent: (id, updates) => {
+    // an edit of a repeating event changes the whole series, so the occurrences are worked out again
+    if (id.includes('#') || get().calendarEvents.some((e) => e.id === id && e.recurrenceRule)) {
+      void get().reloadCalendarEvents();
+      return;
+    }
     set((state) => ({ calendarEvents: state.calendarEvents.map((e) => (e.id === id ? { ...e, ...updates } : e)) }));
   },
 
   removeCalendarEvent: async (id) => {
     const previous = get().calendarEvents;
-    set({ calendarEvents: previous.filter(e => e.id !== id) });
+    const stored = storedEventId(id);
+    // deleting an occurrence deletes the whole series (single-occurrence exceptions are not supported)
+    set({ calendarEvents: previous.filter(e => e.id !== id && e.id !== stored && e.seriesId !== stored) });
     try {
-      await calendarEventApi.delete(id);
+      await calendarEventApi.delete(stored);
       return true;
     } catch (error) {
       console.error('Failed to delete event:', error);

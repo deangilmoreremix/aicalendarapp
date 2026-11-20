@@ -4,7 +4,9 @@
  * Logic follows upstream; styling uses this app's Tailwind design instead of Linaria/twenty-ui.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarPlus, Link2 } from 'lucide-react';
+import { CalendarPlus, Download, Link2 } from 'lucide-react';
+import { buildIcs } from '../../lib/calendar/ics';
+import { downloadTextFile, timelineEventsToIcs } from '../../lib/calendar/icsEvents';
 
 import { CalendarEventsCardContent } from './CalendarEventsCardContent';
 import { CalendarEventComposerModal, type CalendarComposerContext } from './CalendarEventComposerModal';
@@ -106,6 +108,15 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     }
   };
 
+  const exportEvents = () => {
+    const icsEvents = timelineEventsToIcs(events ?? []);
+    if (icsEvents.length === 0) {
+      setError('None of these events can be exported (their details are not shared with you).');
+      return;
+    }
+    downloadTextFile(`${objectName || 'calendar'}-events.ics`, buildIcs(icsEvents));
+  };
+
   const openedEvent = events?.find((event) => event.id === openedEventId) ?? null;
 
   return (
@@ -115,6 +126,15 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
           Calendar {total > 0 && <span className="text-sm font-normal text-gray-500">({total})</span>}
         </h3>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportEvents}
+            disabled={!events || events.length === 0}
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </button>
           <button
             type="button"
             onClick={() => setIsLinkOpen(true)}

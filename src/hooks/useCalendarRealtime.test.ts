@@ -59,7 +59,7 @@ describe('useCalendarRealtime', () => {
     renderHook(() => useCalendarRealtime());
     rt.handlers.calendar_events();
     rt.handlers.calendar_events();
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     expect(rt.reloadEvents).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
     expect(rt.reloadEvents).toHaveBeenCalledTimes(1);
@@ -120,7 +120,7 @@ describe('useCalendarRealtime', () => {
       return Promise.resolve([{ id: 't1', title: 'T', completed: true, status: 'completed' }]);
     });
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
     finishFirstSave();
     await vi.advanceTimersByTimeAsync(10); // the read starts now (old state), no save in flight
@@ -141,10 +141,10 @@ describe('useCalendarRealtime', () => {
       return [{ id: 't1', title: `fetch ${calls}` }];
     });
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
     expect(calls).toBe(1); // first fetch is slow and still running
-    rt.handlers.tasks(); // another change arrives meanwhile
+    rt.handlers.crm_tasks(); // another change arrives meanwhile
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 10);
     expect(calls).toBe(1); // not started in parallel
     finishFirst();
@@ -168,7 +168,7 @@ describe('useCalendarRealtime', () => {
     rt.taskGetAll.mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }));
     rt.taskUpdate.mockImplementation(async (_id: string, u: any) => ({ id: 't1', title: 'T', priority: 'low', tags: [], ...u }));
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1); // the read starts (old state, not yet complete)
     await useTaskStore.getState().rescheduleTask('t1', { completed: true, status: 'completed' } as any); // our save finishes meanwhile
     rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: true, status: 'completed' }]);
@@ -182,7 +182,7 @@ describe('useCalendarRealtime', () => {
     useTaskStore.setState({ tasks: { t1: { id: 't1' } as any, gone: { id: 'gone' } as any } });
     rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'Fresh task' }, { id: 't2', title: 'New' }]);
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
     expect(Object.keys(useTaskStore.getState().tasks).sort()).toEqual(['t1', 't2']);
   });
@@ -201,7 +201,7 @@ describe('useCalendarRealtime', () => {
     void useTaskStore.getState().rescheduleTask('t1', { completed: true, status: 'completed' } as any);
     rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: false, status: 'pending' }, { id: 't2', title: 'Remote' }]);
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
     expect(Object.keys(useTaskStore.getState().tasks)).toEqual(['t1']); // not applied while the save is pending
     finishSave();
@@ -229,7 +229,7 @@ describe('useCalendarRealtime', () => {
     void useTaskStore.getState().rescheduleTask('t1', { title: 'T' } as any);
     rt.taskGetAll.mockImplementation(async () => [{ id: 't1', title: 'T', completed: false, status: 'pending' }, { id: 't2', title: 'Remote' }]);
     renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 1);
     finishSave();
     await vi.advanceTimersByTimeAsync(50);
@@ -244,7 +244,7 @@ describe('useCalendarRealtime', () => {
     void useTaskStore.getState().rescheduleTask('t1', { title: 'T' } as any);
     rt.taskGetAll.mockClear();
     const { unmount } = renderHook(() => useCalendarRealtime());
-    rt.handlers.tasks();
+    rt.handlers.crm_tasks();
     await vi.advanceTimersByTimeAsync(REALTIME_DEBOUNCE_MS + 5000);
     expect(rt.taskGetAll).not.toHaveBeenCalled(); // never reads while a save is pending (it waits)
     unmount();
