@@ -60,7 +60,10 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     }
   }, [targetType, targetId]);
 
+  // a different record starts empty, so nothing of the previous record can be shown or exported while it loads
   useEffect(() => {
+    setEvents(undefined);
+    setTotal(0);
     void load();
   }, [load]);
 
@@ -108,13 +111,32 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     }
   };
 
-  const exportEvents = () => {
-    const icsEvents = timelineEventsToIcs(events ?? []);
-    if (icsEvents.length === 0) {
-      setError('None of these events can be exported (their details are not shared with you).');
-      return;
+  const [exporting, setExporting] = useState(false);
+  const exportEvents = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      // every page of this record's events, whatever is loaded for display (the card shows 10 at a time)
+      const all: TimelineCalendarEvent[] = [];
+      const PAGE = 100;
+      for (let page = 0; page < 100; page += 1) {
+        const result = await calendarEventApi.getTimeline(targetType, targetId, PAGE, all.length);
+        all.push(...result.timelineCalendarEvents);
+        if (result.timelineCalendarEvents.length < PAGE || all.length >= result.totalNumberOfCalendarEvents) break;
+      }
+      const details = await calendarEventApi.getExportDetails(all.map((e) => e.id));
+      const icsEvents = timelineEventsToIcs(all, details);
+      if (icsEvents.length === 0) {
+        setError('None of these events can be exported (their details are not shared with you).');
+        return;
+      }
+      downloadTextFile(`${objectName || 'calendar'}-events.ics`, buildIcs(icsEvents));
+    } catch (err) {
+      console.error('Failed to export calendar events:', err);
+      setError('Could not export the events.');
+    } finally {
+      setExporting(false);
     }
-    downloadTextFile(`${objectName || 'calendar'}-events.ics`, buildIcs(icsEvents));
   };
 
   const openedEvent = events?.find((event) => event.id === openedEventId) ?? null;
@@ -128,8 +150,8 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={exportEvents}
-            disabled={!events || events.length === 0}
+            onClick={() => void exportEvents()}
+            disabled={exporting || !events || events.length === 0}
             className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             <Download className="mr-2 h-4 w-4" />

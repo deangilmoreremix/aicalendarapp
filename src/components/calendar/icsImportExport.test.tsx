@@ -8,7 +8,8 @@ const api = vi.hoisted(() => ({
   getSettings: vi.fn(),
   update: vi.fn(),
   getTimeline: vi.fn(),
-  cleanOrphans: vi.fn()
+  cleanOrphans: vi.fn(),
+  getExportDetails: vi.fn()
 }));
 vi.mock('../../services/api', () => ({
   calendarEventApi: api,
@@ -36,6 +37,7 @@ beforeEach(() => {
   api.existingIcalUids.mockResolvedValue(new Set());
   api.create.mockResolvedValue('id');
   api.getTimeline.mockResolvedValue({ totalNumberOfCalendarEvents: 0, timelineCalendarEvents: [] });
+  api.getExportDetails.mockResolvedValue(new Map());
 });
 
 describe('ImportCalendarDialog', () => {
@@ -192,7 +194,7 @@ describe('export from a record card', () => {
     render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
     await screen.findByText('Shared call');
     fireEvent.click(screen.getByRole('button', { name: /Export/ }));
-    expect(dl.downloadTextFile).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(dl.downloadTextFile).toHaveBeenCalledTimes(1));
     const [name, text] = dl.downloadTextFile.mock.calls[0];
     expect(name).toBe('contact-events.ics');
     expect(text).toContain('SUMMARY:Shared call');

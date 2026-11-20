@@ -74,8 +74,8 @@ describe('repeating events in the calendar API', () => {
   it('getRange reads series whatever their end date, and returns only the occurrences in the range', async () => {
     fake.events = [row({ recurrence_rule: 'FREQ=WEEKLY;COUNT=10' })];
     const events = await calendarEventApi.getRange(new Date(2031, 0, 20), new Date(2031, 0, 31));
-    const or = fake.calls.find((c) => c.table === 'calendar_events' && c.method === 'or');
-    expect(String(or?.args[0])).toContain('recurrence_rule.not.is.null');
+    const not = fake.calls.find((c) => c.table === 'calendar_events' && c.method === 'not');
+    expect(not?.args.slice(0, 2)).toEqual(['recurrence_rule', 'is']); // series are read in a query of their own, whatever their end date
     expect(events.map((e) => e.startDate.getDate())).toEqual([20, 27]); // Mondays 6, 13, 20, 27 ... only 20 and 27 are in range
     expect(events.every((e) => e.seriesId === 's1')).toBe(true);
   });

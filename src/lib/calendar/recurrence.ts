@@ -63,6 +63,9 @@ export const parseRule = (text: string | null | undefined): RecurrenceRule | nul
   }
   const supported = new Set(['FREQ', 'INTERVAL', 'COUNT', 'UNTIL', 'BYDAY', 'WKST']);
   for (const key of map.keys()) if (!supported.has(key)) return null;
+  // weeks start on Monday (the RFC default); another week start changes which days a weekly rule picks, so it is not
+  // supported and the event falls back to a single one
+  if (map.has('WKST') && map.get('WKST')?.toUpperCase() !== 'MO') return null;
 
   const freq = map.get('FREQ')?.toUpperCase() as RecurrenceFrequency | undefined;
   if (!freq || !FREQUENCIES.includes(freq)) return null;
@@ -152,8 +155,19 @@ function* candidates(start: Date, rule: RecurrenceRule): Generator<Date> {
  * The occurrences of a repeating event that overlap [from, to]. `start`/`end` are the first occurrence; every occurrence
  * lasts as long as the first one. Bounded by MAX_OCCURRENCES results and MAX_CANDIDATES examined dates.
  */
-export function expandOccurrences(start: Date, end: Date, rule: RecurrenceRule, from: Date, to: Date): Occurrence[] {
+export function expandOccurrences(
+  start: Date,
+  end: Date,
+  rule: RecurrenceRule,
+  from: Date,
+  to: Date,
+  options: { allDay?: boolean } = {}
+): Occurrence[] {
   const duration = Math.max(0, end.getTime() - start.getTime());
+  // an all-day event spans whole calendar days, and a local day can have 23 or 25 hours: keep the span in days
+  const spanDays = Math.round(
+    (Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86_400_000
+  );
   const result: Occurrence[] = [];
   let index = 0;
   let examined = 0;
@@ -163,7 +177,9 @@ export function expandOccurrences(start: Date, end: Date, rule: RecurrenceRule, 
     if (rule.count !== undefined && index >= rule.count) break;
     if (rule.until && candidate.getTime() > rule.until.getTime()) break;
     if (candidate.getTime() > to.getTime()) break;
-    const occurrenceEnd = new Date(candidate.getTime() + duration);
+    const occurrenceEnd = options.allDay
+      ? new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate() + Math.max(0, spanDays), end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds())
+      : new Date(candidate.getTime() + duration);
     if (occurrenceEnd.getTime() >= from.getTime()) result.push({ start: candidate, end: occurrenceEnd, index });
     index += 1;
   }

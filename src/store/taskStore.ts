@@ -6,6 +6,8 @@ import { generateId } from '../utils';
 interface TaskState {
   tasks: Record<string, Task>;
   calendarEvents: CalendarEvent[];
+  /** The range `calendarEvents` was last loaded for successfully (null before the first load). */
+  calendarEventsRange: { from: Date; to: Date } | null;
   activities: Activity[];
   appointments: Record<string, Appointment>;
   selectedTask: string | null;
@@ -105,6 +107,7 @@ let lastCalendarRange: { from: Date; to: Date } | null = null;
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: {},
   calendarEvents: [],
+  calendarEventsRange: null,
   activities: [],
   appointments: {},
   selectedTask: null,
@@ -321,7 +324,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const request = ++latestCalendarRangeRequest;
     try {
       const events = await calendarEventApi.getRange(from, to);
-      if (request === latestCalendarRangeRequest) set({ calendarEvents: events });
+      if (request === latestCalendarRangeRequest) set({ calendarEvents: events, calendarEventsRange: { from, to } });
     } catch (error) {
       console.error('Failed to load calendar events:', error);
       if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
@@ -347,7 +350,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   patchCalendarEvent: (id, updates) => {
     // an edit of a repeating event changes the whole series, so the occurrences are worked out again
-    if (id.includes('#') || get().calendarEvents.some((e) => e.id === id && e.recurrenceRule)) {
+    if (id.includes('#') || updates.recurrenceRule || get().calendarEvents.some((e) => e.id === id && e.recurrenceRule)) {
       void get().reloadCalendarEvents();
       return;
     }

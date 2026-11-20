@@ -7,6 +7,9 @@ import { CalendarChannelVisibility } from '../../vendor/twenty/calendar/shared/C
 import type { TimelineCalendarEvent } from '../../vendor/twenty/calendar/types/generated';
 import type { IcsEvent, ParsedIcsEvent } from './ics';
 
+/** The zone repeating timed events are written in: the one the calendar works out their occurrences in (the viewer's). */
+const viewerTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+
 const localDateString = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -27,30 +30,38 @@ export const calendarEventsToIcs = (events: CalendarEvent[]): IcsEvent[] => {
       end: event.seriesEndDate ?? event.endDate,
       isAllDay: event.isAllDay,
       rrule: event.recurrenceRule,
+      timeZone: event.recurrenceRule && !event.isAllDay ? viewerTimeZone() : undefined,
       attendees: (event.participants ?? []).filter((p) => p.handle).map((p) => ({ handle: p.handle as string, displayName: p.displayName }))
     });
   }
   return out;
 };
 
+/** What a record's timeline response does not carry, read from the stored events (see calendarEventApi.getExportDetails). */
+export type ExportDetails = Map<string, { recurrenceRule?: string; icalUid?: string }>;
+
 /**
- * A record's timeline events as .ics events. Events whose details are not shared with the viewer (no title) are left out,
- * and an event's all-day end is the day after its last day (the timeline stores the last day's end).
+ * A record's timeline events as .ics events. Events whose details are not shared with the viewer (no title) are left out.
+ * `details` supplies the repeat rule and the UID an imported event came with, so a repeating event is written once, with
+ * its rule, and re-importing the file does not create duplicates.
  */
-export const timelineEventsToIcs = (events: TimelineCalendarEvent[]): IcsEvent[] =>
+export const timelineEventsToIcs = (events: TimelineCalendarEvent[], details: ExportDetails = new Map()): IcsEvent[] =>
   events
     .filter((e) => e.title !== undefined && e.title !== null)
     .map((e) => {
       const start = new Date(e.startsAt);
       const end = e.endsAt ? new Date(e.endsAt) : start;
+      const extra = details.get(e.id);
       return {
-        uid: `${e.id}@aicalendar`,
+        uid: extra?.icalUid || `${e.id}@aicalendar`,
         title: e.title as string,
         description: e.description,
         location: e.location,
         start,
         end,
         isAllDay: e.isFullDay,
+        rrule: extra?.recurrenceRule,
+        timeZone: extra?.recurrenceRule && !e.isFullDay ? viewerTimeZone() : undefined,
         attendees: (e.participants ?? []).filter((p) => p.handle).map((p) => ({ handle: p.handle, displayName: p.displayName }))
       };
     });

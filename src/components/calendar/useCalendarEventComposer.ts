@@ -119,7 +119,10 @@ export const useCalendarEventComposer = ({
     const rule: RecurrenceRule = { freq: repeatFreq, interval: repeatInterval };
     if (repeatFreq === 'WEEKLY' && repeatDays.length > 0) rule.byDay = [...repeatDays].sort((a, b) => a - b);
     if (repeatEnds === 'count') rule.count = repeatCount;
-    if (repeatEnds === 'until') rule.until = new Date(`${repeatUntil}T23:59:59`);
+    if (repeatEnds === 'until') {
+      // an end date the person did not change keeps the exact instant it was saved (or imported) with
+      rule.until = existingRule?.until && repeatUntil === localDateString(existingRule.until) ? existingRule.until : new Date(`${repeatUntil}T23:59:59`);
+    }
     return formatRule(rule);
   };
 

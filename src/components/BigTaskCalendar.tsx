@@ -328,6 +328,7 @@ export const BigTaskCalendar: React.FC = () => {
   const { 
     tasks, 
     calendarEvents,
+    calendarEventsRange,
     loadInitialData,
     loadCalendarEvents,
   } = useTaskStore();
@@ -435,6 +436,16 @@ export const BigTaskCalendar: React.FC = () => {
       }),
     [tasks, deals, contacts, calendarEvents, fieldByType, visibleTypes, filters, visibleCalendars]
   );
+
+  // .ics export: the events in view (after the view's filters and calendar switches), once the range in view has loaded
+  const exportEvents: CalendarEvent[] = useMemo(
+    () => records.filter((r) => r.type === 'event').map((r) => r.raw as CalendarEvent),
+    [records]
+  );
+  const exportReady =
+    !!calendarEventsRange &&
+    calendarEventsRange.from.getTime() === visibleRange.from.getTime() &&
+    calendarEventsRange.to.getTime() === visibleRange.to.getTime();
 
   // react-big-calendar orders a day's cards by start/end and keeps input order for ties, and gives no hook to sort by
   // anything else. So all-day cards (deals, contacts, untimed tasks/events) are placed at the start of their day, which
@@ -737,8 +748,9 @@ export const BigTaskCalendar: React.FC = () => {
             onApply={applySavedView}
           />
           <CalendarDataMenu
-            exportCount={new Set(calendarEvents.map((e) => e.seriesId ?? e.id)).size}
-            onExport={() => downloadTextFile('calendar.ics', buildIcs(calendarEventsToIcs(calendarEvents)))}
+            exportCount={new Set(exportEvents.map((e) => e.seriesId ?? e.id)).size}
+            exportReady={exportReady}
+            onExport={() => downloadTextFile('calendar.ics', buildIcs(calendarEventsToIcs(exportEvents)))}
             onImported={() => void useTaskStore.getState().reloadCalendarEvents()}
           />
 

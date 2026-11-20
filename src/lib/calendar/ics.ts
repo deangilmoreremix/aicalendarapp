@@ -4,7 +4,7 @@
  * UTC, floating and TZID times, whole days, DURATION, ATTENDEE, RRULE (supported subset only). Not imported: alarms,
  * attachments, exceptions of a repeating event (EXDATE / RECURRENCE-ID) and cancelled events.
  */
-import { formatUtc, parseRule } from './recurrence';
+import { formatRule, formatUtc, parseRule } from './recurrence';
 
 export interface IcsAttendee {
   handle: string;
@@ -23,6 +23,11 @@ export interface IcsEvent {
   attendees: IcsAttendee[];
   /** RRULE text without the "RRULE:" prefix */
   rrule?: string;
+  /**
+   * IANA zone in which a repeating timed event keeps its wall-clock time. Without it the event is written in UTC, which
+   * shifts the occurrences by an hour after a daylight-saving change in the viewer's calendar.
+   */
+  timeZone?: string;
 }
 
 export interface ParsedIcsEvent extends IcsEvent {
@@ -47,6 +52,28 @@ const escapeText = (value: string): string =>
 
 const unescapeText = (value: string): string =>
   value.replace(/\\([nN,;\\])/g, (_m, c: string) => (c === 'n' || c === 'N' ? '\n' : c));
+
+/** "YYYYMMDDTHHMMSS" as the wall clock of `zone` shows it at this instant (null for an unknown zone). */
+const wallTimeIn = (instant: Date, zone: string): string | null => {
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        .formatToParts(instant)
+        .map((p) => [p.type, p.value])
+    );
+    return `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`;
+  } catch {
+    return null;
+  }
+};
+
+/** An all-day event's UNTIL must be a date like its DTSTART (RFC 5545): the chosen last day, in local time. */
+const ruleForAllDay = (rrule: string): string => {
+  const rule = parseRule(rrule);
+  if (!rule?.until) return rrule;
+  const text = formatRule({ ...rule, until: undefined });
+  return `${text};UNTIL=${dateOnly(rule.until)}`;
+};
 
 const dateOnly = (d: Date): string => `${pad(d.getFullYear(), 4)}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 
@@ -84,12 +111,18 @@ export const buildIcs = (events: IcsEvent[], now: Date = new Date()): string => 
       if (endDay.getTime() <= startDay.getTime()) endDay = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + 1);
       lines.push(`DTSTART;VALUE=DATE:${dateOnly(startDay)}`, `DTEND;VALUE=DATE:${dateOnly(endDay)}`);
     } else {
-      lines.push(`DTSTART:${formatUtc(event.start)}`, `DTEND:${formatUtc(event.end)}`);
+      const zoned = event.rrule && event.timeZone ? [wallTimeIn(event.start, event.timeZone), wallTimeIn(event.end, event.timeZone)] : null;
+      if (zoned && zoned[0] && zoned[1]) {
+        // a repeating event keeps its local time across daylight-saving changes: write it in its zone (UNTIL stays UTC)
+        lines.push(`DTSTART;TZID=${event.timeZone}:${zoned[0]}`, `DTEND;TZID=${event.timeZone}:${zoned[1]}`);
+      } else {
+        lines.push(`DTSTART:${formatUtc(event.start)}`, `DTEND:${formatUtc(event.end)}`);
+      }
     }
     lines.push(`SUMMARY:${escapeText(event.title || '(no title)')}`);
     if (event.description) lines.push(`DESCRIPTION:${escapeText(event.description)}`);
     if (event.location) lines.push(`LOCATION:${escapeText(event.location)}`);
-    if (event.rrule) lines.push(`RRULE:${event.rrule}`);
+    if (event.rrule) lines.push(`RRULE:${event.isAllDay ? ruleForAllDay(event.rrule) : event.rrule}`);
     for (const attendee of event.attendees) {
       const cn = attendee.displayName && attendee.displayName !== attendee.handle ? `;CN="${attendee.displayName.replace(/"/g, "'")}"` : '';
       lines.push(`ATTENDEE${cn}:mailto:${attendee.handle}`);

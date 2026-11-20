@@ -24,6 +24,12 @@ const readFileText = (file: File): Promise<string> =>
         reader.readAsText(file);
       });
 
+/** A duplicate-key error on the UID index (other unique constraints, if any, are real failures). */
+const isUidConflict = (error: unknown): boolean => {
+  const e = error as { code?: string; message?: string } | null;
+  return e?.code === '23505' && String(e.message ?? '').includes('calendar_events_ical_uid_key');
+};
+
 const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 type Props = {
@@ -40,6 +46,8 @@ export const ImportCalendarDialog = ({ isOpen, onClose, onImported }: Props) => 
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number; failed: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  // a read of an older selection that finishes late must not replace the newest selection's data
+  const selection = useRef(0);
 
   if (!isOpen) return null;
 
@@ -51,6 +59,7 @@ export const ImportCalendarDialog = ({ isOpen, onClose, onImported }: Props) => 
   };
 
   const onFile = async (file: File | undefined) => {
+    const mine = ++selection.current;
     reset();
     if (!file) return;
     setFileName(file.name);
@@ -60,12 +69,13 @@ export const ImportCalendarDialog = ({ isOpen, onClose, onImported }: Props) => 
     }
     try {
       const text = await readFileText(file);
+      if (mine !== selection.current) return;
       const next = parseIcs(text);
       if (next.events.length === 0 && next.warnings.length === 0) setReadError('No events were found in that file.');
       setParsed(next);
     } catch (error) {
       console.error('Could not read the .ics file:', error);
-      setReadError('That file could not be read.');
+      if (mine === selection.current) setReadError('That file could not be read.');
     }
   };
 
@@ -96,6 +106,11 @@ export const ImportCalendarDialog = ({ isOpen, onClose, onImported }: Props) => 
           await calendarEventApi.create(parsedIcsToCreateInput(event, timeZone, visibility));
           imported += 1;
         } catch (error) {
+          // another import may have stored this UID after the lookup above: that is a skip, not a failure
+          if (event.uid && isUidConflict(error) && (await calendarEventApi.existingIcalUids([event.uid]).catch(() => new Set<string>())).has(event.uid)) {
+            skipped += 1;
+            continue;
+          }
           console.error('Could not import an event:', error);
           failed += 1;
         }

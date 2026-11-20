@@ -812,6 +812,8 @@ const matchAttendeesToContacts = async <A extends { handle: string; contactId?: 
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RECURRING_PAGE_SIZE = 1000;
+const MAX_RECURRING_PAGES = 50;
 const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
 
@@ -823,7 +825,7 @@ type GuestRow = { calendar_event_id: string; handle: string; display_name: strin
 export const expandRepeatingEvent = (event: CalendarEvent, from: Date, to: Date): CalendarEvent[] => {
   const rule = parseRule(event.recurrenceRule);
   if (!rule) return [event.recurrenceRule ? { ...event, recurrenceRule: undefined } : event];
-  return expandOccurrences(event.startDate, event.endDate, rule, from, to).map((o) => ({
+  return expandOccurrences(event.startDate, event.endDate, rule, from, to, { allDay: event.isAllDay }).map((o) => ({
     ...event,
     id: `${event.id}#${o.index}`,
     seriesId: event.id,
@@ -867,6 +869,22 @@ export const calendarEventApi = {
         participants: (event.participants ?? []).map(p => ({ ...p, lastName: p.lastName ?? '' }))
       }))
     };
+  },
+
+  /** The repeat rule and imported UID of stored events (the timeline response does not carry them), for .ics export. */
+  async getExportDetails(ids: string[]): Promise<Map<string, { recurrenceRule?: string; icalUid?: string }>> {
+    const out = new Map<string, { recurrenceRule?: string; icalUid?: string }>();
+    for (let i = 0; i < ids.length; i += GUEST_BATCH_SIZE) {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('id, recurrence_rule, ical_uid')
+        .in('id', ids.slice(i, i + GUEST_BATCH_SIZE));
+      if (error) throw error;
+      for (const row of (data ?? []) as { id: string; recurrence_rule: string | null; ical_uid: string | null }[]) {
+        out.set(row.id, { recurrenceRule: row.recurrence_rule ?? undefined, icalUid: row.ical_uid ?? undefined });
+      }
+    }
+    return out;
   },
 
   /** Which of these .ics UIDs are already stored (so importing the same file twice skips them). */
@@ -925,11 +943,32 @@ export const calendarEventApi = {
       .from('calendar_events')
       .select('*')
       .lte('start_date', to.toISOString())
-      // a repeating event is one row that starts early and may end early: it is read whatever its own end date
-      .or(`end_date.gte.${from.toISOString()},end_date.is.null,recurrence_rule.not.is.null`)
+      .or(`end_date.gte.${from.toISOString()},end_date.is.null`)
       .order('start_date');
     if (error) throw error;
-    const events = (data ?? []).map(mapCalendarEventFromDB);
+    // Repeating events are one row that starts early and may end early, so they are read whatever their own end date. They
+    // are read in pages of their own: a response is capped (max_rows), and old series must not push a current event out.
+    const recurring: Record<string, unknown>[] = [];
+    for (let page = 0; page < MAX_RECURRING_PAGES; page += 1) {
+      const { data: rows, error: recurringError } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .not('recurrence_rule', 'is', null)
+        .lte('start_date', to.toISOString())
+        .order('start_date')
+        .range(page * RECURRING_PAGE_SIZE, (page + 1) * RECURRING_PAGE_SIZE - 1);
+      if (recurringError) throw recurringError;
+      recurring.push(...((rows ?? []) as Record<string, unknown>[]));
+      if ((rows ?? []).length < RECURRING_PAGE_SIZE) break;
+    }
+    const seen = new Set<string>();
+    const merged = [...((data ?? []) as Record<string, unknown>[]), ...recurring].filter((row) => {
+      const id = String(row.id);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const events = (merged as unknown as CalendarEventDB[]).map(mapCalendarEventFromDB);
     if (events.length === 0) return events;
 
     // guests live in their own table; load them so events opened from the calendar show who is invited
