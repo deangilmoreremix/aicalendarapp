@@ -100,6 +100,14 @@ export const foldLine = (line: string): string => {
   return out.join(CRLF + ' ');
 };
 
+const isoDuration = (ms: number): string => {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  return `PT${h}H${m}M${sec}S`;
+};
+
 export const buildIcs = (events: IcsEvent[], now: Date = new Date()): string => {
   const lines: string[] = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AI Calendar//Calendar export//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
   const stamp = formatUtc(now);
@@ -114,7 +122,8 @@ export const buildIcs = (events: IcsEvent[], now: Date = new Date()): string => 
       const zoned = event.rrule && event.timeZone ? [wallTimeIn(event.start, event.timeZone), wallTimeIn(event.end, event.timeZone)] : null;
       if (zoned && zoned[0] && zoned[1]) {
         // a repeating event keeps its local time across daylight-saving changes: write it in its zone (UNTIL stays UTC)
-        lines.push(`DTSTART;TZID=${event.timeZone}:${zoned[0]}`, `DTEND;TZID=${event.timeZone}:${zoned[1]}`);
+        // the length is written as a duration: a zoned end time is ambiguous in the repeated hour of a daylight-saving change
+        lines.push(`DTSTART;TZID=${event.timeZone}:${zoned[0]}`, `DURATION:${isoDuration(event.end.getTime() - event.start.getTime())}`);
       } else {
         lines.push(`DTSTART:${formatUtc(event.start)}`, `DTEND:${formatUtc(event.end)}`);
       }

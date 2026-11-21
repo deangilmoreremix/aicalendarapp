@@ -12,7 +12,7 @@ vi.mock('../lib/supabase', () => {
     const q: any = {
       select: () => q,
       lte: () => q,
-      not: () => ({ lte: () => ({ order: () => ({ range: () => Promise.resolve({ data: [], error: null }) }) }) }),
+      not: () => ({ lte: () => ({ order: () => ({ order: () => ({ range: () => Promise.resolve({ data: [], error: null }) }) }) }) }),
       or: () => q,
       in: (_col: string, list: string[]) => {
         ids = list;

@@ -102,6 +102,8 @@ const applyTaskUpdate = (task: Task, update: TaskUpdate): Task => {
 
 // only the latest range request may write the store: navigating quickly must not let an older response win
 let latestCalendarRangeRequest = 0;
+/** Counts successful range loads: an optimistic edit's rollback is dropped if a newer load has replaced the events. */
+let calendarLoadGeneration = 0;
 let lastCalendarRange: { from: Date; to: Date } | null = null;
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
@@ -324,7 +326,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const request = ++latestCalendarRangeRequest;
     try {
       const events = await calendarEventApi.getRange(from, to);
-      if (request === latestCalendarRangeRequest) set({ calendarEvents: events, calendarEventsRange: { from, to } });
+      if (request === latestCalendarRangeRequest) {
+        calendarLoadGeneration += 1;
+        set({ calendarEvents: events, calendarEventsRange: { from, to } });
+      }
     } catch (error) {
       console.error('Failed to load calendar events:', error);
       if (request === latestCalendarRangeRequest) set({ error: 'Failed to load calendar events' });
@@ -337,13 +342,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   rescheduleCalendarEvent: async (id, updates) => {
     const previous = get().calendarEvents;
+    const generation = calendarLoadGeneration;
     set({ calendarEvents: previous.map(e => (e.id === id ? { ...e, ...updates } : e)) });
     try {
       await calendarEventApi.update(storedEventId(id), updates);
       return true;
     } catch (error) {
       console.error('Failed to reschedule event:', error);
-      set({ calendarEvents: previous, error: 'Failed to reschedule event' });
+      set(calendarLoadGeneration === generation ? { calendarEvents: previous, error: 'Failed to reschedule event' } : { error: 'Failed to reschedule event' });
       return false;
     }
   },
@@ -360,6 +366,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   removeCalendarEvent: async (id) => {
     const previous = get().calendarEvents;
     const stored = storedEventId(id);
+    const generation = calendarLoadGeneration;
     // deleting an occurrence deletes the whole series (single-occurrence exceptions are not supported)
     set({ calendarEvents: previous.filter(e => e.id !== id && e.id !== stored && e.seriesId !== stored) });
     try {
@@ -367,7 +374,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       return true;
     } catch (error) {
       console.error('Failed to delete event:', error);
-      set({ calendarEvents: previous, error: 'Failed to delete event' });
+      set(calendarLoadGeneration === generation ? { calendarEvents: previous, error: 'Failed to delete event' } : { error: 'Failed to delete event' });
       return false;
     }
   },

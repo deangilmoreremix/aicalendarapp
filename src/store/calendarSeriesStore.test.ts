@@ -58,3 +58,18 @@ describe('repeating events in the store', () => {
     expect(useTaskStore.getState().calendarEvents.find((e) => e.id === 'p')?.title).toBe('Renamed');
   });
 });
+
+describe('rollback after a newer range has loaded', () => {
+  it('does not restore the events of an obsolete range when a delete fails late', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let fail: (e: Error) => void = () => {};
+    api.delete.mockReturnValue(new Promise((_, reject) => { fail = reject; }));
+    const pending = useTaskStore.getState().removeCalendarEvent('p');
+    api.getRange.mockResolvedValue([]);
+    await useTaskStore.getState().loadCalendarEvents(new Date(2030, 1, 1), new Date(2030, 1, 28)); // a newer range replaces the events
+    fail(new Error('down'));
+    expect(await pending).toBe(false);
+    expect(useTaskStore.getState().calendarEvents).toEqual([]); // not the January events again
+  });
+});
+

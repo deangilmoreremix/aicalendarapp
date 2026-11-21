@@ -813,7 +813,7 @@ const matchAttendeesToContacts = async <A extends { handle: string; contactId?: 
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RECURRING_PAGE_SIZE = 1000;
-const MAX_RECURRING_PAGES = 50;
+const MAX_RECURRING_PAGES = 200;
 const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
 
@@ -824,7 +824,11 @@ type GuestRow = { calendar_event_id: string; handle: string; display_name: strin
  */
 export const expandRepeatingEvent = (event: CalendarEvent, from: Date, to: Date): CalendarEvent[] => {
   const rule = parseRule(event.recurrenceRule);
-  if (!rule) return [event.recurrenceRule ? { ...event, recurrenceRule: undefined } : event];
+  if (!rule) {
+    // a single event (the series was read whatever its dates): only if it overlaps the range
+    if (event.startDate.getTime() > to.getTime() || event.endDate.getTime() < from.getTime()) return [];
+    return [event.recurrenceRule ? { ...event, recurrenceRule: undefined } : event];
+  }
   return expandOccurrences(event.startDate, event.endDate, rule, from, to, { allDay: event.isAllDay }).map((o) => ({
     ...event,
     id: `${event.id}#${o.index}`,
@@ -956,10 +960,12 @@ export const calendarEventApi = {
         .not('recurrence_rule', 'is', null)
         .lte('start_date', to.toISOString())
         .order('start_date')
+        .order('id') // a unique order, so pages never repeat or skip rows when start dates tie
         .range(page * RECURRING_PAGE_SIZE, (page + 1) * RECURRING_PAGE_SIZE - 1);
       if (recurringError) throw recurringError;
       recurring.push(...((rows ?? []) as Record<string, unknown>[]));
       if ((rows ?? []).length < RECURRING_PAGE_SIZE) break;
+      if (page === MAX_RECURRING_PAGES - 1) throw new Error('Too many repeating events to read the calendar completely');
     }
     const seen = new Set<string>();
     const merged = [...((data ?? []) as Record<string, unknown>[]), ...recurring].filter((row) => {

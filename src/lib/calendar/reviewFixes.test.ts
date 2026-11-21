@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRule, expandOccurrences } from './recurrence';
+import { parseRule, expandOccurrences, formatUtc } from './recurrence';
 import { buildIcs } from './ics';
 import { timelineEventsToIcs } from './icsEvents';
 
@@ -24,7 +24,9 @@ describe('review fixes: recurrence and .ics', () => {
   it('writes a repeating timed event with its time zone, and an all-day UNTIL as a date', () => {
     const timed = buildIcs([{ uid: 'a@x', title: 'T', start: new Date('2031-01-06T14:00:00Z'), end: new Date('2031-01-06T15:00:00Z'), isAllDay: false, rrule: 'FREQ=WEEKLY', timeZone: 'America/New_York', attendees: [] }]);
     expect(timed).toContain('DTSTART;TZID=America/New_York:20310106T090000');
-    const allDay = buildIcs([{ uid: 'b@x', title: 'D', start: at(2031, 1, 6, 0), end: at(2031, 1, 7, 0), isAllDay: true, rrule: 'FREQ=DAILY;UNTIL=20310110T050000Z', attendees: [] }]);
+    expect(timed).toContain('DURATION:PT1H0M0S');
+    expect(timed).not.toContain('DTEND');
+    const allDay = buildIcs([{ uid: 'b@x', title: 'D', start: at(2031, 1, 6, 0), end: at(2031, 1, 7, 0), isAllDay: true, rrule: `FREQ=DAILY;UNTIL=${formatUtc(at(2031, 1, 10, 0))}`, attendees: [] }]);
     expect(allDay).toMatch(/RRULE:FREQ=DAILY;UNTIL=20310110(\r\n|$)/);
   });
 
@@ -36,5 +38,15 @@ describe('review fixes: recurrence and .ics', () => {
     const [rich] = timelineEventsToIcs(events, new Map([['s1', { recurrenceRule: 'FREQ=WEEKLY', icalUid: 'orig@cal' }]]));
     expect(rich).toMatchObject({ uid: 'orig@cal', rrule: 'FREQ=WEEKLY' });
     expect(rich.timeZone).toBeTruthy();
+  });
+});
+
+import { expandRepeatingEvent } from '../../services/api';
+
+describe('review fixes, round two', () => {
+  it('a series with an unsupported rule is only shown when it overlaps the range', () => {
+    const event = { id: 'u1', title: 'Monthly', startDate: new Date(2031, 0, 14, 9), endDate: new Date(2031, 0, 14, 10), isAllDay: false, recurrenceRule: 'FREQ=MONTHLY;BYDAY=2TU' } as any;
+    expect(expandRepeatingEvent(event, new Date(2031, 2, 1), new Date(2031, 2, 31))).toEqual([]);
+    expect(expandRepeatingEvent(event, new Date(2031, 0, 1), new Date(2031, 0, 31))).toHaveLength(1);
   });
 });

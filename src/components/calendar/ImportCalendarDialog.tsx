@@ -26,8 +26,12 @@ const readFileText = (file: File): Promise<string> =>
 
 /** A duplicate-key error on the UID index (other unique constraints, if any, are real failures). */
 const isUidConflict = (error: unknown): boolean => {
-  const e = error as { code?: string; message?: string } | null;
-  return e?.code === '23505' && String(e.message ?? '').includes('calendar_events_ical_uid_key');
+  // the error may be the database error itself or wrapped (`error.error`, `cause`)
+  const e = error as { code?: string; message?: string; details?: string; error?: unknown; cause?: unknown } | null;
+  if (!e) return false;
+  const text = `${e.message ?? ''} ${e.details ?? ''}`;
+  if (e.code === '23505' && text.includes('calendar_events_ical_uid_key')) return true;
+  return (e.error ? isUidConflict(e.error) : false) || (e.cause ? isUidConflict(e.cause) : false);
 };
 
 const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
