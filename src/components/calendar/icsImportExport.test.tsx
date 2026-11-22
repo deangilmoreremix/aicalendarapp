@@ -201,3 +201,28 @@ describe('export from a record card', () => {
     expect(text.match(/BEGIN:VEVENT/g)).toHaveLength(1); // the event without a shared title is left out
   });
 });
+
+describe('export timeout', () => {
+  it('stops the export when the timeout fires: no more requests and no download after the error', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      api.getTimeline.mockResolvedValueOnce({
+        totalNumberOfCalendarEvents: 1,
+        timelineCalendarEvents: [{ id: 'a', title: 'Call', isFullDay: false, startsAt: '2030-03-01T10:00:00.000Z', endsAt: '2030-03-01T11:00:00.000Z', visibility: 'SHARE_EVERYTHING', participants: [] }]
+      });
+      render(<CalendarEventsCard targetType="contact" targetId="c1" objectName="contact" />);
+      await screen.findByText('Call');
+      let release: (v: unknown) => void = () => {};
+      api.getTimeline.mockReturnValueOnce(new Promise((resolve) => { release = resolve; })); // the export's first request hangs
+      fireEvent.click(screen.getByRole('button', { name: /Export/ }));
+      await vi.advanceTimersByTimeAsync(61_000);
+      expect(await screen.findByText('Could not export the events.')).toBeInTheDocument();
+      release({ totalNumberOfCalendarEvents: 1, timelineCalendarEvents: [{ id: 'a', title: 'Call', isFullDay: false, startsAt: '2030-03-01T10:00:00.000Z', endsAt: '2030-03-01T11:00:00.000Z', visibility: 'SHARE_EVERYTHING', participants: [] }] });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(api.getExportDetails).not.toHaveBeenCalled();
+      expect(dl.downloadTextFile).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
