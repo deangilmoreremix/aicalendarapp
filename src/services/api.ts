@@ -849,14 +849,16 @@ export const calendarEventApi = {
     targetType: CalendarTargetType,
     targetId: string,
     pageSize = 10,
-    offset = 0
+    offset = 0,
+    signal?: AbortSignal
   ): Promise<TimelineCalendarEventsWithTotal> {
-    const { data, error } = await supabase.rpc('get_timeline_calendar_events', {
+    const request = supabase.rpc('get_timeline_calendar_events', {
       p_target_type: targetType,
       p_target_id: targetId,
       p_page_size: pageSize,
       p_offset: offset
     });
+    const { data, error } = await (signal ? request.abortSignal(signal) : request);
     if (error) throw error;
 
     // events with a blocked guest are already left out (and not counted) by the function itself, before it paginates
@@ -876,13 +878,15 @@ export const calendarEventApi = {
   },
 
   /** The repeat rule and imported UID of stored events (the timeline response does not carry them), for .ics export. */
-  async getExportDetails(ids: string[]): Promise<Map<string, { recurrenceRule?: string; icalUid?: string }>> {
+  async getExportDetails(ids: string[], signal?: AbortSignal): Promise<Map<string, { recurrenceRule?: string; icalUid?: string }>> {
     const out = new Map<string, { recurrenceRule?: string; icalUid?: string }>();
     for (let i = 0; i < ids.length; i += GUEST_BATCH_SIZE) {
-      const { data, error } = await supabase
+      if (signal?.aborted) throw new Error('Aborted');
+      const query = supabase
         .from('calendar_events')
         .select('id, recurrence_rule, ical_uid')
         .in('id', ids.slice(i, i + GUEST_BATCH_SIZE));
+      const { data, error } = await (signal ? query.abortSignal(signal) : query);
       if (error) throw error;
       for (const row of (data ?? []) as { id: string; recurrence_rule: string | null; ical_uid: string | null }[]) {
         out.set(row.id, { recurrenceRule: row.recurrence_rule ?? undefined, icalUid: row.ical_uid ?? undefined });

@@ -221,6 +221,7 @@ describe('export timeout', () => {
       await vi.advanceTimersByTimeAsync(10);
       expect(api.getExportDetails).not.toHaveBeenCalled();
       expect(dl.downloadTextFile).not.toHaveBeenCalled();
+      expect(api.getTimeline.mock.calls.at(-1)?.[4]?.aborted).toBe(true); // the request in flight was cancelled
     } finally {
       vi.useRealTimers();
     }

@@ -129,31 +129,31 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
   const exportEvents = async () => {
     setExporting(true);
     setError(null);
-    // set when the timeout fires: the run must then stop asking for pages and must not download anything
-    const run = { cancelled: false };
+    // aborted when the timeout fires: the requests in flight are cancelled, and the run asks for nothing more and downloads nothing
+    const run = new AbortController();
     try {
       await withTimeout((async () => {
       // every page of this record's events, whatever is loaded for display (the card shows 10 at a time)
       const all: TimelineCalendarEvent[] = [];
       const PAGE = 100;
       for (let page = 0; page < 100; page += 1) {
-        if (run.cancelled) return;
-        const result = await calendarEventApi.getTimeline(targetType, targetId, PAGE, all.length);
-        if (run.cancelled) return;
+        if (run.signal.aborted) return;
+        const result = await calendarEventApi.getTimeline(targetType, targetId, PAGE, all.length, run.signal);
+        if (run.signal.aborted) return;
         all.push(...result.timelineCalendarEvents);
         if (result.timelineCalendarEvents.length < PAGE || all.length >= result.totalNumberOfCalendarEvents) break;
         if (page === 99) throw new Error('Too many events to export at once');
       }
-      if (run.cancelled) return;
-      const details = await calendarEventApi.getExportDetails(all.map((e) => e.id));
-      if (run.cancelled) return;
+      if (run.signal.aborted) return;
+      const details = await calendarEventApi.getExportDetails(all.map((e) => e.id), run.signal);
+      if (run.signal.aborted) return;
       const icsEvents = timelineEventsToIcs(all, details);
       if (icsEvents.length === 0) {
         setError('None of these events can be exported (their details are not shared with you).');
         return;
       }
       downloadTextFile(`${objectName || 'calendar'}-events.ics`, buildIcs(icsEvents));
-      })(), EXPORT_TIMEOUT_MS, () => { run.cancelled = true; });
+      })(), EXPORT_TIMEOUT_MS, () => run.abort());
     } catch (err) {
       console.error('Failed to export calendar events:', err);
       setError('Could not export the events.');
