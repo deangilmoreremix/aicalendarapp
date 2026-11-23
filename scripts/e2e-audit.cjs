@@ -35,7 +35,7 @@ const reqLog = []; const fnCalls = {};
   page.on('pageerror', (e) => note('PAGEERROR', e));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|favicon/.test(m.text())) note('console.error', m.text()); if (m.type() === 'warning' && /Warning:/.test(m.text())) note('react-warning', m.text().split('\n')[0]); });
   await page.route('http://127.0.0.1:54321/**', async (route) => {
-    const req = route.request(); const url = new URL(req.url()); const parts = url.pathname.split('/'); const table = parts.pop(); const method = req.method();
+    const req = route.request(); const url = new URL(req.url()); const parts = url.pathname.split('/'); const table = parts.pop().replace(/^crm_tasks$/, 'tasks'); const method = req.method();
     const headers = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
     reqLog.push({ step, method, table });

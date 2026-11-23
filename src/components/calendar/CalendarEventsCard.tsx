@@ -4,7 +4,9 @@
  * Logic follows upstream; styling uses this app's Tailwind design instead of Linaria/twenty-ui.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarPlus, Link2 } from 'lucide-react';
+import { CalendarPlus, Download, Link2 } from 'lucide-react';
+import { buildIcs } from '../../lib/calendar/ics';
+import { downloadTextFile, timelineEventsToIcs } from '../../lib/calendar/icsEvents';
 
 import { CalendarEventsCardContent } from './CalendarEventsCardContent';
 import { CalendarEventComposerModal, type CalendarComposerContext } from './CalendarEventComposerModal';
@@ -27,6 +29,20 @@ type CalendarEventsCardProps = {
 
 /** Reload signals that arrive within this time of each other cause a single reload of the timeline. */
 const TIMELINE_RELOAD_DEBOUNCE_MS = 150;
+
+const EXPORT_TIMEOUT_MS = 60_000;
+/** Rejects if the work takes longer than `ms`, so a hung request cannot leave Export stuck. */
+const withTimeout = <T,>(work: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error('Export timed out'));
+    }, ms);
+    work.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
 
 export const CalendarEventsCard = ({ targetType, targetId, objectName, composerContext }: CalendarEventsCardProps) => {
   const [events, setEvents] = useState<TimelineCalendarEvent[] | undefined>(undefined);
@@ -58,7 +74,10 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     }
   }, [targetType, targetId]);
 
+  // a different record starts empty, so nothing of the previous record can be shown or exported while it loads
   useEffect(() => {
+    setEvents(undefined);
+    setTotal(0);
     void load();
   }, [load]);
 
@@ -106,6 +125,43 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+  const exportEvents = async () => {
+    setExporting(true);
+    setError(null);
+    // aborted when the timeout fires: the requests in flight are cancelled, and the run asks for nothing more and downloads nothing
+    const run = new AbortController();
+    try {
+      await withTimeout((async () => {
+      // every page of this record's events, whatever is loaded for display (the card shows 10 at a time)
+      const all: TimelineCalendarEvent[] = [];
+      const PAGE = 100;
+      for (let page = 0; page < 100; page += 1) {
+        if (run.signal.aborted) return;
+        const result = await calendarEventApi.getTimeline(targetType, targetId, PAGE, all.length, run.signal);
+        if (run.signal.aborted) return;
+        all.push(...result.timelineCalendarEvents);
+        if (result.timelineCalendarEvents.length < PAGE || all.length >= result.totalNumberOfCalendarEvents) break;
+        if (page === 99) throw new Error('Too many events to export at once');
+      }
+      if (run.signal.aborted) return;
+      const details = await calendarEventApi.getExportDetails(all.map((e) => e.id), run.signal);
+      if (run.signal.aborted) return;
+      const icsEvents = timelineEventsToIcs(all, details);
+      if (icsEvents.length === 0) {
+        setError('None of these events can be exported (their details are not shared with you).');
+        return;
+      }
+      downloadTextFile(`${objectName || 'calendar'}-events.ics`, buildIcs(icsEvents));
+      })(), EXPORT_TIMEOUT_MS, () => run.abort());
+    } catch (err) {
+      console.error('Failed to export calendar events:', err);
+      setError('Could not export the events.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const openedEvent = events?.find((event) => event.id === openedEventId) ?? null;
 
   return (
@@ -115,6 +171,15 @@ export const CalendarEventsCard = ({ targetType, targetId, objectName, composerC
           Calendar {total > 0 && <span className="text-sm font-normal text-gray-500">({total})</span>}
         </h3>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void exportEvents()}
+            disabled={exporting || !events || events.length === 0}
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </button>
           <button
             type="button"
             onClick={() => setIsLinkOpen(true)}

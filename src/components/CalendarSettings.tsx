@@ -15,7 +15,7 @@ interface CalendarPreferences {
   weekStartsOn: 0 | 1;
 }
 
-import { CALENDAR_PREFERENCES_CHANGED, CALENDAR_BLOCKLIST_CHANGED } from '../lib/calendarPreferences';
+import { CALENDAR_PREFERENCES_CHANGED, CALENDAR_BLOCKLIST_CHANGED, CALENDAR_DATA_CHANGED } from '../lib/calendarPreferences';
 
 const STORAGE_KEY = 'calendar-preferences';
 
@@ -82,6 +82,24 @@ export const CalendarSettings: React.FC = () => {
     window.dispatchEvent(new Event(CALENDAR_BLOCKLIST_CHANGED));
     setBlockInput('');
     await loadBlocked();
+  };
+
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanResult, setCleanResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const cleanOrphans = async () => {
+    if (!window.confirm('Delete events that have no guests and are not linked to any contact, deal or task? Events created in the last hour are kept.')) return;
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const removed = await calendarEventApi.cleanOrphans();
+      setCleanResult({ ok: true, text: removed === 0 ? 'Nothing to clean up.' : `Removed ${removed} event${removed === 1 ? '' : 's'}.` });
+      if (removed > 0) window.dispatchEvent(new Event(CALENDAR_DATA_CHANGED));
+    } catch (err) {
+      console.error('Could not clean up events:', err);
+      setCleanResult({ ok: false, text: 'Could not clean up events.' });
+    } finally {
+      setCleaning(false);
+    }
   };
 
   const removeBlocked = async (id: string) => {
@@ -284,6 +302,26 @@ export const CalendarSettings: React.FC = () => {
             </ul>
           )}
           {blockError && <p className="text-xs text-red-600">{blockError}</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Clean up events</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-xs text-gray-500">
+            Removes events that have no guests and are not linked to any contact, deal or task (for example leftovers of an
+            import). Events created in the last hour are never removed.
+          </p>
+          <Button variant="outline" onClick={() => void cleanOrphans()} disabled={cleaning}>
+            {cleaning ? 'Cleaning...' : 'Clean up orphan events'}
+          </Button>
+          {cleanResult && (
+            <p role="status" className={`text-xs ${cleanResult.ok ? 'text-gray-700 dark:text-gray-300' : 'text-red-600'}`}>
+              {cleanResult.text}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

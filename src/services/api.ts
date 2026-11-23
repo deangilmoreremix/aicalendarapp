@@ -5,6 +5,7 @@ import type {
 } from '../vendor/twenty/calendar/types/generated';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 import { isEmailBlocklisted } from '../vendor/twenty/calendar-sync/is-email-blocklisted.util';
+import { expandOccurrences, parseRule } from '../lib/calendar/recurrence';
 import { sanitizeCalendarEvent } from '../vendor/twenty/calendar-sync/sanitizeCalendarEvent';
 import { resolveCalendarEventTimeZone } from '../vendor/twenty/calendar-sync/resolve-calendar-event-time-zone.util';
 import { contactTargetsForGuests, escapeIlike, matchGuestsToContacts, normalizeHandle } from '../lib/calendar/matchGuests';
@@ -106,6 +107,9 @@ interface DealDB {
 }
 
 // Utility functions for data mapping
+/** The database table behind `Task` (named crm_tasks so it cannot clash with a `tasks` table in a shared Supabase project). */
+export const TASKS_TABLE = 'crm_tasks';
+
 export const mapContactFromDB = (contact: ContactDB): Contact => ({
   id: contact.id,
   firstName: contact.first_name,
@@ -306,7 +310,7 @@ export const contactApi = {
 export const taskApi = {
   async getAll(): Promise<Task[]> {
     const { data, error } = await supabase
-      .from('tasks')
+      .from(TASKS_TABLE)
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -317,7 +321,7 @@ export const taskApi = {
 
   async create(task: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
     const { data, error } = await supabase
-      .from('tasks')
+      .from(TASKS_TABLE)
       .insert(mapTaskToDB(task))
       .select()
       .single();
@@ -339,7 +343,7 @@ export const taskApi = {
     });
 
     const { data, error } = await supabase
-      .from('tasks')
+      .from(TASKS_TABLE)
       .update(updateData)
       .eq('id', id)
       .select()
@@ -352,7 +356,7 @@ export const taskApi = {
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase
-      .from('tasks')
+      .from(TASKS_TABLE)
       .delete()
       .eq('id', id);
 
@@ -667,6 +671,10 @@ export interface CreateCalendarEventInput {
   timeZone: string;
   visibility: CalendarChannelVisibility;
   conferenceLink?: string;
+  /** RFC 5545 RRULE value for a repeating event */
+  recurrenceRule?: string;
+  /** UID from an imported .ics file (the same UID is never imported twice) */
+  icalUid?: string;
   attendees: { handle: string; displayName?: string; contactId?: string }[];
   targets: { type: CalendarTargetType; id: string }[];
 }
@@ -688,6 +696,8 @@ interface CalendarEventDB {
   conference_link?: string | null;
   visibility?: string | null;
   time_zone?: string | null;
+  recurrence_rule?: string | null;
+  ical_uid?: string | null;
 }
 
 export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent => {
@@ -710,7 +720,9 @@ export const mapCalendarEventFromDB = (event: CalendarEventDB): CalendarEvent =>
     conferenceLink: event.conference_link ?? undefined,
     visibility: (event.visibility as CalendarEvent['visibility']) ?? 'SHARE_EVERYTHING',
     position: event.position ?? undefined,
-    timeZone: event.time_zone ?? undefined
+    timeZone: event.time_zone ?? undefined,
+    recurrenceRule: event.recurrence_rule ?? undefined,
+    icalUid: event.ical_uid ?? undefined
   };
 };
 
@@ -800,22 +812,53 @@ const matchAttendeesToContacts = async <A extends { handle: string; contactId?: 
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RECURRING_PAGE_SIZE = 1000;
+const MAX_RECURRING_PAGES = 200;
 const TARGET_CONFLICT = 'calendar_event_id,target_type,target_id';
 type GuestRow = { calendar_event_id: string; handle: string; display_name: string | null; contact_id: string | null };
+
+/**
+ * A repeating event is one stored row; the calendar needs one entry per occurrence in the range. Each occurrence gets the
+ * id `${seriesId}#${index}` and remembers the series' own first dates, so editing it edits the whole series. An event whose
+ * rule is empty or unsupported is a single event.
+ */
+export const expandRepeatingEvent = (event: CalendarEvent, from: Date, to: Date): CalendarEvent[] => {
+  const rule = parseRule(event.recurrenceRule);
+  if (!rule) {
+    // a single event (the series was read whatever its dates): only if it overlaps the range
+    if (event.startDate.getTime() > to.getTime() || event.endDate.getTime() < from.getTime()) return [];
+    return [event.recurrenceRule ? { ...event, recurrenceRule: undefined } : event];
+  }
+  return expandOccurrences(event.startDate, event.endDate, rule, from, to, { allDay: event.isAllDay }).map((o) => ({
+    ...event,
+    id: `${event.id}#${o.index}`,
+    seriesId: event.id,
+    occurrenceIndex: o.index,
+    seriesStartDate: event.startDate,
+    seriesEndDate: event.endDate,
+    startDate: o.start,
+    endDate: o.end
+  }));
+};
+
+/** The stored row's id for an event id that may be an occurrence's (`${seriesId}#${index}`). */
+export const storedEventId = (id: string): string => (id.includes('#') ? id.slice(0, id.indexOf('#')) : id);
 
 export const calendarEventApi = {
   async getTimeline(
     targetType: CalendarTargetType,
     targetId: string,
     pageSize = 10,
-    offset = 0
+    offset = 0,
+    signal?: AbortSignal
   ): Promise<TimelineCalendarEventsWithTotal> {
-    const { data, error } = await supabase.rpc('get_timeline_calendar_events', {
+    const request = supabase.rpc('get_timeline_calendar_events', {
       p_target_type: targetType,
       p_target_id: targetId,
       p_page_size: pageSize,
       p_offset: offset
     });
+    const { data, error } = await (signal ? request.abortSignal(signal) : request);
     if (error) throw error;
 
     // events with a blocked guest are already left out (and not counted) by the function itself, before it paginates
@@ -834,6 +877,43 @@ export const calendarEventApi = {
     };
   },
 
+  /** The repeat rule and imported UID of stored events (the timeline response does not carry them), for .ics export. */
+  async getExportDetails(ids: string[], signal?: AbortSignal): Promise<Map<string, { recurrenceRule?: string; icalUid?: string }>> {
+    const out = new Map<string, { recurrenceRule?: string; icalUid?: string }>();
+    for (let i = 0; i < ids.length; i += GUEST_BATCH_SIZE) {
+      if (signal?.aborted) throw new Error('Aborted');
+      const query = supabase
+        .from('calendar_events')
+        .select('id, recurrence_rule, ical_uid')
+        .in('id', ids.slice(i, i + GUEST_BATCH_SIZE));
+      const { data, error } = await (signal ? query.abortSignal(signal) : query);
+      if (error) throw error;
+      for (const row of (data ?? []) as { id: string; recurrence_rule: string | null; ical_uid: string | null }[]) {
+        out.set(row.id, { recurrenceRule: row.recurrence_rule ?? undefined, icalUid: row.ical_uid ?? undefined });
+      }
+    }
+    return out;
+  },
+
+  /** Which of these .ics UIDs are already stored (so importing the same file twice skips them). */
+  async existingIcalUids(uids: string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+    const unique = [...new Set(uids.filter(Boolean))];
+    for (let i = 0; i < unique.length; i += GUEST_BATCH_SIZE) {
+      const { data, error } = await supabase.from('calendar_events').select('ical_uid').in('ical_uid', unique.slice(i, i + GUEST_BATCH_SIZE));
+      if (error) throw error;
+      for (const row of (data ?? []) as { ical_uid: string | null }[]) if (row.ical_uid) found.add(row.ical_uid);
+    }
+    return found;
+  },
+
+  /** Delete events that have no guests and no links (older than `olderThanHours`); returns how many were removed. */
+  async cleanOrphans(olderThanHours = 1): Promise<number> {
+    const { data, error } = await supabase.rpc('clean_orphan_calendar_events', { p_older_than: `${olderThanHours} hours` });
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
   async create(input: CreateCalendarEventInput): Promise<string> {
     // guests whose email is a contact's email are linked to that contact, and the event is linked to the contact too
     const attendees = await matchAttendeesToContacts(input.attendees);
@@ -850,7 +930,9 @@ export const calendarEventApi = {
         is_all_day: input.isFullDay,
         time_zone: resolveCalendarEventTimeZone(input.timeZone),
         visibility: input.visibility,
-        conference_link: input.conferenceLink || null
+        conference_link: input.conferenceLink || null,
+        ical_uid: input.icalUid || null,
+        recurrence_rule: input.recurrenceRule || null
       },
       p_participants: attendees.map(a => ({
         handle: a.handle,
@@ -872,7 +954,31 @@ export const calendarEventApi = {
       .or(`end_date.gte.${from.toISOString()},end_date.is.null`)
       .order('start_date');
     if (error) throw error;
-    const events = (data ?? []).map(mapCalendarEventFromDB);
+    // Repeating events are one row that starts early and may end early, so they are read whatever their own end date. They
+    // are read in pages of their own: a response is capped (max_rows), and old series must not push a current event out.
+    const recurring: Record<string, unknown>[] = [];
+    for (let page = 0; page < MAX_RECURRING_PAGES; page += 1) {
+      const { data: rows, error: recurringError } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .not('recurrence_rule', 'is', null)
+        .lte('start_date', to.toISOString())
+        .order('start_date')
+        .order('id') // a unique order, so pages never repeat or skip rows when start dates tie
+        .range(page * RECURRING_PAGE_SIZE, (page + 1) * RECURRING_PAGE_SIZE - 1);
+      if (recurringError) throw recurringError;
+      recurring.push(...((rows ?? []) as Record<string, unknown>[]));
+      if ((rows ?? []).length < RECURRING_PAGE_SIZE) break;
+      if (page === MAX_RECURRING_PAGES - 1) throw new Error('Too many repeating events to read the calendar completely');
+    }
+    const seen = new Set<string>();
+    const merged = [...((data ?? []) as Record<string, unknown>[]), ...recurring].filter((row) => {
+      const id = String(row.id);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const events = (merged as unknown as CalendarEventDB[]).map(mapCalendarEventFromDB);
     if (events.length === 0) return events;
 
     // guests live in their own table; load them so events opened from the calendar show who is invited
@@ -895,7 +1001,8 @@ export const calendarEventApi = {
     }
     const withGuests = events.map((e) => (byEvent.has(e.id) ? { ...e, participants: byEvent.get(e.id) } : e));
     const blocklist = await loadBlocklist();
-    return withGuests.filter((e) => !hasBlockedGuest((e.participants ?? []).map((p) => p.handle ?? ''), blocklist));
+    const visible = withGuests.filter((e) => !hasBlockedGuest((e.participants ?? []).map((p) => p.handle ?? ''), blocklist));
+    return visible.flatMap((e) => expandRepeatingEvent(e, from, to));
   },
 
   /** Link an existing event to a record (contact, deal or task). Linking twice is harmless. */
@@ -950,7 +1057,7 @@ export const calendarEventApi = {
     return Number(data ?? 0);
   },
 
-  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number }): Promise<CalendarEvent> {
+  async update(id: string, updates: { startDate?: Date; endDate?: Date; title?: string; location?: string; description?: string; isAllDay?: boolean; timeZone?: string; visibility?: CalendarChannelVisibility; conferenceLink?: string; position?: number; recurrenceRule?: string | null }): Promise<CalendarEvent> {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (updates.startDate) patch.start_date = updates.startDate.toISOString();
     if (updates.endDate) patch.end_date = updates.endDate.toISOString();
@@ -962,6 +1069,7 @@ export const calendarEventApi = {
     if (updates.visibility !== undefined) patch.visibility = updates.visibility;
     if (updates.position !== undefined) patch.position = updates.position;
     if (updates.conferenceLink !== undefined) patch.conference_link = updates.conferenceLink || null;
+    if (updates.recurrenceRule !== undefined) patch.recurrence_rule = updates.recurrenceRule || null;
     const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', id).select().single();
     if (error) throw error;
     return mapCalendarEventFromDB(data);
@@ -1082,7 +1190,7 @@ export type SampleDataIds = { [K in keyof SampleDataCounts]: string[] };
 
 // children before parents, so foreign keys never block a delete
 const SAMPLE_TABLES: [keyof SampleDataCounts, string][] = [
-  ['tasks', 'tasks'],
+  ['tasks', TASKS_TABLE],
   ['calendarEvents', 'calendar_events'],
   ['activities', 'activities'],
   ['deals', 'deals'],

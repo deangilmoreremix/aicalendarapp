@@ -263,10 +263,11 @@ const SYSTEM_DATE_FIELDS = new Set(['createdAt', 'updatedAt', 'completedAt']);
  * change a different field (due date / follow-up) from the one the card is positioned by.
  */
 export const canRescheduleRecord = (
-  record: Pick<UnifiedCalendarRecord, 'type'>,
+  record: Pick<UnifiedCalendarRecord, 'type'> & { raw?: unknown },
   fieldByType: Partial<Record<UnifiedRecordType, string>> = {}
 ): boolean => {
-  if (record.type === 'event') return true;
+  // one occurrence of a repeating event cannot be moved on its own (single-occurrence exceptions are not supported)
+  if (record.type === 'event') return !(record.raw as CalendarEvent | undefined)?.seriesId;
   return !SYSTEM_DATE_FIELDS.has(fieldByType[record.type] ?? DEFAULT_FIELD_BY_TYPE[record.type]);
 };
 

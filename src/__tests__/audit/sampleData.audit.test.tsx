@@ -46,7 +46,7 @@ const seed = () => {
   db.deleteError = null;
   db.log = [];
   db.tables = {
-    tasks: [{ id: 't-sample', is_sample: true }, { id: 't-real', is_sample: false }],
+    crm_tasks: [{ id: 't-sample', is_sample: true }, { id: 't-real', is_sample: false }],
     calendar_events: [{ id: 'e-sample', is_sample: true }],
     activities: [],
     deals: [{ id: 'd-real', is_sample: false }],
@@ -73,14 +73,14 @@ describe('sampleDataApi', () => {
     const ids = await sampleDataApi.deleteAll();
     expect(ids).toEqual({ tasks: ['t-sample'], calendarEvents: ['e-sample'], activities: [], contacts: ['c-sample'], deals: [] });
     expect(db.log.filter((l) => l.startsWith('delete')).every((l) => l.endsWith('is_sample=true'))).toBe(true);
-    expect(db.tables.tasks.map((r) => r.id)).toEqual(['t-real']);
+    expect(db.tables.crm_tasks.map((r) => r.id)).toEqual(['t-real']);
     expect(db.tables.deals.map((r) => r.id)).toEqual(['d-real']);
   });
 
   it('deletes children (tasks, events, activities) before deals and contacts', async () => {
     await sampleDataApi.deleteAll();
     const order = db.log.filter((l) => l.startsWith('delete')).map((l) => l.split(' ')[1]);
-    expect(order.indexOf('tasks')).toBeLessThan(order.indexOf('deals'));
+    expect(order.indexOf('crm_tasks')).toBeLessThan(order.indexOf('deals'));
     expect(order.indexOf('deals')).toBeLessThan(order.indexOf('contacts'));
   });
 
@@ -123,7 +123,7 @@ describe('DeleteMockDataDialog', () => {
   });
 
   it('is empty-state only (no delete button) when nothing is flagged', async () => {
-    db.tables = { tasks: [{ id: 't-real', is_sample: false }], calendar_events: [], activities: [], deals: [], contacts: [] };
+    db.tables = { crm_tasks: [{ id: 't-real', is_sample: false }], calendar_events: [], activities: [], deals: [], contacts: [] };
     useAppointmentStore.setState({ appointments: {} });
     render(<DeleteMockDataDialog isOpen onClose={vi.fn()} />);
     expect(await screen.findByText('No Sample Data Found')).toBeInTheDocument();

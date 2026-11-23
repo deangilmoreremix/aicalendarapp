@@ -5,7 +5,7 @@ declare
   t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'tasks', 'deals', 'contacts'] loop
+    foreach t in array array['calendar_events', 'calendar_event_participants', 'calendar_event_targets', 'crm_tasks', 'deals', 'contacts'] loop
       if to_regclass('public.' || t) is not null
          and not exists (
            select 1 from pg_publication_tables

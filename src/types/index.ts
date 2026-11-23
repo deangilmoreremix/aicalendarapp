@@ -88,6 +88,16 @@ export interface CalendarEvent {
   visibility?: 'SHARE_EVERYTHING' | 'METADATA';
   /** IANA zone the event was saved in; the editor keeps it unless the user changes it. */
   timeZone?: string;
+  /** RFC 5545 RRULE value when the event repeats (the stored row is the whole series). */
+  recurrenceRule?: string;
+  /** UID of the event in the .ics file it was imported from. */
+  icalUid?: string;
+  /** Set on one occurrence of a repeating event: the stored row's id (this object's id is `${seriesId}#${index}`). */
+  seriesId?: string;
+  occurrenceIndex?: number;
+  /** First occurrence's dates (an occurrence's own startDate/endDate are its own), so an editor edits the series, not one day. */
+  seriesStartDate?: Date;
+  seriesEndDate?: Date;
 }
 
 export interface Activity {

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Calendar import/export, repeating events, event cleaner, shared-project deploy
+- **.ics export** (calendar toolbar "Import / Export", and "Export" on a record's Calendar card): standard iCalendar file with times in UTC (or whole days), guests, and the repeat rule; a repeating event is written once.
+- **.ics import**: pick a file, see what it contains, import. Reads UTC, floating and TZID times, whole days, DURATION, guests and supported repeat rules; skips cancelled events and edited single occurrences of a series (with a message). `ical_uid` (new column, unique) makes importing the same file twice skip events already stored.
+- **Repeating events**: daily / weekly (days) / monthly / yearly with interval and an end (never, on a date, after N times), in the event editor. One stored row per series; the calendar shows each occurrence. Editing or deleting applies to the whole series; single occurrences cannot be dragged on their own (documented limit). Record timelines show the series once.
+- **Event cleaner**: Calendar Settings, "Clean up orphan events" removes events with no guests and no links (older than an hour) through `clean_orphan_calendar_events`.
+- **Shared Supabase project**: the task table is now `crm_tasks` (it clashed with a `tasks` table in a shared project); `20260111000000_app_grants.sql` grants the API roles access explicitly (projects with private-by-default tables need it). Migrations: `20260111` grants, `20260112` ical_uid + recurrence, `20260113` orphan cleaner (32 in total).
+- Fixed on the way: a `;` in an event title was not escaped in the .ics text (caught by lint, covered by a round-trip test).
+
 ### Calendar follow-ups (branch `claude/calendar-link-match-realtime`)
 - **Link an existing event** to a contact or deal from its Calendar card (`calendar_event_targets`, duplicates ignored).
 - **Guests matched to contacts by email** (case-insensitive): a new event links matching guests to the contact and the event to that contact; when a contact is created or its email changes, existing guests with that email are linked too. Ours (glue): Twenty's matcher runs inside its workspace-schema server code and is not portable.
