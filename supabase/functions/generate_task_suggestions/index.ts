@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth, type OpenAIAuth } from "../_shared/openai.ts";
 
 interface TaskSuggestion {
   id: string
@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json()
     const { prompt, context, stream } = body
+    const auth = readOpenAIAuth(req)
 
     // Input validation
     if (!prompt || typeof prompt !== 'string') {
@@ -47,10 +48,10 @@ Deno.serve(async (req) => {
     const sanitizedPrompt = prompt.replace(/[<>"'&]/g, '')
 
     if (stream) {
-      return handleStreamingResponse(prompt, context)
+      return handleStreamingResponse(prompt, context, auth)
     }
 
-    const suggestions = await generateTaskSuggestions(sanitizedPrompt, context)
+    const suggestions = await generateTaskSuggestions(sanitizedPrompt, context, auth)
 
     return new Response(JSON.stringify(suggestions), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -68,8 +69,8 @@ Deno.serve(async (req) => {
   }
 })
 
-async function generateTaskSuggestions(prompt: string, context?: any): Promise<TaskSuggestion[]> {
-  if (!hasOpenAIKey()) {
+async function generateTaskSuggestions(prompt: string, context?: any, auth?: OpenAIAuth): Promise<TaskSuggestion[]> {
+  if (!hasOpenAIKey(auth)) {
     return generateRuleBasedSuggestions(prompt, context)
   }
 
@@ -77,6 +78,7 @@ async function generateTaskSuggestions(prompt: string, context?: any): Promise<T
     const str = { type: 'string' }
     const num = { type: 'number' }
     const parsed = await callResponsesJson<{ suggestions: TaskSuggestion[] }>({
+          auth,
       instructions: `You analyze text prompts and generate structured task suggestions for a productivity app. Today is ${new Date().toISOString().split('T')[0]}.
 - Analyze urgency, complexity and type; suggest priority, due date (YYYY-MM-DD) and duration in minutes
 - Break complex tasks into logical subtasks and add relevant tags
@@ -255,8 +257,8 @@ function generateFallbackSuggestion(prompt: string): TaskSuggestion {
   }
 }
 
-async function handleStreamingResponse(sanitizedPrompt: string, context?: any) {
-  const suggestions = await generateTaskSuggestions(sanitizedPrompt, context)
+async function handleStreamingResponse(sanitizedPrompt: string, context?: any, auth?: OpenAIAuth) {
+  const suggestions = await generateTaskSuggestions(sanitizedPrompt, context, auth)
 
   return new Response(JSON.stringify(suggestions), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,16 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth, KEY_REQUIRED_MESSAGE, KEY_REQUIRED_CODE } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = readOpenAIAuth(req);
   try {
     const body = await req.json();
     const contact = body.contact;
     if (!contact || typeof contact !== "object") throw new Error("contact is required");
-    if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured", fallback: true }, 503);
+    if (!hasOpenAIKey(auth)) return json({ error: KEY_REQUIRED_MESSAGE, code: KEY_REQUIRED_CODE, fallback: true }, 503);
 
     const out = await callResponsesJson<{ score: number; reasoning: string; nextBestAction: string; fitScore: number; engagementScore: number; conversionProbability: number; urgencyScore: number }>({
+          auth,
       instructions:
         "You are a lead-scoring analyst. Score the contact 0-100 for sales potential based on seniority, company, engagement, source and social presence. " +
         "Also score fit, engagement, conversion probability and urgency (each 0-100), give a one-sentence reasoning and one concrete next best action. Base everything only on the data provided.",

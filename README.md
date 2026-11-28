@@ -42,5 +42,5 @@ Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANO
 
 ## Known limits
 - No sign-in: every table has open `anon, authenticated` policies (see `DEPLOY.md`, "Access model").
-- AI functions were tested against mocks; they need a live `OPENAI_API_KEY` smoke test after deploy.
+- AI functions were tested against mocks; they need a smoke test with a real key (added in Settings) after deploy. The app is bring-your-own-key: users add their own OpenAI key, kept only in their browser.
 - No email delivery, no Google/Microsoft calendar sync (outside the Netlify + Supabase + OpenAI stack).

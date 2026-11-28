@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
@@ -16,9 +17,10 @@ Deno.serve(async (req) => {
       throw new Error("attendee_ids must be a non-empty array");
     }
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const out = await callResponsesJson<{ times: string[] }>({
+          auth,
           instructions:
             `You are a scheduling assistant. Today is ${new Date().toISOString()}. Return exactly 3 ISO 8601 datetime strings: the best suggested meeting start times within the next 14 days during business hours.`,
           input: `Suggest ${duration}-minute meeting times for attendees ${JSON.stringify(attendeeIds)}.`,

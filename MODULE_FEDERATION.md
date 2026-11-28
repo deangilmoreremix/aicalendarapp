@@ -140,7 +140,7 @@ Make sure the following environment variables are set:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-# OpenAI is server-side only: set OPENAI_API_KEY (optionally OPENAI_MODEL, default gpt-6-astra, and OPENAI_IMAGE_MODEL, default gpt-image-2.6-flare) as Supabase Edge Function secrets.
+# OpenAI is bring-your-own-key: users add their own key in Settings (kept in their browser, sent in the x-openai-key header). Nothing OpenAI-related is set on Netlify or in Supabase secrets. Do not create VITE_OPENAI_API_KEY.
 ```
 
 ## Features Included

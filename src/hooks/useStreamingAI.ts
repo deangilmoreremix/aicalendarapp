@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { openaiHeaders } from '../lib/openaiKey';
 import { StreamingClient, StreamingOptions } from '../services/streamingClient';
 
 export interface StreamingAIOptions extends StreamingOptions {
@@ -91,6 +92,7 @@ export const useStreamingAI = () => {
           spec.buildBody(...(args as never[])),
           {
             headers: {
+              ...openaiHeaders(),
               apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },

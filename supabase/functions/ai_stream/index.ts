@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { hasOpenAIKey, streamResponses } from "../_shared/openai.ts";
+import { hasOpenAIKey, streamResponses, readOpenAIAuth, KEY_REQUIRED_MESSAGE, KEY_REQUIRED_CODE } from "../_shared/openai.ts";
 
 // Streams OpenAI Responses API output as SSE. body: { operation, ...params }
 const OPS: Record<string, (b: any) => { instructions: string; input: string; webSearch?: boolean }> = {
@@ -33,14 +33,16 @@ const OPS: Record<string, (b: any) => { instructions: string; input: string; web
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = readOpenAIAuth(req);
   try {
     const body = await req.json();
     const build = OPS[body.operation];
     if (!build) return json({ error: `Unknown operation: ${body.operation}` }, 400);
-    if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured" }, 503);
+    if (!hasOpenAIKey(auth)) return json({ error: KEY_REQUIRED_MESSAGE, code: KEY_REQUIRED_CODE }, 503);
     const spec = build(body);
     const stream = streamResponses({
       ...spec,
+      auth,
       effort: "low",
       maxOutputTokens: body.operation === "web-research" && body.depth === "comprehensive" ? 4000 : 2000,
     });

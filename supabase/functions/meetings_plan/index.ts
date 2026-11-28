@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponses, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponses, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
@@ -13,9 +14,10 @@ Deno.serve(async (req) => {
     const duration: number = Number(body.duration ?? 60);
     const topic: string = body.topic ?? "our meeting";
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const { text } = await callResponses({
+          auth,
           instructions: "You are a meeting planning assistant. Given attendees, duration and topic, return a short plain-text plan: objectives, agenda, and prep items. Respond with plain text only.",
           input: `Plan a ${duration}-minute meeting on "${topic}" with ${JSON.stringify(attendees)}.`,
           maxOutputTokens: 1500,

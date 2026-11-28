@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
@@ -16,9 +17,10 @@ Deno.serve(async (req) => {
       throw new Error("contact_id is required");
     }
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const out = await callResponsesJson<{ probability: number }>({
+          auth,
           instructions: "You are a sales forecasting model. Given a contact and a deal value, estimate the probability (0-100) that the deal closes successfully.",
           input: `Predict deal success probability for contact ${contactId} with deal value ${dealValue}.`,
           maxOutputTokens: 500,

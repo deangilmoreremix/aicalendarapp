@@ -77,7 +77,7 @@ Run on 5 views x desktop/mobile. Before -> after, per view (critical/serious/mod
   (1-2 per view) and `region` on the New Contact modal (13 nodes, dialog content outside landmarks).
 
 ## Needs your keys (cannot run here)
-- Deploy: `supabase link`, `supabase db push` (chain now applies), `supabase functions deploy`, `supabase secrets set OPENAI_API_KEY ...`.
+- Deploy: `supabase link`, `supabase db push` (chain now applies), `supabase functions deploy`. No OpenAI secret: bring-your-own-key (users add their key in Settings).
 - Smoke each AI function with a real key: `contacts_enrich` (web_search + strict JSON together), `contacts_score`, `contacts_image`
   (model `gpt-image-2.6-flare`, `avatars` bucket), `ai_stream` (SSE through Supabase), `research_web`, `generate_*`.
 - Confirm model IDs (`gpt-6-astra`, `gpt-image-2.6-flare`) accept the parameters sent (no temperature, `reasoning.effort`, `include` sources).

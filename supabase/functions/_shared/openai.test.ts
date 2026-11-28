@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildRequestBody, callResponses, callResponsesJson, extractCitations, extractText } from './openai.ts';
+import { buildRequestBody, callResponses, callResponsesJson, extractCitations, extractText, readOpenAIAuth } from './openai.ts';
+
+const auth = { apiKey: 'sk-test' };
 
 const g = globalThis as any;
 
@@ -29,7 +31,7 @@ describe('OpenAI Responses helper', () => {
 
   it('posts to /v1/responses with bearer auth and reads output_text', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(ok({ output_text: 'hello' }));
-    const { text } = await callResponses({ instructions: 'a', input: 'b', fetchImpl });
+    const { text } = await callResponses({ instructions: 'a', input: 'b', auth, fetchImpl });
     expect(text).toBe('hello');
     expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/responses');
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-test');
@@ -48,17 +50,45 @@ describe('OpenAI Responses helper', () => {
 
   it('parses JSON output', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(ok({ output_text: '{"a":1}' }));
-    expect(await callResponsesJson({ instructions: 'a', input: 'b', fetchImpl })).toEqual({ a: 1 });
+    expect(await callResponsesJson({ instructions: 'a', input: 'b', auth, fetchImpl })).toEqual({ a: 1 });
   });
 
   it('surfaces API errors instead of swallowing them', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
-    await expect(callResponses({ instructions: 'a', input: 'b', fetchImpl })).rejects.toThrow('bad key');
+    await expect(callResponses({ instructions: 'a', input: 'b', auth, fetchImpl })).rejects.toThrow('rejected your API key');
   });
 
-  it('throws when the key is missing', async () => {
-    g.Deno = { env: { get: () => undefined } };
-    await expect(callResponses({ instructions: 'a', input: 'b' })).rejects.toThrow('OPENAI_API_KEY');
+  it('throws when the caller sent no key, and never falls back to a server key', async () => {
+    g.Deno = { env: { get: (k: string) => (k === 'OPENAI_API_KEY' ? 'sk-server' : undefined) } };
+    const fetchImpl = vi.fn();
+    await expect(callResponses({ instructions: 'a', input: 'b', fetchImpl })).rejects.toThrow('OpenAI key required');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("uses the caller's key and model, not the server's", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(ok({ output_text: 'hi' }));
+    await callResponses({ instructions: 'a', input: 'b', auth: { apiKey: 'sk-user', model: 'gpt-x' }, fetchImpl });
+    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-user');
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).model).toBe('gpt-x');
+  });
+
+  it('never repeats the key in an error and says when OpenAI rejects it', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'Incorrect API key provided: sk-user' } }) });
+    const err = await callResponses({ instructions: 'a', input: 'b', auth: { apiKey: 'sk-user' }, fetchImpl }).catch((e) => e);
+    expect(String(err.message)).toMatch(/rejected your API key/);
+    expect(String(err.message)).not.toContain('sk-user');
+  });
+});
+
+describe('readOpenAIAuth', () => {
+  const req = (h: Record<string, string>) => new Request('http://x', { headers: h });
+  it('reads the key and model names from the headers', () => {
+    expect(readOpenAIAuth(req({ 'x-openai-key': ' sk-abc ', 'x-openai-model': 'm', 'x-openai-image-model': 'i' }))).toEqual({ apiKey: 'sk-abc', model: 'm', imageModel: 'i' });
+  });
+  it('ignores a missing, malformed or oversized key', () => {
+    expect(readOpenAIAuth(req({})).apiKey).toBeUndefined();
+    expect(readOpenAIAuth(req({ 'x-openai-key': 'not-a-key' })).apiKey).toBeUndefined();
+    expect(readOpenAIAuth(req({ 'x-openai-key': 'sk-' + 'a'.repeat(400) })).apiKey).toBeUndefined();
   });
 });
 
@@ -77,7 +107,7 @@ describe('OpenAI Images helper', () => {
 
   it('calls /v1/images/generations and decodes b64_json', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('abc') }] }) });
-    const out = await callImages({ prompt: 'p', fetchImpl: fetchImpl as any });
+    const out = await callImages({ prompt: 'p', auth, fetchImpl: fetchImpl as any });
     expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/generations');
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body).model).toBe('gpt-image-2.6-flare');
     expect(new TextDecoder().decode(out.bytes)).toBe('abc');
@@ -86,13 +116,13 @@ describe('OpenAI Images helper', () => {
 
   it('uses /v1/images/edits with reference images', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [{ b64_json: btoa('x') }] }) });
-    await callImages({ prompt: 'p', referenceImages: [{ bytes: new Uint8Array([1]), type: 'image/png', name: 'a.png' }], fetchImpl: fetchImpl as any });
+    await callImages({ prompt: 'p', auth, referenceImages: [{ bytes: new Uint8Array([1]), type: 'image/png', name: 'a.png' }], fetchImpl: fetchImpl as any });
     expect(fetchImpl.mock.calls[0][0]).toBe('https://api.openai.com/v1/images/edits');
   });
 
   it('surfaces image errors', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: { message: 'moderation_blocked' } }) });
-    await expect(callImages({ prompt: 'p', fetchImpl: fetchImpl as any })).rejects.toThrow('moderation_blocked');
+    await expect(callImages({ prompt: 'p', auth, fetchImpl: fetchImpl as any })).rejects.toThrow('moderation_blocked');
   });
 });
 
@@ -150,7 +180,7 @@ describe('streaming', () => {
     ];
     const body = new ReadableStream({ start(c) { events.forEach((e) => c.enqueue(new TextEncoder().encode(e))); c.close(); } });
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, body });
-    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', auth, fetchImpl: fetchImpl as any })).text();
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body).stream).toBe(true);
     expect(out).toContain('data: {"content":"Hel"}');
     expect(out).toContain('data: {"content":"lo"}');
@@ -162,7 +192,8 @@ describe('streaming', () => {
     const env: Record<string, string> = { OPENAI_API_KEY: 'sk-test' };
     (globalThis as any).Deno = { env: { get: (k: string) => env[k] } };
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
-    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', fetchImpl: fetchImpl as any })).text();
-    expect(out).toContain('"error":"bad key"');
+    const out = await new Response(streamResponses({ instructions: 'a', input: 'b', auth, fetchImpl: fetchImpl as any })).text();
+    expect(out).toContain('rejected your API key');
+    expect(out).not.toContain('sk-test');
   });
 });

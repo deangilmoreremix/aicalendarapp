@@ -25,11 +25,21 @@ const load = async (name: string): Promise<Handler> => {
   return captured;
 };
 
-const post = (body: unknown) => new Request('http://x/fn', { method: 'POST', body: JSON.stringify(body) });
+// BYOK: the caller's key travels in a header, never from the server environment
+let userKey: string | undefined;
+let userModel: string | undefined;
+const post = (body: unknown) =>
+  new Request('http://x/fn', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { ...(userKey ? { 'x-openai-key': userKey } : {}), ...(userModel ? { 'x-openai-model': userModel } : {}) }
+  });
 const openaiText = (text: string) => ({ ok: true, status: 200, json: async () => ({ output_text: text }) });
 const lastOpenAIBody = () => JSON.parse(fetchMock.mock.calls.at(-1)![1].body);
 
 beforeEach(() => {
+  userKey = undefined;
+  userModel = undefined;
   for (const k of Object.keys(env)) delete env[k];
   fetchMock.mockReset();
   (globalThis as any).fetch = fetchMock;
@@ -52,7 +62,7 @@ describe.each(ALL)('%s', (name) => {
   });
 });
 
-describe('fallbacks without OPENAI_API_KEY', () => {
+describe('fallbacks without a caller key', () => {
   it('email_compose returns a plain-text draft', async () => {
     handler = await load('email_compose');
     const body = await (await handler(post({ recipient: { firstName: 'Ada' }, context: 'Follow up' }))).json();
@@ -123,7 +133,7 @@ describe('fallbacks without OPENAI_API_KEY', () => {
 
 describe('validation', () => {
   beforeEach(() => {
-    env.OPENAI_API_KEY = 'sk-test';
+    userKey = 'sk-test';
   });
 
   it.each([
@@ -150,7 +160,7 @@ describe('validation', () => {
 
 describe('OpenAI Responses requests (with a key)', () => {
   beforeEach(() => {
-    env.OPENAI_API_KEY = 'sk-test';
+    userKey = 'sk-test';
   });
 
   it('predict_deal_success sends a strict json_schema request to /v1/responses and clamps the result', async () => {
@@ -166,8 +176,8 @@ describe('OpenAI Responses requests (with a key)', () => {
     expect(sent).not.toHaveProperty('messages');
   });
 
-  it('honours OPENAI_MODEL', async () => {
-    env.OPENAI_MODEL = 'gpt-custom';
+  it("honours the caller's model header", async () => {
+    userModel = 'gpt-custom';
     fetchMock.mockResolvedValue(openaiText('hello'));
     handler = await load('email_compose');
     await handler(post({ recipient: {}, context: 'x' }));
@@ -328,5 +338,31 @@ describe('generate_deal_suggestions', () => {
     expect(s.probability).toBeGreaterThanOrEqual(0);
     expect(s.probability).toBeLessThanOrEqual(100);
     expect(s.strategy.nextSteps.length).toBeGreaterThan(0);
+  });
+});
+
+describe('bring your own key', () => {
+  it('ignores a server-side key: without the caller header the function refuses with OPENAI_KEY_REQUIRED', async () => {
+    env.OPENAI_API_KEY = 'sk-server';
+    handler = await load('contacts_score');
+    const res = await handler(post({ contact: { name: 'Ada' } }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: 'OPENAI_KEY_REQUIRED', fallback: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards the caller's key to OpenAI and does not leak it in the response", async () => {
+    userKey = 'sk-user-123';
+    fetchMock.mockResolvedValue(openaiText(JSON.stringify({ score: 70, reasoning: 'r', nextBestAction: 'n', fitScore: 1, engagementScore: 2, conversionProbability: 3, urgencyScore: 4 })));
+    handler = await load('contacts_score');
+    const res = await handler(post({ contact: { name: 'Ada' } }));
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-user-123');
+    expect(await res.text()).not.toContain('sk-user-123');
+  });
+
+  it('CORS allows the key and model headers', async () => {
+    handler = await load('email_compose');
+    const res = await handler(new Request('http://x/fn', { method: 'OPTIONS' }));
+    expect(res.headers.get('Access-Control-Allow-Headers')?.toLowerCase()).toContain('x-openai-key');
   });
 });

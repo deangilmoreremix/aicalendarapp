@@ -18,10 +18,9 @@ Deploy with Netlify's Git integration, or `npx netlify deploy --prod --dir=dist`
 supabase link --project-ref <ref>
 supabase db push                 # tables, RLS, calendar_events, avatars storage bucket
 supabase functions deploy        # all functions in supabase/functions
-supabase secrets set OPENAI_API_KEY=... OPENAI_MODEL=gpt-6-astra OPENAI_IMAGE_MODEL=gpt-image-2.6-flare
 ```
 
-`OPENAI_MODEL` and `OPENAI_IMAGE_MODEL` are optional (defaults shown).
+**OpenAI is bring-your-own-key.** There is no server-side OpenAI secret to set. Each user adds their own key in Settings ("OpenAI key"); it is kept only in that browser and sent in the `x-openai-key` header (optionally `x-openai-model`, `x-openai-image-model`) with each AI request. The edge functions forward it to OpenAI and never store or log it, and they do not fall back to a server key. The default models are `gpt-6-astra` and `gpt-image-2.6-flare`; a user whose account uses other models sets them in the same card. Limits: the key is readable by anything running in the page, and without sign-in it does not follow the user to another device, so recommend a project-limited key with a spend cap.
 
 ## Edge functions
 | Function | OpenAI API | Used for |
@@ -69,9 +68,9 @@ The tasks table is named `crm_tasks` (it used to be `tasks`). If you already app
 
 ## Deploy checklist
 1. `supabase db push`, then `supabase migration list` and check the local and remote histories match (an existing project only applies the new ones), then `supabase functions deploy`.
-2. `supabase secrets set OPENAI_API_KEY=...` (and optionally `OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`).
+2. No OpenAI secret is needed (bring-your-own-key: users add their key in Settings).
 3. Netlify env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (+ `VITE_HOST_ORIGIN` if embedded); deploy.
-4. Smoke test with the live key: score and enrich a contact, draft an email, generate an avatar (file appears in `avatars`),
+4. Smoke test with a key added in Settings: score and enrich a contact, draft an email, generate an avatar (file appears in `avatars`),
    upload a file to a record (appears in `attachments`), drag a task on the calendar, save a view.
 5. Confirm the model ids exist on your account; override through the env vars if not.
 6. Flag demo rows with `scripts/mark-sample-data.sql` if you want "Delete mock data" to remove them.
@@ -82,4 +81,4 @@ The tasks table is named `crm_tasks` (it used to be `tasks`). If you already app
 before building). Vendored code lives in `src/vendor/twenty/`.
 
 ## Deployed to a shared Supabase project (notes)
-The calendar/CRM migrations (everything except `20251012*`) were applied to project `bzxohkrxcwodllketcpz` through the Supabase connector, so its migration history carries the connector's own version stamps: do not run `supabase db push` against it (use `supabase migration repair` first if you ever need to). The edge functions are deployed with the CLI: `supabase link --project-ref bzxohkrxcwodllketcpz && supabase functions deploy`, and `supabase secrets set OPENAI_API_KEY=...` only if the project does not already have one.
+The calendar/CRM migrations (everything except `20251012*`) were applied to project `bzxohkrxcwodllketcpz` through the Supabase connector, so its migration history carries the connector's own version stamps: do not run `supabase db push` against it (use `supabase migration repair` first if you ever need to). The edge functions are deployed with the CLI: `supabase link --project-ref bzxohkrxcwodllketcpz && supabase functions deploy`. No OpenAI secret is needed: the app is bring-your-own-key.

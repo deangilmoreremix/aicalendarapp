@@ -1,20 +1,22 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponses, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponses, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
     const recipient = body.recipient ?? {};
     const context: string = body.context ?? "";
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const { text } = await callResponses({
+          auth,
           instructions: "You are an email copywriting assistant. Given a recipient and context, compose a concise, professional, personalized email. Respond with plain text only (no subject line needed separately).",
           input: `Compose an email for ${JSON.stringify(recipient)}. Context: ${context}`,
           maxOutputTokens: 1500,

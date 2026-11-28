@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponses, callResponsesJsonWithData, hasOpenAIKey, extractSources } from "../_shared/openai.ts";
+import { callResponses, callResponsesJsonWithData, hasOpenAIKey, extractSources, readOpenAIAuth, KEY_REQUIRED_MESSAGE, KEY_REQUIRED_CODE } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
@@ -16,11 +17,12 @@ Deno.serve(async (req) => {
 
     if (body.format === "structured") {
       // Public-information enrichment using the OpenAI Responses API web_search tool.
-      if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured", fallback: true }, 503);
+      if (!hasOpenAIKey(auth)) return json({ error: KEY_REQUIRED_MESSAGE, code: KEY_REQUIRED_CODE, fallback: true }, 503);
       const nullableStr = { type: ["string", "null"] };
       const emailDomain = String(contact.email ?? "").split("@")[1]?.toLowerCase();
       try {
         const { value, data } = await callResponsesJsonWithData<Record<string, unknown>>({
+          auth,
           instructions:
             "You are a B2B contact enrichment assistant. Search the public web for professional information about the contact: " +
             "current job title, employer, industry, business location, official profile pages (LinkedIn, X/Twitter, Facebook, Instagram, personal or company website) and a short professional bio. " +
@@ -57,9 +59,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const { text } = await callResponses({
+          auth,
           instructions: "You are a B2B contact enrichment assistant. Given partial contact data, produce a concise professional enrichment summary (bio, likely company, suggested social profiles). Only state facts you are confident about; say when unknown. Respond with plain text only.",
           input: `Enrich this contact: ${JSON.stringify(contact)}`,
           maxOutputTokens: 1500,

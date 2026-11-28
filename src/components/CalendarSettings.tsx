@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Calendar, Settings, CheckCircle } from 'lucide-react';
+import { OpenAIKeySettings } from './OpenAIKeySettings';
 import { calendarEventApi, calendarBlocklistApi } from '../services/api';
 import { CalendarChannelVisibility } from '../vendor/twenty/calendar/shared/CalendarChannelVisibility';
 
@@ -304,6 +305,8 @@ export const CalendarSettings: React.FC = () => {
           {blockError && <p className="text-xs text-red-600">{blockError}</p>}
         </CardContent>
       </Card>
+
+      <OpenAIKeySettings />
 
       <Card>
         <CardHeader>

@@ -1,17 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callImages, hasOpenAIKey } from "../_shared/openai.ts";
+import { callImages, hasOpenAIKey, readOpenAIAuth, KEY_REQUIRED_MESSAGE, KEY_REQUIRED_CODE } from "../_shared/openai.ts";
 
 /** Generates a profile image with the OpenAI Images API and stores it in the Supabase `avatars` bucket. */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = readOpenAIAuth(req);
   try {
     const body = await req.json();
     const contact = body.contact ?? {};
     const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || contact.name;
     if (!name) throw new Error("contact name is required");
-    if (!hasOpenAIKey()) return json({ error: "OPENAI_API_KEY is not configured" }, 503);
+    if (!hasOpenAIKey(auth)) return json({ error: KEY_REQUIRED_MESSAGE, code: KEY_REQUIRED_CODE }, 503);
 
     const role = [contact.title, contact.company].filter(Boolean).join(" at ");
     const prompt =
@@ -19,6 +20,7 @@ Deno.serve(async (req) => {
       `Head-and-shoulders, soft neutral background, modern flat style, centered, no text, no logos.`;
 
     const image = await callImages({
+      auth,
       prompt,
       size: "1024x1024",
       quality: "medium",

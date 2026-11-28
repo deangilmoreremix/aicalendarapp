@@ -4,10 +4,12 @@ const invoke = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/supabase', () => ({ supabase: { functions: { invoke } } }));
 
 import { aiApi, clearContactScoreCache } from '../../services/api';
+import { saveOpenAIAuth } from '../../lib/openaiKey';
 
 const ok = { data: { score: 80, reasoning: 'r', nextBestAction: 'Call', fitScore: 1, engagementScore: 2, conversionProbability: 3, urgencyScore: 4 }, error: null };
 
 beforeEach(() => {
+  saveOpenAIAuth({ apiKey: 'sk-test-key-123456' });
   invoke.mockReset();
   clearContactScoreCache();
 });

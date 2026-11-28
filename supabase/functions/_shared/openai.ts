@@ -7,6 +7,35 @@ export const IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 export const DEFAULT_MODEL = "gpt-6-astra";
 export const DEFAULT_IMAGE_MODEL = "gpt-image-2.6-flare";
 
+/**
+ * Bring-your-own-key: the end user's OpenAI key (and optional model names) arrive per request in headers.
+ * There is no server-side fallback key, and the key is never stored or logged.
+ */
+export interface OpenAIAuth {
+  apiKey?: string;
+  model?: string;
+  imageModel?: string;
+}
+
+const MAX_HEADER = 300;
+const clean = (v: string | null): string | undefined => {
+  const t = (v ?? "").trim();
+  return t && t.length <= MAX_HEADER && !/[\s\r\n]/.test(t) ? t : undefined;
+};
+
+/** Reads the caller's OpenAI key and optional model names from the request headers. */
+export function readOpenAIAuth(req: Request): OpenAIAuth {
+  const apiKey = clean(req.headers.get("x-openai-key"));
+  return {
+    apiKey: apiKey && apiKey.startsWith("sk-") ? apiKey : undefined,
+    model: clean(req.headers.get("x-openai-model")),
+    imageModel: clean(req.headers.get("x-openai-image-model")),
+  };
+}
+
+export const KEY_REQUIRED_MESSAGE = "OpenAI key required: add your own key in Settings";
+export const KEY_REQUIRED_CODE = "OPENAI_KEY_REQUIRED";
+
 export type Effort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ResponsesOptions {
@@ -20,6 +49,8 @@ export interface ResponsesOptions {
   webSearch?: boolean | WebSearchOptions;
   /** "required" forces at least one search. */
   toolChoice?: "auto" | "required";
+  /** The caller's key and models (BYOK). */
+  auth?: OpenAIAuth;
   fetchImpl?: typeof fetch;
 }
 
@@ -37,8 +68,14 @@ export class OpenAIError extends Error {
   }
 }
 
-export function hasOpenAIKey(): boolean {
-  return Boolean(Deno.env.get("OPENAI_API_KEY"));
+export function hasOpenAIKey(auth?: OpenAIAuth): boolean {
+  return Boolean(auth?.apiKey);
+}
+
+/** OpenAI's own message can be about the key; never pass the key back, and make a rejected key clear. */
+function openAIFailure(data: any, status: number, what: string): OpenAIError {
+  if (status === 401) return new OpenAIError("OpenAI rejected your API key. Check the key in Settings.", 401);
+  return new OpenAIError(data?.error?.message ?? `${what} (${status})`, status);
 }
 
 export function buildRequestBody(opts: ResponsesOptions, model: string): Record<string, unknown> {
@@ -114,9 +151,9 @@ export function extractSources(data: any): { title: string; url: string }[] {
 }
 
 export async function callResponses(opts: ResponsesOptions): Promise<{ text: string; data: any }> {
-  const key = Deno.env.get("OPENAI_API_KEY");
-  if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
-  const model = Deno.env.get("OPENAI_MODEL") ?? DEFAULT_MODEL;
+  const key = opts.auth?.apiKey;
+  if (!key) throw new OpenAIError(KEY_REQUIRED_MESSAGE);
+  const model = opts.auth?.model ?? Deno.env.get("OPENAI_MODEL") ?? DEFAULT_MODEL;
   const res = await (opts.fetchImpl ?? fetch)(OPENAI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -124,7 +161,7 @@ export async function callResponses(opts: ResponsesOptions): Promise<{ text: str
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new OpenAIError(data?.error?.message ?? `OpenAI request failed (${res.status})`, res.status);
+    throw openAIFailure(data, res.status, "OpenAI request failed");
   }
   if (data?.status === "incomplete") {
     console.warn("OpenAI response incomplete:", data.incomplete_details);
@@ -159,6 +196,8 @@ export interface ImageOptions {
   safetyIdentifier?: string;
   /** Reference image(s) for /v1/images/edits. */
   referenceImages?: { bytes: Uint8Array; type: string; name: string }[];
+  /** The caller's key and models (BYOK). */
+  auth?: OpenAIAuth;
   fetchImpl?: typeof fetch;
 }
 
@@ -177,9 +216,9 @@ export function buildImageBody(opts: ImageOptions, model: string): Record<string
 
 /** Generate (or edit, when referenceImages is given) an image. Returns raw bytes. */
 export async function callImages(opts: ImageOptions): Promise<{ bytes: Uint8Array; contentType: string; revisedPrompt?: string }> {
-  const key = Deno.env.get("OPENAI_API_KEY");
-  if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
-  const model = Deno.env.get("OPENAI_IMAGE_MODEL") ?? DEFAULT_IMAGE_MODEL;
+  const key = opts.auth?.apiKey;
+  if (!key) throw new OpenAIError(KEY_REQUIRED_MESSAGE);
+  const model = opts.auth?.imageModel ?? Deno.env.get("OPENAI_IMAGE_MODEL") ?? DEFAULT_IMAGE_MODEL;
   const body = buildImageBody(opts, model);
   const doFetch = opts.fetchImpl ?? fetch;
 
@@ -199,7 +238,7 @@ export async function callImages(opts: ImageOptions): Promise<{ bytes: Uint8Arra
     });
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new OpenAIError(data?.error?.message ?? `OpenAI image request failed (${res.status})`, res.status);
+  if (!res.ok) throw openAIFailure(data, res.status, "OpenAI image request failed");
   const b64: string | undefined = data?.data?.[0]?.b64_json;
   if (!b64) throw new OpenAIError("OpenAI returned no image data");
   const bin = atob(b64);
@@ -228,8 +267,8 @@ export function parseSseData(block: string): any | null {
  *   data: {"done":true,"citations":[...]}  at the end, or {"error":"..."} on failure.
  */
 export function streamResponses(opts: ResponsesOptions): ReadableStream<Uint8Array> {
-  const key = Deno.env.get("OPENAI_API_KEY");
-  const model = Deno.env.get("OPENAI_MODEL") ?? DEFAULT_MODEL;
+  const key = opts.auth?.apiKey;
+  const model = opts.auth?.model ?? Deno.env.get("OPENAI_MODEL") ?? DEFAULT_MODEL;
   const enc = new TextEncoder();
   const send = (c: ReadableStreamDefaultController<Uint8Array>, obj: unknown) =>
     c.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
@@ -237,7 +276,7 @@ export function streamResponses(opts: ResponsesOptions): ReadableStream<Uint8Arr
   return new ReadableStream({
     async start(controller) {
       try {
-        if (!key) throw new OpenAIError("OPENAI_API_KEY is not configured");
+        if (!key) throw new OpenAIError(KEY_REQUIRED_MESSAGE);
         const res = await (opts.fetchImpl ?? fetch)(OPENAI_URL, {
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -245,7 +284,7 @@ export function streamResponses(opts: ResponsesOptions): ReadableStream<Uint8Arr
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => ({}));
-          throw new OpenAIError(data?.error?.message ?? `OpenAI request failed (${res.status})`, res.status);
+          throw openAIFailure(data, res.status, "OpenAI request failed");
         }
         const reader = res.body.getReader();
         const dec = new TextDecoder();

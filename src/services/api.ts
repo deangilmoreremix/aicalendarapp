@@ -1,3 +1,4 @@
+import { openaiHeaders } from '../lib/openaiKey';
 import { supabase } from '../lib/supabase';
 import type {
   TimelineCalendarEvent,
@@ -534,10 +535,25 @@ const contactScoreKey = (c: Partial<Contact>) =>
 /** Test helper: forget cached scores. */
 export const clearContactScoreCache = () => contactScoreCache.clear();
 
+/**
+ * Calls an OpenAI-backed edge function with the user's own key (bring-your-own-key). Without a saved key it fails
+ * before any request is made, so the user is told to add one instead of getting placeholder output.
+ */
+const invokeAI = async (name: string, options: { body: Record<string, unknown> }) => {
+  const result = await supabase.functions.invoke(name, { ...options, headers: openaiHeaders() });
+  if (result.error) {
+    // show the function's own message (for example "OpenAI rejected your API key") instead of a generic status error
+    const response = (result.error as { context?: Response }).context;
+    const body = await response?.clone?.().json?.().catch(() => null);
+    if (body && typeof body.error === 'string') throw new Error(body.error);
+  }
+  return result;
+};
+
 // AI API (Edge Functions)
 export const aiApi = {
   async enrichContact(contact: Partial<Contact>): Promise<ContactEnrichmentData> {
-    const { data, error } = await supabase.functions.invoke('contacts_enrich', {
+    const { data, error } = await invokeAI('contacts_enrich', {
       body: { contact, format: 'structured' }
     });
     if (error) throw error;
@@ -565,13 +581,13 @@ export const aiApi = {
   },
 
   async generateContactImage(contact: Partial<Contact>): Promise<string> {
-    const { data, error } = await supabase.functions.invoke('contacts_image', { body: { contact } });
+    const { data, error } = await invokeAI('contacts_image', { body: { contact } });
     if (error) throw error;
     return data.url as string;
   },
 
   async composeEmail(recipient: Partial<Contact>, context: string): Promise<string> {
-    const { data, error } = await supabase.functions.invoke('email_compose', { body: { recipient, context } });
+    const { data, error } = await invokeAI('email_compose', { body: { recipient, context } });
     if (error) throw error;
     return data.text;
   },
@@ -587,7 +603,7 @@ export const aiApi = {
     if (cached && Date.now() - cached.at < CONTACT_SCORE_TTL_MS) return cached.promise;
 
     const promise = (async () => {
-      const { data, error } = await supabase.functions.invoke('contacts_score', { body: { contact } });
+      const { data, error } = await invokeAI('contacts_score', { body: { contact } });
       if (error) throw error;
       return data as ContactScoreResult;
     })();
@@ -598,7 +614,7 @@ export const aiApi = {
   },
 
   async generateInsights(contacts: Contact[], extra: { deals?: Deal[]; tasks?: Task[] } = {}): Promise<AIInsight[]> {
-    const { data, error } = await supabase.functions.invoke('generate_ai_insights', {
+    const { data, error } = await invokeAI('generate_ai_insights', {
       body: { contacts, deals: extra.deals, tasks: extra.tasks }
     });
 
@@ -610,7 +626,7 @@ export const aiApi = {
   },
 
   async predictDealSuccess(contactId: string, dealValue: number): Promise<number> {
-    const { data, error } = await supabase.functions.invoke('predict_deal_success', {
+    const { data, error } = await invokeAI('predict_deal_success', {
       body: { contact_id: contactId, deal_value: dealValue }
     });
 
@@ -619,7 +635,7 @@ export const aiApi = {
   },
 
   async optimizeMeetingTime(attendeeIds: string[], duration: number): Promise<Date[]> {
-    const { data, error } = await supabase.functions.invoke('optimize_meeting_time', {
+    const { data, error } = await invokeAI('optimize_meeting_time', {
       body: { attendee_ids: attendeeIds, duration }
     });
 
@@ -628,7 +644,7 @@ export const aiApi = {
   },
 
   async generateMeetingAgenda(title: string, attendees: string[]): Promise<string[]> {
-    const { data, error } = await supabase.functions.invoke('generate_meeting_agenda', {
+    const { data, error } = await invokeAI('generate_meeting_agenda', {
       body: { title, attendees }
     });
 
@@ -637,7 +653,7 @@ export const aiApi = {
   },
 
   async generateTaskSuggestions(prompt: string, context?: Record<string, unknown>): Promise<TaskSuggestion[]> {
-    const { data, error } = await supabase.functions.invoke('generate_task_suggestions', {
+    const { data, error } = await invokeAI('generate_task_suggestions', {
       body: { prompt, context }
     });
 

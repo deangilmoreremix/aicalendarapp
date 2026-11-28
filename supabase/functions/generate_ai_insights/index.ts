@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 interface ContactInput {
   id?: string;
@@ -30,15 +30,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
     const contacts: ContactInput[] = body.contacts ?? [];
     const deals: unknown[] = (body.deals ?? []).slice(0, 50);
     const tasks: unknown[] = (body.tasks ?? []).slice(0, 50);
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const parsed = await callResponsesJson<{ insights: any[] }>({
+          auth,
           instructions: "You are a CRM analyst. Given contacts, deals and tasks, return the most valuable actionable insights grounded ONLY in the provided data (never invent companies, numbers or trends). Set category to the data the insight is about.",
           input: `Analyze this CRM data and surface the most valuable insights: ${JSON.stringify({ contacts, deals, tasks })}`,
           maxOutputTokens: 4000,

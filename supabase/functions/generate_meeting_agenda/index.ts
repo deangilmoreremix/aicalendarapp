@@ -1,20 +1,22 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { callResponsesJson, hasOpenAIKey } from "../_shared/openai.ts";
+import { callResponsesJson, hasOpenAIKey, readOpenAIAuth } from "../_shared/openai.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const auth = readOpenAIAuth(req);
 
   try {
     const body = await req.json();
     const title: string = body.title ?? "Meeting";
     const attendees: string[] = body.attendees ?? [];
 
-    if (hasOpenAIKey()) {
+    if (hasOpenAIKey(auth)) {
       try {
         const out = await callResponsesJson<{ items: string[] }>({
+          auth,
           instructions: "You are a meeting facilitator. Given a meeting title and attendees, return 5-7 short agenda item strings.",
           input: `Build an agenda for "${title}" with attendees ${JSON.stringify(attendees)}.`,
           maxOutputTokens: 1500,

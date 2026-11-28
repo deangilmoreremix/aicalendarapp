@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### OpenAI is bring-your-own-key
+- Each user adds their own OpenAI key in Settings ("OpenAI key"); it is kept only in their browser and sent in the `x-openai-key` header (optionally `x-openai-model`, `x-openai-image-model`). The edge functions forward it and never store, log or fall back to a server key, so there is no `OPENAI_API_KEY` secret to set. Without a key AI features are off and say so; OpenAI rejecting a key shows a clear message.
+
 ### Calendar import/export, repeating events, event cleaner, shared-project deploy
 - **.ics export** (calendar toolbar "Import / Export", and "Export" on a record's Calendar card): standard iCalendar file with times in UTC (or whole days), guests, and the repeat rule; a repeating event is written once.
 - **.ics import**: pick a file, see what it contains, import. Reads UTC, floating and TZID times, whole days, DURATION, guests and supported repeat rules; skips cancelled events and edited single occurrences of a series (with a message). `ical_uid` (new column, unique) makes importing the same file twice skip events already stored.
